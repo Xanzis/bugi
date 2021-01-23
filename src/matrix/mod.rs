@@ -2,6 +2,8 @@ use std::fmt;
 use std::ops::{Add, Mul};
 use crate::spatial::Point;
 
+pub mod inverse;
+
 // rolling my own (pretty limited) matrix math
 // standard order for shape is (row, col)
 // m[r][c] is stored at data[r*ncol + c]
@@ -77,21 +79,63 @@ impl Matrix {
 		}
 	}
 
-	// *****
-	// methods returning iterators over rows/columns
-
-	pub fn get_row(&self, i: usize) -> Option<MatrixRow> {
-		if i < self.nrow {
-			Some( MatrixRow {source: &self, row: i, pos: 0} )
-		}
-		else { None }
+	pub fn mutate<F>(&mut self, loc: (usize, usize), mut f: F) where F: FnMut(&mut f64) {
+		f(self.get_mut(loc).unwrap());
 	}
 
-	pub fn get_col(&self, i: usize) -> Option<MatrixCol> {
-		if i < self.ncol {
-			Some( MatrixCol {source: &self, col: i, pos: 0} )
+	// *****
+	// methods for manipulating rows/columns
+
+	pub fn row(&self, i: usize) -> MatrixRow {
+		if i < self.nrow {
+			return MatrixRow {source: &self, row: i, pos: 0}
 		}
-		else { None }
+		else { panic!("index out of bounds"); }
+	}
+
+	pub fn col(&self, i: usize) -> MatrixCol {
+		if i < self.ncol {
+			return MatrixCol {source: &self, col: i, pos: 0}
+		}
+		else { panic!("index out of bounds"); }
+	}
+
+	pub fn set_row(&mut self, i: usize, new: Vec<f64>) {
+		if new.len() != self.shape().1 { panic!("incompatible row length") }
+		for (c, val) in new.into_iter().enumerate() {
+			self.put((i, c), val);
+		}
+	}
+
+	pub fn set_col(&mut self, i: usize, new: Vec<f64>) {
+		if new.len() != self.shape().0 { panic!("incompatible column length") }
+		for (r, val) in new.into_iter().enumerate() {
+			self.put((r, i), val);
+		}
+	}
+
+	pub fn swap_rows(&mut self, i: usize, j: usize) {
+		let temp: Vec<f64> = self.row(j).cloned().collect();
+		self.set_row(j, self.row(i).cloned().collect());
+		self.set_row(i, temp);
+	}
+
+	pub fn swap_cols(&mut self, i: usize, j: usize) {
+		let temp: Vec<f64> = self.row(j).cloned().collect();
+		self.set_row(j, self.row(i).cloned().collect());
+		self.set_row(i, temp);
+	}
+
+	pub fn mutate_row<F>(&mut self, i:usize, mut f:F) where F: FnMut(&mut f64) {
+		for c in 0..self.ncol {
+			f(self.get_mut((i, c)).unwrap());
+		}
+	}
+
+	pub fn mutate_col<F>(&mut self, i:usize, mut f:F) where F: FnMut(&mut f64) {
+		for r in 0..self.nrow {
+			f(self.get_mut((r, i)).unwrap());
+		}
 	}
 
 	// *****
@@ -99,9 +143,7 @@ impl Matrix {
 
 	pub fn zeros(shape: (usize, usize)) -> Self {
 		let mut res = Matrix::init(shape);
-		for _ in 0..(res.nrow * res.ncol) {
-			res.data.push(0.0);
-		}
+		res.data.extend(vec![0.0; res.nrow * res.ncol]);
 		res
 	}
 
@@ -155,7 +197,7 @@ impl Matrix {
 	pub fn transpose(&self) -> Self {
 		let mut rows: Vec<Vec<f64>> = Vec::new();
 		for i in 0..self.ncol {
-			rows.push(self.get_col(i).unwrap().collect());
+			rows.push(self.col(i).cloned().collect());
 		}
 
 		Matrix::from_rows(rows)
@@ -181,8 +223,8 @@ impl<'a> Mul for &'a Matrix {
 
     	for r in 0..res_shape.0 {
     		for c in 0..res_shape.1 {
-    			let row = self.get_row(r).unwrap();
-    			let col = rhs.get_col(c).unwrap();
+    			let row = self.row(r);
+    			let col = rhs.col(c);
     			let dot = row.zip(col).map(|x| x.0 * x.1).sum();
     			res.data.push(dot);
     		}
@@ -212,25 +254,25 @@ impl<'a> Add for &'a Matrix {
 	}
 }
 
-impl Iterator for MatrixCol<'_> {
-    type Item = f64;
+impl<'a> Iterator for MatrixCol<'a> {
+    type Item = &'a f64;
     
-    fn next(&mut self) -> Option<f64> {
+    fn next(&mut self) -> Option<&'a f64> {
     	if self.pos >= self.source.nrow { return None }
         let loc = self.pos * self.source.ncol + self.col;
         self.pos += 1;
-        Some(self.source.data[loc])
+        self.source.data.get(loc)
     }
 }
 
-impl Iterator for MatrixRow<'_> {
-    type Item = f64;
+impl<'a> Iterator for MatrixRow<'a> {
+    type Item = &'a f64;
     
-    fn next(&mut self) -> Option<f64> {
+    fn next(&mut self) -> Option<&'a f64> {
     	if self.pos >= self.source.ncol { return None }
         let loc = self.row * self.source.ncol + self.pos;
         self.pos += 1;
-        Some(self.source.data[loc])
+        self.source.data.get(loc)
     }
 }
 
@@ -276,5 +318,23 @@ mod tests {
     	let a = a.transpose();
     	let b = Matrix::from_rows( vec![vec![1.0, 4.0], vec![2.0, 5.0], vec![3.0, 6.0]]);
     	assert_eq!(a, b);
+    }
+    #[test]
+    fn swaps() {
+    	let mut a = Matrix::from_rows( vec![vec![1.0, 2.0], vec![3.0, 4.0]] );
+    	let target_a = Matrix::from_rows( vec![vec![3.0, 4.0], vec![1.0, 2.0]] );
+    	a.swap_rows(0, 1);
+    	assert_eq!(a, target_a);
+    	let target_b = Matrix::from_rows( vec![vec![4.0, 3.0], vec![2.0, 2.0]] );
+    	a.swap_cols(0, 1);
+    	assert_eq!(a, target_b);
+    }
+    #[test]
+    fn solve_gauss() {
+    	let mut a = Matrix::from_rows( vec![vec![1.0, 2.0], vec![3.0, 4.0]] );
+    	let b = Matrix::from_rows( vec![vec![5.0], vec![6.0]]);
+
+    	let target_x = Matrix::from_rows( vec![vec![4.0], vec![4.5]] );
+    	assert_eq!(a.solve_gausselim(b), Ok(target_x));
     }
 }

@@ -150,8 +150,9 @@ fn project(points: Vec<Point>) -> Vec<(f64, f64)> {
 
 	let new_points = &r * &points;
 	// return the x and y coordinates of the new points by zipping the first two rows
-	new_points.get_row(0).unwrap()
-		.zip(new_points.get_row(1).unwrap())
+	new_points.row(0)
+		.cloned()
+		.zip(new_points.row(1).cloned())
 		.collect()
 }
 
