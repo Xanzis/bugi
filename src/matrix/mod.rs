@@ -1,10 +1,11 @@
 use std::fmt;
 use std::ops::{Add, Mul};
+use crate::spatial::Point;
 
 // rolling my own (pretty limited) matrix math
 // standard order for shape is (row, col)
 // m[r][c] is stored at data[r*ncol + c]
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Matrix {
 	nrow: usize,
 	ncol: usize,
@@ -25,10 +26,10 @@ struct MatrixCol<'a> {
 
 impl fmt::Display for Matrix {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "rows: {} cols: {}", self.nrow, self.ncol)?;
+        write!(f, "rows: {} cols: {}\n", self.nrow, self.ncol)?;
         for i in 0..self.nrow {
         	for j in 0..self.ncol {
-        		write!(f, "{:2.5} ", self.get((i, j)).unwrap())?;
+        		write!(f, "{:1.5} ", self.get((i, j)).unwrap())?;
         	}
         	write!(f, "\n")?;
         }
@@ -38,8 +39,7 @@ impl fmt::Display for Matrix {
 
 impl Matrix {
 	fn init(shape: (usize, usize)) -> Self {
-		let mut data = Vec::new();
-		data.reserve(shape.0 * shape.1);
+		let data = Vec::with_capacity(shape.0 * shape.1);
 		Matrix { nrow: shape.0, ncol: shape.1, data }
 	}
 
@@ -114,6 +114,51 @@ impl Matrix {
 			}
 		}
 		res
+	}
+
+	// *****
+	// methods for alternative matrix constructions
+
+	pub fn from_rows(rows: Vec<Vec<f64>>) -> Self {
+		let nrows = rows.len();
+		let ncols = rows[0].len();
+		let mut res = Matrix::init((nrows, ncols));
+		for r in rows.iter() {
+			if r.len() != ncols { panic!("inconsistent row lengths in Matrix::from_rows") }
+			res.data.extend(r);
+		}
+		res
+	}
+
+	pub fn from_points_row(points: Vec<Point>) -> Self {
+		// construct a matrix from a series of points as row vectors
+		let mut rows: Vec<Vec<f64>> = Vec::new();
+		let dim = points[0].dim();
+
+		for p in points.iter() {
+			if p.dim() != dim { panic!("inconsistent point dimensionalities in Matrix::from_points_row"); }
+			rows.push(p.clone().into());
+		}
+
+		Matrix::from_rows(rows)
+	}
+
+	pub fn add_block_below(&mut self, other: &Matrix) {
+		if self.ncol != other.ncol { panic!("inconsistent row lengths in Matrix::add_block_below"); }
+		self.nrow += other.nrow;
+		self.data.extend(other.data.clone());
+	}
+
+	// *****
+	// matrix transformation methods
+
+	pub fn tranpose(&self) -> Self {
+		let mut rows: Vec<Vec<f64>> = Vec::new();
+		for i in 0..self.ncol {
+			rows.push(self.get_col(i).unwrap().collect());
+		}
+
+		Matrix::from_rows(rows)
 	}
 }
 
@@ -191,8 +236,38 @@ impl Iterator for MatrixRow<'_> {
 
 #[cfg(test)]
 mod tests {
+	use super::Matrix;
     #[test]
-    fn sub_works() {
-        assert!(true);
+    fn zeros() {
+    	let target = Matrix::from_rows( vec![vec![0.0, 0.0]; 3] );
+        assert!(target == Matrix::zeros((3, 2)));
+    }
+    #[test]
+    fn eye() {
+    	let target = Matrix::from_rows( vec![vec![1.0, 0.0], vec![0.0, 1.0]] );
+    	assert!(target == Matrix::eye(2));
+    }
+    #[test]
+    fn matadd() {
+    	let a = Matrix::from_rows( vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 7.0]] );
+    	let b = Matrix::from_rows( vec![vec![4.0, 5.0, 6.0], vec![1.0, 2.0, 3.0]] );
+    	let sum = &a + &b;
+    	let target = Matrix::from_rows( vec![vec![5.0, 7.0, 9.0], vec![5.0, 7.0, 10.0]] );
+    	assert!(sum == target);
+    }
+    #[test]
+    fn matmul() {
+    	let a = Matrix::from_rows( vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 7.0]] );
+    	let b = Matrix::from_rows( vec![vec![4.0, 2.0, 2.0, 1.0], vec![1.0, 2.0, 1.0, 1.0], vec![1.0, 2.0, 1.0, 2.0]] );
+    	let target = Matrix::from_rows( vec![vec![9.0, 12.0, 7.0, 9.0], vec![28.0, 32.0, 20.0, 23.0]] );
+    	let prod = &a * &b;
+    	assert!(target == prod);
+    }
+    #[test]
+    fn disp() {
+    	let target = "rows: 1 cols: 2\n1.00000 2.00000 \n";
+    	let mat = Matrix::from_rows( vec![vec![1.0, 2.0]] );
+    	println!("{}", mat);
+    	assert!(format!("{}", mat) == target)
     }
 }
