@@ -12,13 +12,13 @@ pub struct Matrix {
 	data: Vec<f64>,
 }
 
-struct MatrixRow<'a> {
+pub struct MatrixRow<'a> {
 	source: &'a Matrix,
 	row: usize,
 	pos: usize,
 }
 
-struct MatrixCol<'a> {
+pub struct MatrixCol<'a> {
 	source: &'a Matrix,
 	col: usize,
 	pos: usize,
@@ -80,14 +80,14 @@ impl Matrix {
 	// *****
 	// methods returning iterators over rows/columns
 
-	fn get_row(&self, i: usize) -> Option<MatrixRow> {
+	pub fn get_row(&self, i: usize) -> Option<MatrixRow> {
 		if i < self.nrow {
 			Some( MatrixRow {source: &self, row: i, pos: 0} )
 		}
 		else { None }
 	}
 
-	fn get_col(&self, i: usize) -> Option<MatrixCol> {
+	pub fn get_col(&self, i: usize) -> Option<MatrixCol> {
 		if i < self.ncol {
 			Some( MatrixCol {source: &self, col: i, pos: 0} )
 		}
@@ -135,9 +135,9 @@ impl Matrix {
 		let mut rows: Vec<Vec<f64>> = Vec::new();
 		let dim = points[0].dim();
 
-		for p in points.iter() {
+		for p in points.into_iter() {
 			if p.dim() != dim { panic!("inconsistent point dimensionalities in Matrix::from_points_row"); }
-			rows.push(p.clone().into());
+			rows.push(p.into());
 		}
 
 		Matrix::from_rows(rows)
@@ -152,7 +152,7 @@ impl Matrix {
 	// *****
 	// matrix transformation methods
 
-	pub fn tranpose(&self) -> Self {
+	pub fn transpose(&self) -> Self {
 		let mut rows: Vec<Vec<f64>> = Vec::new();
 		for i in 0..self.ncol {
 			rows.push(self.get_col(i).unwrap().collect());
