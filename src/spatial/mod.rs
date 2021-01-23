@@ -59,6 +59,16 @@ impl TryFrom<Vec<f64>> for Point {
 	}
 }
 
+impl From<Point> for Vec<f64> {
+	fn from(x: Point) -> Self {
+		match x {
+			Point::One(x) => vec![x],
+			Point::Two(x, y) => vec![x, y],
+			Point::Thr(x, y, z) => vec![x, y, z],
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::Point;
