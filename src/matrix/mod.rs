@@ -240,12 +240,12 @@ mod tests {
     #[test]
     fn zeros() {
     	let target = Matrix::from_rows( vec![vec![0.0, 0.0]; 3] );
-        assert!(target == Matrix::zeros((3, 2)));
+        assert_eq!(target, Matrix::zeros((3, 2)));
     }
     #[test]
     fn eye() {
     	let target = Matrix::from_rows( vec![vec![1.0, 0.0], vec![0.0, 1.0]] );
-    	assert!(target == Matrix::eye(2));
+    	assert_eq!(target, Matrix::eye(2));
     }
     #[test]
     fn matadd() {
@@ -253,7 +253,7 @@ mod tests {
     	let b = Matrix::from_rows( vec![vec![4.0, 5.0, 6.0], vec![1.0, 2.0, 3.0]] );
     	let sum = &a + &b;
     	let target = Matrix::from_rows( vec![vec![5.0, 7.0, 9.0], vec![5.0, 7.0, 10.0]] );
-    	assert!(sum == target);
+    	assert_eq!(sum, target);
     }
     #[test]
     fn matmul() {
@@ -261,13 +261,20 @@ mod tests {
     	let b = Matrix::from_rows( vec![vec![4.0, 2.0, 2.0, 1.0], vec![1.0, 2.0, 1.0, 1.0], vec![1.0, 2.0, 1.0, 2.0]] );
     	let target = Matrix::from_rows( vec![vec![9.0, 12.0, 7.0, 9.0], vec![28.0, 32.0, 20.0, 23.0]] );
     	let prod = &a * &b;
-    	assert!(target == prod);
+    	assert_eq!(target, prod);
     }
     #[test]
     fn disp() {
     	let target = "rows: 1 cols: 2\n1.00000 2.00000 \n";
     	let mat = Matrix::from_rows( vec![vec![1.0, 2.0]] );
     	println!("{}", mat);
-    	assert!(format!("{}", mat) == target)
+    	assert_eq!(format!("{}", mat), target)
+    }
+    #[test]
+    fn transpose() {
+    	let a = Matrix::from_rows( vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]] );
+    	let a = a.transpose();
+    	let b = Matrix::from_rows( vec![vec![1.0, 4.0], vec![2.0, 5.0], vec![3.0, 6.0]]);
+    	assert_eq!(a, b);
     }
 }
