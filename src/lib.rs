@@ -1,3 +1,6 @@
+mod matrix;
+mod spatial;
+
 #[cfg(test)]
 mod tests {
     #[test]
