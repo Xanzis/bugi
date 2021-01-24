@@ -15,7 +15,7 @@ impl Matrix {
 		for col in 0..dim {
 			// find the row with the greatest value in the current column
 			// (after finished rows)
-			let max = self.col(col).skip(col).enumerate()
+			let max = self.col(col).enumerate().skip(col)
 				.max_by( |(_, &x), (_, y)| x.partial_cmp(y).unwrap() );
 			if max == None { return Err(format!("solve error 1")) }
 			let (max_idx, _) = max.unwrap();
@@ -36,18 +36,19 @@ impl Matrix {
 					let to_subtract = self.get((col, i)).unwrap() * scaling;
 					self.mutate((row, i), |x| *x -= to_subtract);
 				}
-				let to_subtract = b.get((col, 1)).unwrap() * scaling;
-				b.mutate((row, 1), |x| *x -= to_subtract);
+				let to_subtract = b.get((col, 0)).unwrap() * scaling;
+				b.mutate((row, 0), |x| *x -= to_subtract);
 			}
 		}
-
+		
 		//backsubstitute triangularized matrix
 		for row in (0..dim).rev() {
 			let mut temp = 0.0;
 			for j in (row+1)..dim {
-				temp += self.get((row, j)).unwrap();
+				temp += self.get((row, j)).unwrap() * x.get((j, 0)).unwrap();
 			}
-			x.put((row, 1), b.get((row, 1)).unwrap() - temp);
+			println!("{:?}", temp);
+			x.put((row, 0), b.get((row, 0)).unwrap() - temp);
 		}
 
 		Ok(x)

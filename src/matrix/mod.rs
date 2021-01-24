@@ -1,8 +1,9 @@
 use std::fmt;
-use std::ops::{Add, Mul};
+use std::ops::{Add, Mul, Sub};
 use crate::spatial::Point;
 
 pub mod inverse;
+pub mod norm;
 
 // rolling my own (pretty limited) matrix math
 // standard order for shape is (row, col)
@@ -121,9 +122,9 @@ impl Matrix {
 	}
 
 	pub fn swap_cols(&mut self, i: usize, j: usize) {
-		let temp: Vec<f64> = self.row(j).cloned().collect();
-		self.set_row(j, self.row(i).cloned().collect());
-		self.set_row(i, temp);
+		let temp: Vec<f64> = self.col(j).cloned().collect();
+		self.set_col(j, self.col(i).cloned().collect());
+		self.set_col(i, temp);
 	}
 
 	pub fn mutate_row<F>(&mut self, i:usize, mut f:F) where F: FnMut(&mut f64) {
@@ -237,19 +238,26 @@ impl<'a> Add for &'a Matrix {
 	type Output = Matrix;
 
 	fn add(self, rhs: Self) -> Self::Output {
-		let a_shape = self.shape();
-    	let b_shape = rhs.shape();
-
-    	if (a_shape.0 != b_shape.0) || (a_shape.1 != b_shape.1) {
-    		panic!("improper shapes for matrix addition: {:?} and {:?}", a_shape, b_shape)
+    	if self.shape() != rhs.shape() {
+    		panic!("improper shapes for matrix addition: {:?} and {:?}", self.shape(), rhs.shape())
     	}
 
-    	let res_shape = (a_shape.0, a_shape.1);
-    	let mut res = Matrix::init(res_shape);
-    	res.data.extend(
-    		self.data.iter()
-    		.zip(rhs.data.iter())
-    		.map(|x| x.0 + x.1));
+    	let mut res = Matrix::init(self.shape());
+    	res.data.extend(self.data.iter().zip(rhs.data.iter()).map(|x| x.0 + x.1));
+    	res
+	}
+}
+
+impl<'a> Sub for &'a Matrix {
+	type Output = Matrix;
+
+	fn sub(self, rhs: Self) -> Self::Output {
+    	if self.shape() != rhs.shape() {
+    		panic!("improper shapes for matrix subtraction: {:?} and {:?}", self.shape(), rhs.shape())
+    	}
+
+    	let mut res = Matrix::init(self.shape());
+    	res.data.extend(self.data.iter().zip(rhs.data.iter()).map(|x| x.0 - x.1));
     	res
 	}
 }
@@ -325,16 +333,19 @@ mod tests {
     	let target_a = Matrix::from_rows( vec![vec![3.0, 4.0], vec![1.0, 2.0]] );
     	a.swap_rows(0, 1);
     	assert_eq!(a, target_a);
-    	let target_b = Matrix::from_rows( vec![vec![4.0, 3.0], vec![2.0, 2.0]] );
+    	let target_b = Matrix::from_rows( vec![vec![4.0, 3.0], vec![2.0, 1.0]] );
     	a.swap_cols(0, 1);
     	assert_eq!(a, target_b);
     }
     #[test]
     fn solve_gauss() {
     	let mut a = Matrix::from_rows( vec![vec![1.0, 2.0], vec![3.0, 4.0]] );
+    	let a_backup = a.clone();
     	let b = Matrix::from_rows( vec![vec![5.0], vec![6.0]]);
 
-    	let target_x = Matrix::from_rows( vec![vec![4.0], vec![4.5]] );
-    	assert_eq!(a.solve_gausselim(b), Ok(target_x));
+    	let x = a.solve_gausselim(b).unwrap();
+
+    	let target_x = Matrix::from_rows( vec![vec![-4.0], vec![4.5]] );
+    	assert!((&x - &target_x).frobenius() < 1e-10);
     }
 }
