@@ -1,6 +1,6 @@
 mod matrix;
 mod spatial;
-mod visual;
+pub mod visual;
 
 #[cfg(test)]
 mod tests {

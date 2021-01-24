@@ -394,7 +394,6 @@ mod tests {
     #[test]
     fn solve_gauss() {
         let mut a = Matrix::from_rows(vec![vec![1.0, 2.0], vec![3.0, 4.0]]);
-        let a_backup = a.clone();
         let b = Matrix::from_rows(vec![vec![5.0], vec![6.0]]);
 
         let x = a.solve_gausselim(b).unwrap();

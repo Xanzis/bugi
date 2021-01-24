@@ -8,7 +8,7 @@ mod bresenham;
 const IMG_SIZE: u32 = 64;
 
 // big ol' struct with all the stuff we're gonna need
-struct Assemblage {
+pub struct Assemblage {
     dim: usize,
     points: Vec<Point>,
     proj_points: Option<Vec<(f64, f64)>>,
@@ -101,7 +101,7 @@ impl Assemblage {
         }
     }
 
-    fn draw(&mut self, fileloc: &str) {
+    pub fn draw(&mut self, fileloc: &str) {
         if self.pix_points == None {
             if self.proj_points == None {
                 self.project();

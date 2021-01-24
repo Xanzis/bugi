@@ -1,5 +1,3 @@
-use std::ops::Sub;
-
 pub fn line_unsigned(orig: &(u32, u32), end: &(u32, u32)) -> Vec<(u32, u32)> {
     let orig = (orig.0 as isize, orig.1 as isize);
     let end = (end.0 as isize, end.1 as isize);
