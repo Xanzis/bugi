@@ -3,6 +3,8 @@ use crate::matrix::Matrix;
 
 use image::{RgbImage, Rgb};
 
+mod bresenham;
+
 const IMG_SIZE: u32 = 64;
 
 // big ol' struct with all the stuff we're gonna need
@@ -11,7 +13,7 @@ struct Assemblage {
 	points: Vec<Point>,
 	proj_points: Option<Vec<(f64, f64)>>,
 	pix_points: Option<Vec<(u32, u32)>>,
-	edges: Option<Vec<usize>>,
+	edges: Option<Vec<(usize, usize)>>,
 }
 
 impl Assemblage {
@@ -103,6 +105,17 @@ impl Assemblage {
 		}
 		let mut img = RgbImage::new(IMG_SIZE, IMG_SIZE);
 
+		// draw lines
+		if let Some(edges) = &self.edges {
+			for e in edges.iter() {
+				let orig = self.pix_points.as_ref().unwrap().get(e.0);
+				let end = self.pix_points.as_ref().unwrap().get(e.1);
+				if (orig == None) || (end == None) { continue }
+				let to_draw = bresenham::line_unsigned(orig.unwrap(), end.unwrap());
+				for d in to_draw { img.put_pixel(d.0, d.1, Rgb([0, 255, 0])) }
+			}
+		}
+
 		// draw points -- TODO draw thicker points
 		for (x, y) in self.pix_points.as_ref().unwrap().iter().cloned() {
 			img.put_pixel(x, y, Rgb([255, 0, 0]));
@@ -176,6 +189,7 @@ mod tests {
     	let mut asm: Assemblage = vec![
     		Point::Thr(-1.0, 1.0, 1.0), Point::Thr(1.0, 1.0, 1.0), Point::Thr(1.0, -1.0, 1.0), Point::Thr(-1.0, -1.0, 1.0),
     		Point::Thr(-1.0, 1.0, -1.0), Point::Thr(1.0, 1.0, -1.0), Point::Thr(1.0, -1.0, -1.0), Point::Thr(-1.0, -1.0, -1.0)].into();
+    	asm.edges = Some(vec![(0, 1), (1, 2), (2, 3), (3, 0), (4, 5), (5, 6), (6, 7), (7, 4), (0, 4), (1, 5), (2, 6), (3, 7)]);
     	asm.draw("test_generated/three.png");
     }
 }
