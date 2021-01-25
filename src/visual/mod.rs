@@ -1,4 +1,4 @@
-use crate::matrix::{Matrix, MatrixData};
+use crate::matrix::LinearMatrix;
 use crate::spatial::Point;
 
 use image::{Rgb, RgbImage};
@@ -150,20 +150,20 @@ impl From<Vec<Point>> for Assemblage {
     }
 }
 
-fn rotation_matrix<T: MatrixData>(x_ang: f64, y_ang: f64) -> Matrix<T> {
+fn rotation_matrix(x_ang: f64, y_ang: f64) -> LinearMatrix {
     let sin_xa = x_ang.sin();
     let cos_xa = x_ang.cos();
 
     let sin_ya = y_ang.sin();
     let cos_ya = y_ang.cos();
 
-    let a = Matrix::from_rows(vec![
+    let a = LinearMatrix::from_rows(vec![
         vec![1.0, 0.0, 0.0],
         vec![0.0, cos_xa, -sin_xa],
         vec![0.0, sin_xa, cos_xa],
     ]);
 
-    let b = Matrix::from_rows(vec![
+    let b = LinearMatrix::from_rows(vec![
         vec![cos_ya, 0.0, sin_ya],
         vec![0.0, 1.0, 0.0],
         vec![-sin_ya, 0.0, cos_ya],
@@ -176,8 +176,8 @@ fn project(points: Vec<Point>) -> Vec<(f64, f64)> {
     // compute a parallel projection at a slightly interesting angle
     let r = rotation_matrix(0.79, 0.5);
 
-    let points = Matrix::from_points_row(points);
-    let points = points.transpose();
+    let mut points = LinearMatrix::from_points_row(points);
+    points.transpose();
     if points.shape().0 != 3 {
         panic!("bad dimension count in visual::project");
     }

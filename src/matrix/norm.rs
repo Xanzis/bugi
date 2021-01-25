@@ -12,8 +12,7 @@ impl<T> Norm<T> for T
     fn frobenius(&self) -> f64 {
         // compute the frobenius norm
         let sum: f64 = self
-            .data
-            .iter()
+            .flat()
             .map(|x| (x.clone(), x.clone()))
             .map(|(x, y)| x * y)
             .sum();

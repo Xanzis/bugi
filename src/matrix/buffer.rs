@@ -1,11 +1,232 @@
-use super::{MatrixData, MatrixShape};
+use super::{MatrixShape};
 use std::cmp::PartialEq;
 use std::ops::{Add, Mul, Sub};
 
-pub enum Buffer {
-    Linear(LinearBuffer),
+pub trait MatrixData
+    where Self: Sized + Clone
+{
+    // basic required methods
+    fn shape(&self) -> (usize, usize);
+    fn get(&self, loc: (usize, usize)) -> Option<&f64>;
+    fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64>;
+    fn transpose(&mut self);
+    fn zeros(shape: MatrixShape) -> Self;
+    fn from_flat(shape: MatrixShape, data: Vec<f64>) -> Self;
+
+    // provided methods
+
+    fn put(&mut self, loc:(usize, usize), val: f64) {
+        if let Some(x) = self.get_mut(loc) {
+            *x = val;
+        }
+    }
+
+    fn mutate<F>(&mut self, loc: (usize, usize), mut f: F)
+    where
+        F: FnMut(&mut f64),
+    {
+        if let Some(x) = self.get_mut(loc) { f(x); }
+    }
+
+    fn add(&mut self, other: &Self) {
+        if self.shape() != other.shape() {
+            panic!("bad shapes: {:?}, {:?}", self.shape(), other.shape());
+        }
+        for r in 0..self.shape().0 {
+            for c in 0..self.shape().1 {
+                let y = other.get((r, c)).unwrap();
+                self.mutate((r, c), |x| *x += y);
+            }
+        }
+    }
+
+    fn sub(&mut self, other: &Self) {
+        if self.shape() != other.shape() {
+            panic!("bad shapes: {:?}, {:?}", self.shape(), other.shape());
+        }
+        for r in 0..self.shape().0 {
+            for c in 0..self.shape().1 {
+                let y = other.get((r, c)).unwrap();
+                self.mutate((r, c), |x| *x -= y);
+            }
+        }
+    }
+
+    fn mul(&self, other: &Self) -> Self {
+        let a_shape = self.shape();
+        let b_shape = other.shape();
+
+        if a_shape.1 != b_shape.0 {
+            panic!(
+                "improper shapes for matrix multiplication: {:?} and {:?}",
+                a_shape, b_shape
+            )
+        }
+
+        let res_shape = (a_shape.0, b_shape.1);
+        let mut res_vals = Vec::with_capacity(res_shape.0 * res_shape.1);
+
+        for r in 0..res_shape.0 {
+            for c in 0..res_shape.1 {
+                let dot = self.row(r)
+                    .zip(other.col(c))
+                    .map(|x| x.0 * x.1).sum();
+                res_vals.push(dot);
+            }
+        }
+        Self::from_flat(res_shape.into(), res_vals)
+    }
+
+    // *****
+    // methods for manipulating rows/columns
+
+    fn row(&self, i: usize) -> MatrixRow<Self> {
+        if i < self.shape().0 {
+            return MatrixRow { source: &self, row: i, pos: 0 };
+        }
+        else { panic!("index out of bounds") }
+    }
+
+    fn col(&self, i: usize) -> MatrixCol<Self> {
+        if i < self.shape().1 {
+            return MatrixCol { source: &self, col: i, pos: 0 };
+        }
+        else { panic!("index out of bounds") }
+    }
+
+    fn flat(&self) -> MatrixAll<Self> {
+        // visit all of the matrix elements in row-major order
+        MatrixAll::new(&self)
+    }
+
+    fn set_row(&mut self, i: usize, new: Vec<f64>) {
+        if new.len() != self.shape().1 { panic!("incompatible row length") }
+        for (c, val) in new.into_iter().enumerate() {
+            self.put((i, c), val);
+        }
+    }
+
+    fn set_col(&mut self, i: usize, new: Vec<f64>) {
+        if new.len() != self.shape().0 { panic!("incompatible column length") }
+        for (r, val) in new.into_iter().enumerate() {
+            self.put((r, i), val);
+        }
+    }
+
+    fn swap_rows(&mut self, i: usize, j: usize) {
+        let temp: Vec<f64> = self.row(j).cloned().collect();
+        self.set_row(j, self.row(i).cloned().collect());
+        self.set_row(i, temp);
+    }
+
+    fn swap_cols(&mut self, i: usize, j: usize) {
+        let temp: Vec<f64> = self.col(j).cloned().collect();
+        self.set_col(j, self.col(i).cloned().collect());
+        self.set_col(i, temp);
+    }
+
+    fn mutate_row<F>(&mut self, i: usize, mut f: F)
+    where
+        F: FnMut(&mut f64),
+    {
+        for c in 0..self.shape().1 {
+            f(self.get_mut((i, c)).unwrap());
+        }
+    }
+
+    fn mutate_col<F>(&mut self, i: usize, mut f: F)
+    where
+        F: FnMut(&mut f64),
+    {
+        for r in 0..self.shape().0 {
+            f(self.get_mut((r, i)).unwrap());
+        }
+    }
+
+    // *****
+    // matrix initialization methods
+
+    fn eye(dim: usize) -> Self {
+        let mut res = Self::zeros((dim, dim).into());
+        // this is the naive way - this can certainly be done faster
+        for i in 0..dim { res.put((i, i), 1.0); }
+        res
+    }
 }
 
+pub struct MatrixRow<'a, T>
+    where T: MatrixData
+{
+    source: &'a T,
+    row: usize,
+    pos: usize,
+}
+
+pub struct MatrixCol<'a, T>
+    where T: MatrixData
+{
+    source: &'a T,
+    col: usize,
+    pos: usize,
+}
+
+pub struct MatrixAll<'a, T>
+    where T: MatrixData
+{
+    source: &'a T,
+    row_pos: usize,
+    col_pos: usize,
+}
+
+impl<'a, T> Iterator for MatrixCol<'a, T>
+    where T: MatrixData
+{
+    type Item = &'a f64;
+
+    fn next(&mut self) -> Option<&'a f64> {
+        let loc = self.pos;
+        self.pos += 1;
+        self.source.get((loc, self.col))
+    }
+}
+
+impl<'a, T> Iterator for MatrixRow<'a, T>
+    where T: MatrixData
+{
+    type Item = &'a f64;
+
+    fn next(&mut self) -> Option<&'a f64> {
+        let loc = self.pos;
+        self.pos += 1;
+        self.source.get((self.row, loc))
+    }
+}
+
+impl<'a, T> Iterator for MatrixAll<'a, T>
+    where T: MatrixData
+{
+    type Item = &'a f64;
+
+    fn next(&mut self) -> Option<&'a f64> {
+        let x = self.source.get((self.row_pos, self.col_pos));
+        self.row_pos += 1;
+        if self.row_pos >= self.source.shape().1 {
+            self.row_pos = 0;
+            self.col_pos += 1;
+        }
+        x
+    }
+}
+
+impl<'a, T> MatrixAll<'a, T>
+    where T: MatrixData
+{
+    fn new(source: &'a T) -> Self {
+        MatrixAll{ source, row_pos: 0, col_pos: 0 }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct LinearBuffer {
     dims: (usize, usize),
     row_maj: bool,
@@ -52,85 +273,9 @@ impl MatrixData for LinearBuffer {
         // turn a row-major vector of values into a matrix
         let dims = (shape.nrow, shape.ncol);
         if (dims.0 * dims.1) != data.len() {
-            panic!("bad shape {} for data length {}", dims, data.len())
+            panic!("bad shape {:?} for data length {}", dims, data.len())
         }
         LinearBuffer{ dims, row_maj: true, data }
-    }
-}
-
-impl Mul<&LinearBuffer> for &LinearBuffer{
-    type Output = LinearBuffer;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        let a_shape = self.shape();
-        let b_shape = rhs.shape();
-
-        if a_shape.1 != b_shape.0 {
-            panic!(
-                "improper shapes for matrix multiplication: {:?} and {:?}",
-                a_shape, b_shape
-            )
-        }
-
-        let res_shape = (a_shape.0, b_shape.1);
-        let mut res_vals = Vec::reserve(res_shape.0 * res_shape.1);
-
-        for r in 0..res_shape.0 {
-            for c in 0..res_shape.1 {
-                let dot = self.row(r)
-                    .zip(rhs.col(c))
-                    .map(|x| x.0 * x.1).sum();
-                res_vals.push(dot);
-            }
-        }
-        Self::Output::from_flat(res_shape.into(), res_vals);
-    }
-}
-
-impl Add<&LinearBuffer> for &LinearBuffer{
-    type Output = LinearBuffer;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        if self.shape() != rhs.shape() {
-            panic!(
-                "improper shapes for matrix addition: {:?} and {:?}",
-                self.shape(),
-                rhs.shape()
-            )
-        }
-
-        // TODO this is a little generic and can be sped up for the buffer
-        let res_shape = self.shape();
-        let mut res_vals = Vec::reserved(res_shape.0 * res_shape.1);
-        for r in 0..res_shape.0 {
-            for c in 0..res_shape.1 {
-                res_vals.push(self.get(r, c).unwrap() + rhs.get(r, c).unwrap());
-            }
-        }
-        Self::Output::from_flat(res_shape.into(), res_vals);
-    }
-}
-
-impl Sub<&LinearBuffer> for &LinearBuffer{
-    type Output = LinearBuffer;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        if self.shape() != rhs.shape() {
-            panic!(
-                "improper shapes for matrix subtraction: {:?} and {:?}",
-                self.shape(),
-                rhs.shape()
-            )
-        }
-
-        let res_shape = self.shape();
-        let mut res_vals = Vec::reserve(res_shape.0 * res_shape.1);
-        for r in 0..res_shape.0 {
-            for c in 0..res_shape.1 {
-                res_vals.push(self.get(r, c).unwrap() - rhs.get(r, c).unwrap());
-            }
-        }
-        Self::Output::from_flat(res_shape.into(), res_vals);
     }
 }
 

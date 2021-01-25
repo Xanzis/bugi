@@ -1,4 +1,5 @@
-use super::{MatrixData, Matrix};
+use super::{MatrixData, MatrixShape};
+use super::buffer::LinearBuffer;
 
 pub trait Inverse<T>
     where T: MatrixData
@@ -23,7 +24,6 @@ impl<T> Inverse<T> for T
                 b.shape()
             ));
         }
-        let mut x = Matrix::zeros((dim, 1));
 
         // triangularize the matrix
         for col in 0..dim {
@@ -43,14 +43,12 @@ impl<T> Inverse<T> for T
             b.swap_rows(col, max_idx);
 
             // scale so the new entry on the diagonal is 1
-            let scaling = self.get((col, col)).unwrap();
+            let scaling = self.get((col, col)).unwrap().clone();
             self.mutate_row(col, |x| *x /= scaling);
             b.mutate_row(col, |x| *x /= scaling);
 
-            assert_eq!(self.get((col, col)), Some(1.0));
-
             for row in (col + 1)..dim {
-                let scaling = self.get((row, col)).unwrap();
+                let scaling = self.get((row, col)).unwrap().clone();
                 for i in col..dim {
                     let to_subtract = self.get((col, i)).unwrap() * scaling;
                     self.mutate((row, i), |x| *x -= to_subtract);
@@ -61,6 +59,7 @@ impl<T> Inverse<T> for T
         }
 
         //backsubstitute triangularized matrix
+        let mut x = Self::zeros((dim, 1).into());
         for row in (0..dim).rev() {
             let mut temp = 0.0;
             for j in (row + 1)..dim {
