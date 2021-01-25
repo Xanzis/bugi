@@ -1,7 +1,15 @@
-use super::Matrix;
+use super::MatrixData;
 
-impl Matrix {
-    pub fn frobenius(&self) -> f64 {
+pub trait Norm<T>
+    where T: MatrixData
+{
+    fn frobenius(&self) -> f64;
+}
+
+impl<T> Norm<T> for T
+    where T: MatrixData
+{
+    fn frobenius(&self) -> f64 {
         // compute the frobenius norm
         let sum: f64 = self
             .data

@@ -1,4 +1,4 @@
-use crate::matrix::Matrix;
+use crate::matrix::{Matrix, MatrixData};
 use crate::spatial::Point;
 
 use image::{Rgb, RgbImage};
@@ -150,7 +150,7 @@ impl From<Vec<Point>> for Assemblage {
     }
 }
 
-fn rotation_matrix(x_ang: f64, y_ang: f64) -> Matrix {
+fn rotation_matrix<T: MatrixData>(x_ang: f64, y_ang: f64) -> Matrix<T> {
     let sin_xa = x_ang.sin();
     let cos_xa = x_ang.cos();
 

@@ -1,7 +1,15 @@
-use super::Matrix;
+use super::{MatrixData, Matrix};
 
-impl Matrix {
-    pub fn solve_gausselim(&mut self, mut b: Matrix) -> Result<Matrix, String> {
+pub trait Inverse<T>
+    where T: MatrixData
+{
+    fn solve_gausselim(&mut self, b: T) -> Result<T, String>;
+}
+
+impl<T> Inverse<T> for T
+    where T: MatrixData
+{
+    fn solve_gausselim(&mut self, mut b: T) -> Result<T, String> {
         // solve the system Ax=b for x. WARNING: A (self) is not preserved
         let shape = self.shape();
         if shape.0 != shape.1 {
