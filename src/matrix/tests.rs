@@ -34,7 +34,7 @@ fn linear_ops() {
                                                      4.0, 5.0, 7.0]);
     let b = LinearMatrix::from_flat((2, 3), vec![4.0, 5.0, 6.0, 
                                                  1.0, 2.0, 3.0]);
-    a.add_ass(&b);
+    let a = &a + &b;
     let target = LinearMatrix::from_flat((2, 3), vec![5.0, 7.0, 9.0,
                                                       5.0, 7.0, 10.0]);
     assert_eq!(a, target);
@@ -92,6 +92,5 @@ fn solve_gauss() {
 
     let target_x = LinearMatrix::from_flat((2, 1), vec![-4.0, 
                                                         4.5]);
-    x.sub_ass(&target_x);
-    assert!(x.frobenius() < 1e-10);
+    assert!((&x - &target_x).frobenius() < 1e-10);
 }

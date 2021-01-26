@@ -1,5 +1,6 @@
 use std::fmt;
 use std::cmp::max;
+use std::ops::{Add};
 use crate::spatial::Point;
 
 pub mod buffer;
@@ -219,6 +220,17 @@ pub trait MatrixLike
         }
 
         Self::from_rows(rows)
+    }
+
+    fn row_vec(data: Vec<f64>) -> Self {
+        // construct a (1, n) matrix
+        Self::from_flat((1, data.len()), data)
+    }
+
+    fn col_vec(data: Vec<f64>) -> Self {
+        let mut res = Self::row_vec(data);
+        res.transpose();
+        res
     }
 }
 

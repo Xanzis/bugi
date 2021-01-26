@@ -1,6 +1,6 @@
 use super::{MatrixShape, MatrixLike};
 use std::cmp::PartialEq;
-// use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Mul, Sub};
 use std::fmt;
 
 #[derive(Clone, Debug)]
@@ -88,5 +88,51 @@ impl fmt::Display for LinearMatrix {
             write!(f, "\n")?;
         }
         Ok(())
+    }
+}
+
+impl<'a> Add<&'a LinearMatrix> for &'a LinearMatrix {
+    type Output = LinearMatrix;
+    fn add(self, rhs: Self) -> Self::Output {
+        if self.dims != rhs.dims { panic!("incompatible shapes") }
+        if self.row_maj == rhs.row_maj {
+            let new_data = self.data.iter()
+                                    .zip(rhs.data.iter())
+                                    .map(|(x, y)| x + y)
+                                    .collect();
+            LinearMatrix {dims: self.dims, row_maj: self.row_maj, data: new_data}
+        }
+        else {
+            let mut res = LinearMatrix {dims: self.dims, row_maj: true, data: Vec::new()};
+            for i in 0..self.dims.0 {
+                res.data.extend(self.row(i)
+                                    .zip(rhs.row(i))
+                                    .map(|(x, y)| x + y));
+            }
+            res
+        }
+    }
+}
+
+impl<'a> Sub<&'a LinearMatrix> for &'a LinearMatrix {
+    type Output = LinearMatrix;
+    fn sub(self, rhs: Self) -> Self::Output {
+        if self.dims != rhs.dims { panic!("incompatible shapes") }
+        if self.row_maj == rhs.row_maj {
+            let new_data = self.data.iter()
+                                    .zip(rhs.data.iter())
+                                    .map(|(x, y)| x - y)
+                                    .collect();
+            LinearMatrix {dims: self.dims, row_maj: self.row_maj, data: new_data}
+        }
+        else {
+            let mut res = LinearMatrix {dims: self.dims, row_maj: true, data: Vec::new()};
+            for i in 0..self.dims.0 {
+                res.data.extend(self.row(i)
+                                    .zip(rhs.row(i))
+                                    .map(|(x, y)| x - y));
+            }
+            res
+        }
     }
 }
