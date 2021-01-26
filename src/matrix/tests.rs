@@ -1,14 +1,10 @@
 use super::{LinearMatrix, MatrixLike};
 use super::inverse::Inverse;
 use super::norm::Norm;
-use std::ops::{Add, Mul, Sub};
 #[test]
-fn zeros() {
+fn linear_constructors() {
     let target = LinearMatrix::from_flat((3, 2).into(), vec![0.0; 6]);
     assert_eq!(target, LinearMatrix::zeros((3, 2).into()));
-}
-#[test]
-fn eye() {
     let target = LinearMatrix::from_flat((2, 2).into(), vec![1.0, 0.0, 0.0, 1.0]);
     assert_eq!(target, LinearMatrix::eye(2));
 }
