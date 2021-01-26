@@ -16,10 +16,10 @@ impl LinearMatrix {
         // read differently for row/column major orders of buffer
         if (loc.1 >= self.dims.1) || (loc.0 >= self.dims.0) { return None }
         if self.row_maj {
-            Some((self.dims.0 * loc.0) + loc.1)
+            Some((self.dims.1 * loc.0) + loc.1)
         }
         else {
-            Some((self.dims.1 * loc.1) + loc.0)
+            Some((self.dims.0 * loc.1) + loc.0)
         }
     }
 }

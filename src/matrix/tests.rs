@@ -3,10 +3,18 @@ use super::inverse::Inverse;
 use super::norm::Norm;
 #[test]
 fn linear_constructors() {
+    // check from constructors against special ones
     let target = LinearMatrix::from_flat((3, 2).into(), vec![0.0; 6]);
     assert_eq!(target, LinearMatrix::zeros((3, 2).into()));
     let target = LinearMatrix::from_flat((2, 2).into(), vec![1.0, 0.0, 0.0, 1.0]);
     assert_eq!(target, LinearMatrix::eye(2));
+
+    // check assignment / retrieval in constructed matrices
+    let mut x = LinearMatrix::from_flat((3, 2).into(), vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+    assert_eq!(x.get((0, 1)), Some(&2.0));
+    assert_eq!(x.get((2, 1)), Some(&6.0));
+    x.put((2, 1), 0.0);
+    assert_eq!(x.get((2, 1)), Some(&0.0));
 }
 #[test]
 fn matadd() {
