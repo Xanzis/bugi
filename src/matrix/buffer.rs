@@ -39,6 +39,7 @@ impl MatrixLike for LinearMatrix {
 
     fn transpose(&mut self) {
         self.row_maj = !self.row_maj;
+        self.dims = (self.dims.1, self.dims.0);
     }
 
     fn zeros(shape: MatrixShape) -> Self {
