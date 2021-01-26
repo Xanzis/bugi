@@ -1,13 +1,13 @@
-use super::MatrixData;
+use super::MatrixLike;
 
 pub trait Norm<T>
-    where T: MatrixData
+    where T: MatrixLike
 {
     fn frobenius(&self) -> f64;
 }
 
 impl<T> Norm<T> for T
-    where T: MatrixData
+    where T: MatrixLike
 {
     fn frobenius(&self) -> f64 {
         // compute the frobenius norm

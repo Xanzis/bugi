@@ -1,14 +1,13 @@
-use super::{MatrixData, MatrixShape};
-use super::buffer::LinearBuffer;
+use super::MatrixLike;
 
 pub trait Inverse<T>
-    where T: MatrixData
+    where T: MatrixLike
 {
     fn solve_gausselim(&mut self, b: T) -> Result<T, String>;
 }
 
 impl<T> Inverse<T> for T
-    where T: MatrixData
+    where T: MatrixLike
 {
     fn solve_gausselim(&mut self, mut b: T) -> Result<T, String> {
         // solve the system Ax=b for x. WARNING: A (self) is not preserved

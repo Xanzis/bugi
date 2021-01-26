@@ -1,4 +1,6 @@
-use super::{LinearMatrix};
+use super::{LinearMatrix, MatrixLike};
+use super::inverse::Inverse;
+use super::norm::Norm;
 use std::ops::{Add, Mul, Sub};
 #[test]
 fn zeros() {
@@ -12,11 +14,11 @@ fn eye() {
 }
 #[test]
 fn matadd() {
-    let a = LinearMatrix::from_flat((2, 3).into(), vec![1.0, 2.0, 3.0, 4.0, 5.0, 7.0]);
+    let mut a = LinearMatrix::from_flat((2, 3).into(), vec![1.0, 2.0, 3.0, 4.0, 5.0, 7.0]);
     let b = LinearMatrix::from_rows(vec![vec![4.0, 5.0, 6.0], vec![1.0, 2.0, 3.0]]);
-    let sum = &a + &b;
+    a.add_ass(&b);
     let target = LinearMatrix::from_rows(vec![vec![5.0, 7.0, 9.0], vec![5.0, 7.0, 10.0]]);
-    assert_eq!(sum, target);
+    assert_eq!(a, target);
 }
 #[test]
 fn matmul() {
@@ -30,7 +32,7 @@ fn matmul() {
         vec![9.0, 12.0, 7.0, 9.0],
         vec![28.0, 32.0, 20.0, 23.0],
     ]);
-    let prod = &a * &b;
+    let prod = a.mul(&b);
     assert_eq!(target, prod);
 }
 #[test]
@@ -62,9 +64,9 @@ fn solve_gauss() {
     let mut a = LinearMatrix::from_rows(vec![vec![1.0, 2.0], vec![3.0, 4.0]]);
     let b = LinearMatrix::from_rows(vec![vec![5.0], vec![6.0]]);
 
-    let x = a.solve_gausselim(b).unwrap();
+    let mut x = a.solve_gausselim(b).unwrap();
 
     let target_x = LinearMatrix::from_rows(vec![vec![-4.0], vec![4.5]]);
-    x.sub(&target_x);
+    x.sub_ass(&target_x);
     assert!(x.frobenius() < 1e-10);
 }

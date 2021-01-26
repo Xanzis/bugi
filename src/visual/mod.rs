@@ -1,4 +1,4 @@
-use crate::matrix::LinearMatrix;
+use crate::matrix::{LinearMatrix, MatrixLike};
 use crate::spatial::Point;
 
 use image::{Rgb, RgbImage};
@@ -169,7 +169,7 @@ fn rotation_matrix(x_ang: f64, y_ang: f64) -> LinearMatrix {
         vec![-sin_ya, 0.0, cos_ya],
     ]);
 
-    &a * &b
+    a.mul(&b)
 }
 
 fn project(points: Vec<Point>) -> Vec<(f64, f64)> {
@@ -182,7 +182,7 @@ fn project(points: Vec<Point>) -> Vec<(f64, f64)> {
         panic!("bad dimension count in visual::project");
     }
 
-    let new_points = &r * &points;
+    let new_points = r.mul(&points);
     // return the x and y coordinates of the new points by zipping the first two rows
     new_points
         .row(0)

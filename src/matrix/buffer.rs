@@ -1,9 +1,11 @@
+use crate::spatial::Point;
 use super::{MatrixShape};
 use std::cmp::PartialEq;
 use std::ops::{Add, Mul, Sub};
+use std::fmt;
 
-pub trait MatrixData
-    where Self: Sized + Clone
+pub trait MatrixLike
+    where Self: Sized + Clone + fmt::Debug + fmt::Display
 {
     // basic required methods
     fn shape(&self) -> (usize, usize);
@@ -28,7 +30,7 @@ pub trait MatrixData
         if let Some(x) = self.get_mut(loc) { f(x); }
     }
 
-    fn add(&mut self, other: &Self) {
+    fn add_ass(&mut self, other: &Self) {
         if self.shape() != other.shape() {
             panic!("bad shapes: {:?}, {:?}", self.shape(), other.shape());
         }
@@ -40,7 +42,7 @@ pub trait MatrixData
         }
     }
 
-    fn sub(&mut self, other: &Self) {
+    fn sub_ass(&mut self, other: &Self) {
         if self.shape() != other.shape() {
             panic!("bad shapes: {:?}, {:?}", self.shape(), other.shape());
         }
@@ -152,10 +154,35 @@ pub trait MatrixData
         for i in 0..dim { res.put((i, i), 1.0); }
         res
     }
+
+    fn from_rows(data: Vec<Vec<f64>>) -> Self {
+        let mut total = Vec::new();
+        let nrow = data.len();
+        if nrow == 0 { panic!("empty data") }
+        let ncol = data.get(0).unwrap().len();
+        data.into_iter().for_each(|x| {
+            if x.len() != ncol { panic!("inconstent row lengths") }
+            total.extend(x); });
+
+        Self::from_flat((nrow, ncol).into(), total)
+    }
+
+    fn from_points_row(points: Vec<Point>) -> Self {
+        // construct a matrix from a series of points as row vectors
+        let mut rows: Vec<Vec<f64>> = Vec::new();
+        let dim = points[0].dim();
+
+        for p in points.into_iter() {
+            if p.dim() != dim { panic!("inconsistent point dims") }
+            rows.push(p.into());
+        }
+
+        Self::from_rows(rows)
+    }
 }
 
 pub struct MatrixRow<'a, T>
-    where T: MatrixData
+    where T: MatrixLike
 {
     source: &'a T,
     row: usize,
@@ -163,7 +190,7 @@ pub struct MatrixRow<'a, T>
 }
 
 pub struct MatrixCol<'a, T>
-    where T: MatrixData
+    where T: MatrixLike
 {
     source: &'a T,
     col: usize,
@@ -171,7 +198,7 @@ pub struct MatrixCol<'a, T>
 }
 
 pub struct MatrixAll<'a, T>
-    where T: MatrixData
+    where T: MatrixLike
 {
     source: &'a T,
     row_pos: usize,
@@ -179,7 +206,7 @@ pub struct MatrixAll<'a, T>
 }
 
 impl<'a, T> Iterator for MatrixCol<'a, T>
-    where T: MatrixData
+    where T: MatrixLike
 {
     type Item = &'a f64;
 
@@ -191,7 +218,7 @@ impl<'a, T> Iterator for MatrixCol<'a, T>
 }
 
 impl<'a, T> Iterator for MatrixRow<'a, T>
-    where T: MatrixData
+    where T: MatrixLike
 {
     type Item = &'a f64;
 
@@ -203,7 +230,7 @@ impl<'a, T> Iterator for MatrixRow<'a, T>
 }
 
 impl<'a, T> Iterator for MatrixAll<'a, T>
-    where T: MatrixData
+    where T: MatrixLike
 {
     type Item = &'a f64;
 
@@ -219,7 +246,7 @@ impl<'a, T> Iterator for MatrixAll<'a, T>
 }
 
 impl<'a, T> MatrixAll<'a, T>
-    where T: MatrixData
+    where T: MatrixLike
 {
     fn new(source: &'a T) -> Self {
         MatrixAll{ source, row_pos: 0, col_pos: 0 }
@@ -227,13 +254,13 @@ impl<'a, T> MatrixAll<'a, T>
 }
 
 #[derive(Clone, Debug)]
-pub struct LinearBuffer {
+pub struct LinearMatrix {
     dims: (usize, usize),
     row_maj: bool,
     data: Vec<f64>,
 }
 
-impl LinearBuffer {
+impl LinearMatrix {
     fn pos(&self, loc: (usize, usize)) -> Option<usize> {
         // find the location of the desired element in data
         // read differently for row/column major orders of buffer
@@ -247,7 +274,7 @@ impl LinearBuffer {
     }
 }
 
-impl MatrixData for LinearBuffer {
+impl MatrixLike for LinearMatrix {
     fn shape(&self) -> (usize, usize) {
         self.dims
     }
@@ -264,22 +291,22 @@ impl MatrixData for LinearBuffer {
         self.row_maj = !self.row_maj;
     }
 
-    fn zeros(shape: MatrixShape) -> LinearBuffer {
+    fn zeros(shape: MatrixShape) -> Self {
         let dims = (shape.nrow, shape.ncol);
         let data = vec![0.0; dims.0 * dims.1];
-        LinearBuffer { dims, row_maj: true, data }
+        Self { dims, row_maj: true, data }
     }
-    fn from_flat(shape: MatrixShape, data: Vec<f64>) -> LinearBuffer {
+    fn from_flat(shape: MatrixShape, data: Vec<f64>) -> Self {
         // turn a row-major vector of values into a matrix
         let dims = (shape.nrow, shape.ncol);
         if (dims.0 * dims.1) != data.len() {
             panic!("bad shape {:?} for data length {}", dims, data.len())
         }
-        LinearBuffer{ dims, row_maj: true, data }
+        Self { dims, row_maj: true, data }
     }
 }
 
-impl PartialEq for LinearBuffer {
+impl PartialEq for LinearMatrix {
     fn eq(&self, other: &Self) -> bool {
         if self.shape() != other.shape() { return false }
         if self.row_maj == other.row_maj {
@@ -289,10 +316,24 @@ impl PartialEq for LinearBuffer {
         // if the data orders don't align, check the slow way
         let (nrow, ncol) = self.shape();
         for i in 0..nrow {
-            for j in 0..nrow {
+            for j in 0..ncol {
                 if self.get((i, j)) != other.get((i, j)) { return false }
             }
         }
         true
+    }
+}
+
+impl fmt::Display for LinearMatrix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (nrow, ncol) = self.shape();
+        write!(f, "rows: {} cols: {}\n", nrow, ncol)?;
+        for i in 0..nrow {
+            for j in 0..ncol {
+                write!(f, "{:1.5} ", self.get((i, j)).unwrap())?;
+            }
+            write!(f, "\n")?;
+        }
+        Ok(())
     }
 }
