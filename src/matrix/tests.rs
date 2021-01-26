@@ -48,9 +48,9 @@ fn disp() {
 }
 #[test]
 fn transpose() {
-    let mut a = LinearMatrix::from_rows(vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]]);
+    let mut a = LinearMatrix::from_flat((2, 3).into(), vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
     a.transpose();
-    let b = LinearMatrix::from_rows(vec![vec![1.0, 4.0], vec![2.0, 5.0], vec![3.0, 6.0]]);
+    let b = LinearMatrix::from_flat((3, 2).into(), vec![1.0, 4.0, 2.0, 5.0, 3.0, 6.0]);
     assert_eq!(a, b);
 }
 #[test]
