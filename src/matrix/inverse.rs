@@ -58,7 +58,7 @@ impl<T> Inverse<T> for T
         }
 
         //backsubstitute triangularized matrix
-        let mut x = Self::zeros((dim, 1).into());
+        let mut x = Self::zeros((dim, 1));
         for row in (0..dim).rev() {
             let mut temp = 0.0;
             for j in (row + 1)..dim {

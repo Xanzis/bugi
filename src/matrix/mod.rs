@@ -1,4 +1,5 @@
 use std::fmt;
+use std::cmp::max;
 use crate::spatial::Point;
 
 pub mod buffer;
@@ -15,16 +16,31 @@ pub use buffer::{LinearMatrix};
 // rolling my own (pretty limited) matrix math
 // standard order for shape is (row, col)
 
-// data type for matrix sizes
+// data type for matrix shapes
 // will eventually add fields to help initialize sparse matrices
 pub struct MatrixShape {
     ncol: usize,
     nrow: usize,
+    max_dim: usize,
 }
 
 impl From<(usize, usize)> for MatrixShape {
     fn from(dims: (usize, usize)) -> Self {
-        MatrixShape{ nrow: dims.0, ncol: dims.1 }
+        MatrixShape{
+            nrow: dims.0,
+            ncol: dims.1,
+            max_dim: max(dims.0, dims.1),
+        }
+    }
+}
+
+impl From<usize> for MatrixShape {
+    fn from(dim: usize) -> Self {
+        MatrixShape{
+            nrow: dim,
+            ncol: dim,
+            max_dim: dim,
+        }
     }
 }
 
@@ -36,8 +52,8 @@ pub trait MatrixLike
     fn get(&self, loc: (usize, usize)) -> Option<&f64>;
     fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64>;
     fn transpose(&mut self);
-    fn zeros(shape: MatrixShape) -> Self;
-    fn from_flat(shape: MatrixShape, data: Vec<f64>) -> Self;
+    fn zeros<T: Into<MatrixShape>>(shape: T) -> Self;
+    fn from_flat<T: Into<MatrixShape>>(shape: T, data: Vec<f64>) -> Self;
 
     // provided methods
 
@@ -100,7 +116,7 @@ pub trait MatrixLike
                 res_vals.push(dot);
             }
         }
-        Self::from_flat(res_shape.into(), res_vals)
+        Self::from_flat(res_shape, res_vals)
     }
 
     // *****
@@ -172,10 +188,11 @@ pub trait MatrixLike
     // *****
     // matrix initialization methods
 
-    fn eye(dim: usize) -> Self {
-        let mut res = Self::zeros((dim, dim).into());
+    fn eye<T: Into<MatrixShape>>(dim: T) -> Self {
+        let shape = dim.into();
+        let mut res = Self::zeros(shape.max_dim);
         // this is the naive way - this can certainly be done faster
-        for i in 0..dim { res.put((i, i), 1.0); }
+        for i in 0..shape.max_dim { res.put((i, i), 1.0); }
         res
     }
 
@@ -188,7 +205,7 @@ pub trait MatrixLike
             if x.len() != ncol { panic!("inconstent row lengths") }
             total.extend(x); });
 
-        Self::from_flat((nrow, ncol).into(), total)
+        Self::from_flat((nrow, ncol), total)
     }
 
     fn from_points_row(points: Vec<Point>) -> Self {

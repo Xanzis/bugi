@@ -42,13 +42,15 @@ impl MatrixLike for LinearMatrix {
         self.dims = (self.dims.1, self.dims.0);
     }
 
-    fn zeros(shape: MatrixShape) -> Self {
+    fn zeros<T: Into<MatrixShape>>(shape: T) -> Self {
+        let shape: MatrixShape = shape.into();
         let dims = (shape.nrow, shape.ncol);
         let data = vec![0.0; dims.0 * dims.1];
         Self { dims, row_maj: true, data }
     }
-    fn from_flat(shape: MatrixShape, data: Vec<f64>) -> Self {
+    fn from_flat<T: Into<MatrixShape>>(shape: T, data: Vec<f64>) -> Self {
         // turn a row-major vector of values into a matrix
+        let shape: MatrixShape = shape.into();
         let dims = (shape.nrow, shape.ncol);
         if (dims.0 * dims.1) != data.len() {
             panic!("bad shape {:?} for data length {}", dims, data.len())
