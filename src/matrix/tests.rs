@@ -100,3 +100,19 @@ fn solve_gauss() {
                                                         4.5]);
     assert!((&x - &target_x).frobenius() < 1e-10);
 }
+#[test]
+fn lu_decompose() {
+    let a = LinearMatrix::from_flat((2, 2), vec![4.0, 3.0, 6.0, 3.0]);
+    let (l, u) = a.lu_decompose();
+    assert_eq!(l.get((0, 0)).unwrap(), &1.0);
+    assert_eq!(l.get((1, 1)).unwrap(), &1.0);
+    assert_eq!(l.get((0, 1)).unwrap(), &0.0);
+    assert_eq!(u.get((1, 0)).unwrap(), &0.0);
+    let regen = l.mul(&u);
+    assert!((&a - &regen).frobenius() < 1e-10);
+}
+#[test]
+fn determinant() {
+    let a = LinearMatrix::from_flat((2, 2), vec![3.0, 8.0, 4.0, 6.0]);
+    assert!((a.det_lu() + 14.0).abs() < 1e-10);
+}

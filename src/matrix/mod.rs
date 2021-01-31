@@ -136,6 +136,10 @@ pub trait MatrixLike
         else { panic!("index out of bounds") }
     }
 
+    fn diag(&self) -> MatrixDiag<Self> {
+        MatrixDiag {source: &self, pos: 0}
+    }
+
     fn flat(&self) -> MatrixAll<Self> {
         // visit all of the matrix elements in row-major order
         MatrixAll::new(&self)
@@ -249,6 +253,13 @@ pub struct MatrixCol<'a, T>
     pos: usize,
 }
 
+pub struct MatrixDiag<'a, T>
+    where T: MatrixLike
+{
+    source: &'a T,
+    pos: usize,
+}
+
 pub struct MatrixAll<'a, T>
     where T: MatrixLike
 {
@@ -278,6 +289,18 @@ impl<'a, T> Iterator for MatrixRow<'a, T>
         let loc = self.pos;
         self.pos += 1;
         self.source.get((self.row, loc))
+    }
+}
+
+impl<'a, T> Iterator for MatrixDiag<'a, T>
+    where T: MatrixLike
+{
+    type Item = &'a f64;
+
+    fn next(&mut self) -> Option<&'a f64> {
+        let loc = self.pos;
+        self.pos += 1;
+        self.source.get((loc, loc))
     }
 }
 

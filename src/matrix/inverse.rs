@@ -4,6 +4,8 @@ pub trait Inverse<T>
     where T: MatrixLike
 {
     fn solve_gausselim(&mut self, b: T) -> Result<T, String>;
+    fn lu_decompose(&self) -> (T, T);
+    fn det_lu(&self) -> f64; // find the determinant by lu decomposition
 }
 
 impl<T> Inverse<T> for T
@@ -69,5 +71,44 @@ impl<T> Inverse<T> for T
         }
 
         Ok(x)
+    }
+
+    fn lu_decompose(&self) -> (Self, Self) {
+        let shape = self.shape();
+        if shape.0 != shape.1 {
+            panic!("non-square matrix");
+        }
+        let dim = shape.0;
+        let mut lower = Self::zeros((dim, dim));
+        let mut upper = Self::zeros((dim, dim));
+
+        for i in 0..dim {
+            for k in i..dim {
+                let mut sum = 0.0;
+                for j in 0..i {
+                    sum += lower.get((i, j)).unwrap() * upper.get((j, k)).unwrap();
+                }
+                upper.put((i, k), self.get((i, k)).unwrap() - sum);
+            }
+
+            for k in i..dim {
+                if i == k {
+                    lower.put((i, i), 1.0);
+                }
+                else {
+                    let mut sum = 0.0;
+                    for j in 0..i {
+                        sum += lower.get((k, j)).unwrap() * upper.get((j, i)).unwrap();
+                    }
+                    lower.put((k, i), (self.get((k, i)).unwrap() - sum) / upper.get((i, i)).unwrap());
+                }
+            }
+        }
+        (lower, upper)
+    }
+
+    fn det_lu(&self) -> f64 {
+        let (_, u) = self.lu_decompose();
+        u.diag().product()
     }
 }
