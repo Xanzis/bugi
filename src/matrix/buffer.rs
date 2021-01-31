@@ -1,6 +1,6 @@
 use super::{MatrixShape, MatrixLike};
 use std::cmp::PartialEq;
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Add, Sub, AddAssign, MulAssign};
 use std::fmt;
 
 #[derive(Clone, Debug)]
@@ -48,10 +48,11 @@ impl MatrixLike for LinearMatrix {
         let data = vec![0.0; dims.0 * dims.1];
         Self { dims, row_maj: true, data }
     }
-    fn from_flat<T: Into<MatrixShape>>(shape: T, data: Vec<f64>) -> Self {
+    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, data: U) -> Self {
         // turn a row-major vector of values into a matrix
         let shape: MatrixShape = shape.into();
         let dims = (shape.nrow, shape.ncol);
+        let data: Vec<f64> = data.into_iter().collect();
         if (dims.0 * dims.1) != data.len() {
             panic!("bad shape {:?} for data length {}", dims, data.len())
         }
@@ -134,5 +135,17 @@ impl<'a> Sub<&'a LinearMatrix> for &'a LinearMatrix {
             }
             res
         }
+    }
+}
+
+impl AddAssign<f64> for LinearMatrix {
+    fn add_assign(&mut self, other: f64) {
+        self.data.iter_mut().for_each(|x| *x += other);
+    }
+}
+
+impl MulAssign<f64> for LinearMatrix {
+    fn mul_assign(&mut self, other: f64) {
+        self.data.iter_mut().for_each(|x| *x *= other);
     }
 }

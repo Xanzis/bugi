@@ -1,6 +1,5 @@
 use std::fmt;
 use std::cmp::max;
-use std::ops::{Add};
 use crate::spatial::Point;
 
 pub mod buffer;
@@ -54,7 +53,7 @@ pub trait MatrixLike
     fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64>;
     fn transpose(&mut self);
     fn zeros<T: Into<MatrixShape>>(shape: T) -> Self;
-    fn from_flat<T: Into<MatrixShape>>(shape: T, data: Vec<f64>) -> Self;
+    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, data: U) -> Self;
 
     // provided methods
 

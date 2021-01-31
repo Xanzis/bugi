@@ -30,8 +30,8 @@ fn linear_constructors() {
 #[test]
 fn linear_ops() {
     // check the standard matrix operations for linear matrices
-    let mut a = LinearMatrix::from_flat((2, 3), vec![1.0, 2.0, 3.0,
-                                                     4.0, 5.0, 7.0]);
+    let a = LinearMatrix::from_flat((2, 3), vec![1.0, 2.0, 3.0,
+                                                 4.0, 5.0, 7.0]);
     let b = LinearMatrix::from_flat((2, 3), vec![4.0, 5.0, 6.0, 
                                                  1.0, 2.0, 3.0]);
     let a = &a + &b;
@@ -40,7 +40,7 @@ fn linear_ops() {
     assert_eq!(a, target);
 
     let a = LinearMatrix::from_flat((2, 3), vec![1.0, 2.0, 3.0, 
-                                               4.0, 5.0, 7.0]);
+                                                 4.0, 5.0, 7.0]);
     let b = LinearMatrix::from_flat((3, 4), vec![4.0, 2.0, 2.0, 1.0, 
                                                  1.0, 2.0, 1.0, 1.0, 
                                                  1.0, 2.0, 1.0, 2.0]);
@@ -48,6 +48,13 @@ fn linear_ops() {
                                                       28.0, 32.0, 20.0, 23.0]);
     let prod = a.mul(&b);
     assert_eq!(target, prod);
+    let mut a = LinearMatrix::from_flat((2, 2), vec![1.0, 2.0, 3.0, 4.0]);
+    a += 2.0;
+    let target = LinearMatrix::from_flat((2, 2), vec![3.0, 4.0, 5.0, 6.0]);
+    assert_eq!(a, target);
+    a *= 2.0;
+    let target = LinearMatrix::from_flat((2, 2), vec![6.0, 8.0, 10.0, 12.0]);
+    assert_eq!(a, target);
 }
 #[test]
 fn linear_disp() {
@@ -70,7 +77,6 @@ fn linear_transpose() {
 fn linear_swaps() {
     let mut a = LinearMatrix::from_flat((2, 2), vec![1.0, 2.0, 
                                                      3.0, 4.0]);
-
     let target_a = LinearMatrix::from_flat((2, 2), vec![3.0, 4.0, 
                                                         1.0, 2.0]);
     a.swap_rows(0, 1);
@@ -88,7 +94,7 @@ fn solve_gauss() {
     let b = LinearMatrix::from_flat((2, 1), vec![5.0, 
                                                  6.0]);
 
-    let mut x = a.solve_gausselim(b).unwrap();
+    let x = a.solve_gausselim(b).unwrap();
 
     let target_x = LinearMatrix::from_flat((2, 1), vec![-4.0, 
                                                         4.5]);
