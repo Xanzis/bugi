@@ -1,7 +1,24 @@
-use std::convert::{From, TryFrom};
+use std::convert::{From, TryFrom, TryInto};
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug)]
+pub struct SpatialError {
+    msg: String,
+}
+
+impl fmt::Display for SpatialError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SpatialError: {}", self.msg)
+    }
+}
+
+impl SpatialError {
+    fn new(msg: &str) -> SpatialError {
+        SpatialError {msg: msg.to_string()}
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Point {
     One(f64),
     Two(f64, f64),
@@ -34,15 +51,51 @@ impl From<f64> for Point {
     }
 }
 
+impl TryInto<f64> for Point {
+    type Error = SpatialError;
+    fn try_into(self) -> Result<f64, SpatialError> {
+        if let Point::One(x) = self {
+            Ok(x)
+        }
+        else {
+            Err(SpatialError::new("mismatched dimensions for conversion"))
+        }
+    }
+}
+
 impl From<(f64, f64)> for Point {
     fn from(x: (f64, f64)) -> Self {
         Point::Two(x.0, x.1)
     }
 }
 
+impl TryInto<(f64, f64)> for Point {
+    type Error = SpatialError;
+    fn try_into(self) -> Result<(f64, f64), SpatialError> {
+        if let Point::Two(x, y) = self {
+            Ok((x, y))
+        }
+        else {
+            Err(SpatialError::new("mismatched dimensions for conversion"))
+        }
+    }
+}
+
 impl From<(f64, f64, f64)> for Point {
     fn from(x: (f64, f64, f64)) -> Self {
         Point::Thr(x.0, x.1, x.2)
+    }
+}
+
+impl TryInto<(f64, f64, f64)> for Point {
+    type Error = SpatialError;
+    fn try_into(self) -> Result<(f64, f64, f64), SpatialError> {
+        if let Point::Thr(x, y, z) = self {
+            Ok((x, y, z))
+        }
+        else {
+            Err(SpatialError::new("mismatched dimensions for conversion"))
+        }
     }
 }
 
