@@ -1,4 +1,4 @@
-use crate::matrix::{Matrix};
+use crate::matrix::{LinearMatrix, MatrixLike};
 
 enum ProblemType {
     // strain vector e.T in comments
@@ -12,19 +12,19 @@ enum ProblemType {
 }
 
 pub trait Material {
-    fn youngs() -> f64;
-    fn poisson() -> f64;
+    fn youngs(&self) -> f64;
+    fn poisson(&self) -> f64;
 
-    fn inertia_moment() -> Option<f64> {
+    fn inertia_moment(&self) -> Option<f64> {
         None
     }
 
-    fn thickness() -> Option<f64> {
+    fn thickness(&self) -> Option<f64> {
         // used for plate bending matrices
         None
     }
 
-    fn get_c(problem: ProblemType) -> LinearMatrix {
+    fn get_c(&self, problem: ProblemType) -> LinearMatrix {
         // return the material matrix C for use in element calculations
         // TODO: if useful, these could be stored as symmetrical matrices
         //       (there is not yet a specialized buffer for this)
@@ -32,11 +32,11 @@ pub trait Material {
 
         match problem {
             Bar => {
-                LinearMatrix::from_flat((1, 1), [self.youngs()])
+                LinearMatrix::from_flat((1, 1), vec![self.youngs()])
             },
             Beam => {
                 if let Some(v) = self.inertia_moment() {
-                    LinearMatrix::from_flat((1, 1), [v*self.youngs()])
+                    LinearMatrix::from_flat((1, 1), vec![v*self.youngs()])
                 }
                 else {
                     panic!("inertia moment required for ProblemType::Beam but not supplied")
@@ -68,8 +68,8 @@ pub trait Material {
                 let e = self.poisson();
                 let x = v / (1.0 - v);
                 for (i, j) in [(0, 1), (0, 3), (3, 1)].iter() {
-                    res.put((i, j), x);
-                    res.put((j, i), x);
+                    res.put((*i, *j), x);
+                    res.put((*j, *i), x);
                 }
                 res.put((2, 2), (1.0 - (2.0 * v)) / (2.0 * (1.0 - v)));
                 res *= (e * (1.0 - v)) / ((1.0 + v) * (1.0 - (2.0 * v)));
@@ -81,13 +81,14 @@ pub trait Material {
                 let e = self.poisson();
                 let x = v / (1.0 - v);
                 for (i, j) in [(0, 1), (0, 2), (2, 1)].iter() {
-                    res.put((i, j), x);
-                    res.put((j, i), x);
+                    res.put((*i, *j), x);
+                    res.put((*j, *i), x);
                 }
                 for i in 3..6 {
                     res.put((i, i), (1.0 - (2.0 * v)) / (2.0 * (1.0 - v)));
                 }
                 res *= (e * (1.0 - v)) / ((1.0 + v) * (1.0 - (2.0 * v)));
+                res
             }
             PlateBending => {
                 if let Some(h) = self.thickness() {
@@ -108,14 +109,14 @@ pub trait Material {
     }
 }
 
-pub struct Aluminum6061 {};
+pub struct Aluminum6061;
 
 impl Material for Aluminum6061 {
-    fn youngs() -> f64 {
+    fn youngs(&self) -> f64 {
         // SI units: Pa
         6.89e10
     }
-    fn poisson() -> f64 {
+    fn poisson(&self) -> f64 {
         // unitless
         0.33
     }
