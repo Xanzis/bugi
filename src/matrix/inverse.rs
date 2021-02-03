@@ -1,7 +1,9 @@
 use super::MatrixLike;
+use std::ops::Add;
 
 pub trait Inverse<T>
-    where T: MatrixLike
+where
+    T: MatrixLike,
 {
     fn solve_gausselim(&mut self, b: T) -> Result<T, String>;
     fn lu_decompose(&self) -> (T, T);
@@ -11,7 +13,8 @@ pub trait Inverse<T>
 }
 
 impl<T> Inverse<T> for T
-    where T: MatrixLike
+where
+    T: MatrixLike
 {
     fn solve_gausselim(&mut self, mut b: T) -> Result<T, String> {
         // solve the system Ax=b for x. WARNING: A (self) is not preserved
@@ -46,18 +49,18 @@ impl<T> Inverse<T> for T
             b.swap_rows(col, max_idx);
 
             // scale so the new entry on the diagonal is 1
-            let scaling = self.get((col, col)).unwrap().clone();
+            let scaling = self[(col, col)];
             self.mutate_row(col, |x| *x /= scaling);
             b.mutate_row(col, |x| *x /= scaling);
 
             for row in (col + 1)..dim {
-                let scaling = self.get((row, col)).unwrap().clone();
+                let scaling = self[(row, col)];
                 for i in col..dim {
-                    let to_subtract = self.get((col, i)).unwrap() * scaling;
-                    self.mutate((row, i), |x| *x -= to_subtract);
+                    let to_subtract = self[(col, i)] * scaling;
+                    self[(row, i)] -= to_subtract;
                 }
-                let to_subtract = b.get((col, 0)).unwrap() * scaling;
-                b.mutate((row, 0), |x| *x -= to_subtract);
+                let to_subtract = b[(col, 0)] * scaling;
+                b[(row, 0)] -= to_subtract;
             }
         }
 
@@ -66,10 +69,10 @@ impl<T> Inverse<T> for T
         for row in (0..dim).rev() {
             let mut temp = 0.0;
             for j in (row + 1)..dim {
-                temp += self.get((row, j)).unwrap() * x.get((j, 0)).unwrap();
+                temp += self[(row, j)] * x[(j, 0)];
             }
             println!("{:?}", temp);
-            x.put((row, 0), b.get((row, 0)).unwrap() - temp);
+            x[(row, 0)] = b[(row, 0)] - temp;
         }
 
         Ok(x)
@@ -88,21 +91,21 @@ impl<T> Inverse<T> for T
             for k in i..dim {
                 let mut sum = 0.0;
                 for j in 0..i {
-                    sum += lower.get((i, j)).unwrap() * upper.get((j, k)).unwrap();
+                    sum += lower[(i, j)] * upper[(j, k)];
                 }
-                upper.put((i, k), self.get((i, k)).unwrap() - sum);
+                upper[(i, k)] = self[(i, k)] - sum;
             }
 
             for k in i..dim {
                 if i == k {
-                    lower.put((i, i), 1.0);
+                    lower[(i, i)] = 1.0;
                 }
                 else {
                     let mut sum = 0.0;
                     for j in 0..i {
-                        sum += lower.get((k, j)).unwrap() * upper.get((j, i)).unwrap();
+                        sum += lower[(k, j)] * upper[(j, i)];
                     }
-                    lower.put((k, i), (self.get((k, i)).unwrap() - sum) / upper.get((i, i)).unwrap());
+                    lower[(k, i)] = (self[(k, i)] - sum) / upper[(i, i)];
                 }
             }
         }
@@ -117,8 +120,8 @@ impl<T> Inverse<T> for T
     fn determinant(&self) -> f64 {
         // use the cheaper algorithm if possible
         if self.shape() == (2, 2) {
-            self.get((0, 0)).unwrap() * self.get((1, 1)).unwrap() -
-            self.get((1, 0)).unwrap() * self.get((0, 1)).unwrap()
+            self[(0, 0)] * self[(1, 1)] -
+            self[(1, 0)] * self[(0, 1)]
         }
         else {
             self.det_lu()
@@ -129,10 +132,10 @@ impl<T> Inverse<T> for T
         if self.shape() == (2, 2) {
             let det = self.determinant();
 
-            let a = self.get((0, 0)).unwrap() / det;
-            let b = self.get((0, 1)).unwrap() / det;
-            let c = self.get((1, 0)).unwrap() / det;
-            let d = self.get((1, 1)).unwrap() / det;
+            let a = self[(0, 0)] / det;
+            let b = self[(0, 1)] / det;
+            let c = self[(1, 0)] / det;
+            let d = self[(1, 1)] / det;
 
             return Self::from_flat((2, 2), vec![d, -1.0 * b, -1.0 * c, a]);
         }

@@ -1,6 +1,7 @@
 use std::fmt;
 use std::cmp::max;
 use crate::spatial::Point;
+use std::ops::{Index, IndexMut};
 
 pub mod buffer;
 
@@ -45,7 +46,9 @@ impl From<usize> for MatrixShape {
 }
 
 pub trait MatrixLike
-    where Self: Sized + Clone + fmt::Debug + fmt::Display
+where
+    Self: Sized + Clone + fmt::Debug + fmt::Display,
+    Self: Index<(usize, usize), Output = f64> + IndexMut<(usize, usize), Output = f64>
 {
     // basic required methods
     fn shape(&self) -> (usize, usize);

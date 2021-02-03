@@ -22,10 +22,10 @@ fn linear_constructors() {
     let mut x = LinearMatrix::from_flat((3, 2), vec![1.0, 2.0, 
                                                      3.0, 4.0, 
                                                      5.0, 6.0]);
-    assert_eq!(x.get((0, 1)), Some(&2.0));
-    assert_eq!(x.get((2, 1)), Some(&6.0));
-    x.put((2, 1), 0.0);
-    assert_eq!(x.get((2, 1)), Some(&0.0));
+    assert_eq!(x[(0, 1)], 2.0);
+    assert_eq!(x[(2, 1)], 6.0);
+    x[(2, 1)] = 0.0;
+    assert_eq!(x[(2, 1)], 0.0);
 }
 #[test]
 fn linear_ops() {
@@ -104,10 +104,10 @@ fn solve_gauss() {
 fn lu_decompose() {
     let a = LinearMatrix::from_flat((2, 2), vec![4.0, 3.0, 6.0, 3.0]);
     let (l, u) = a.lu_decompose();
-    assert_eq!(l.get((0, 0)).unwrap(), &1.0);
-    assert_eq!(l.get((1, 1)).unwrap(), &1.0);
-    assert_eq!(l.get((0, 1)).unwrap(), &0.0);
-    assert_eq!(u.get((1, 0)).unwrap(), &0.0);
+    assert_eq!(l[(0, 0)], 1.0);
+    assert_eq!(l[(1, 1)], 1.0);
+    assert_eq!(l[(0, 1)], 0.0);
+    assert_eq!(u[(1, 0)], 0.0);
     let regen = l.mul(&u);
     assert!((&a - &regen).frobenius() < 1e-10);
 }

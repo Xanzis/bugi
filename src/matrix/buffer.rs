@@ -1,6 +1,6 @@
 use super::{MatrixShape, MatrixLike};
 use std::cmp::PartialEq;
-use std::ops::{Add, Sub, AddAssign, MulAssign};
+use std::ops::{Add, Sub, AddAssign, MulAssign, Index, IndexMut};
 use std::fmt;
 
 #[derive(Clone, Debug)]
@@ -30,11 +30,18 @@ impl MatrixLike for LinearMatrix {
     }
 
     fn get(&self, loc: (usize, usize)) -> Option<&f64> {
-        if let Some(i) = self.pos(loc) { self.data.get(i) } else { None }
+        if let Some(i) = self.pos(loc) {
+            // this is fine, self.pos checks bounds
+            unsafe {Some(self.data.get_unchecked(i))}
+        }
+        else { None }
     }
 
     fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64> {
-        if let Some(i) = self.pos(loc) { self.data.get_mut(i) } else { None }
+        if let Some(i) = self.pos(loc) {
+            unsafe {Some(self.data.get_unchecked_mut(i))}
+        }
+        else { None }
     }
 
     fn transpose(&mut self) {
@@ -147,5 +154,33 @@ impl AddAssign<f64> for LinearMatrix {
 impl MulAssign<f64> for LinearMatrix {
     fn mul_assign(&mut self, other: f64) {
         self.data.iter_mut().for_each(|x| *x *= other);
+    }
+}
+
+impl Index<(usize, usize)> for LinearMatrix {
+    type Output = f64;
+    fn index(&self, loc: (usize, usize)) -> &Self::Output {
+        if let Some(i) = self.pos(loc) {
+            // this is perfectly fine, self.pos performs bounds check
+            unsafe {
+                self.data.get_unchecked(i)
+            }
+        }
+        else {
+            panic!("matrix index out of bounds")
+        }
+    }
+}
+
+impl IndexMut<(usize, usize)> for LinearMatrix {
+    fn index_mut(&mut self, loc: (usize, usize)) -> &mut Self::Output {
+        if let Some(i) = self.pos(loc) {
+            unsafe {
+                self.data.get_unchecked_mut(i)
+            }
+        }
+        else {
+            panic!("matrix index out of bounds")
+        }
     }
 }
