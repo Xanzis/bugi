@@ -8,5 +8,6 @@ fn basic_bar_F() {
 	let b = Point::One(3.0);
 	let el = Bar2Node::new(vec![a, b]);
 	let target = LinearMatrix::from_flat((2, 2), vec![1.0, -1.0, -1.0, 1.0]);
-	assert_eq!(el.get_F(Point::One(2.3)), target);
+	let c = LinearMatrix::from_flat((1, 1), vec![1.0]);
+	assert_eq!(el.find_K_integrand(Point::One(2.3), &c), target);
 }
