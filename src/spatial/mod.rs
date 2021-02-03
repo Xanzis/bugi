@@ -1,5 +1,6 @@
 use std::convert::{From, TryFrom, TryInto};
 use std::fmt;
+use std::ops::{Index, IndexMut};
 
 #[derive(Debug)]
 pub struct SpatialError {
@@ -118,6 +119,30 @@ impl From<Point> for Vec<f64> {
             Point::One(x) => vec![x],
             Point::Two(x, y) => vec![x, y],
             Point::Thr(x, y, z) => vec![x, y, z],
+        }
+    }
+}
+
+// TODO this shows Point would better be implemented as a usize, [f64; 3] pair
+impl Index<usize> for Point {
+    type Output = f64;
+    fn index(&self, i: usize) -> Self::Output {
+        match self.clone() {
+            Point::One(x) => {
+                if i >= 1 { panic!("index {} out of range (max 0)", i) }
+                else { x }
+            },
+            Point::Two(x, y) => {
+                if i >= 2 { panic!("index {} out of range (max 1)", i) }
+                else if i == 0 { x }
+                else { y }
+            },
+            Point::Three(x, y, z) => {
+                if i >= 3 { panic!("index {} out of range (max 2)", i) }
+                else if i == 0 { x }
+                else if i == 1 { y }
+                else { z }
+            },
         }
     }
 }
