@@ -23,20 +23,12 @@ impl Assemblage {
         match self.dim {
             1 => {
                 for p in self.points.iter() {
-                    if let Point::One(x) = p {
-                        projs.push((*x, 0.0));
-                    } else {
-                        panic!("bad point variant");
-                    }
+                    projs.push((p[0], 0.0));
                 }
             }
             2 => {
                 for p in self.points.iter() {
-                    if let Point::Two(x, y) = p {
-                        projs.push((*x, *y));
-                    } else {
-                        panic!("bad point variant");
-                    }
+                    projs.push((p[0], p[1]));
                 }
             }
             3 => {
@@ -198,15 +190,15 @@ mod tests {
 
     #[test]
     fn one_d() {
-        let mut asm: Assemblage = vec![Point::One(1.0), Point::One(3.5)].into();
+        let mut asm: Assemblage = vec![Point::new(&[1.0]), Point::new(&[3.5])].into();
         asm.draw("test_generated/one.png");
     }
     #[test]
     fn two_d() {
         let mut asm: Assemblage = vec![
-            Point::Two(1.0, 2.0),
-            Point::Two(-25.0, 37.0),
-            Point::Two(12.0, -5.0),
+            Point::new(&[1.0, 2.0]),
+            Point::new(&[-25.0, 37.0]),
+            Point::new(&[12.0, -5.0]),
         ]
         .into();
         asm.draw("test_generated/two.png");
@@ -214,14 +206,14 @@ mod tests {
     #[test]
     fn three_d() {
         let mut asm: Assemblage = vec![
-            Point::Thr(-1.0, 1.0, 1.0),
-            Point::Thr(1.0, 1.0, 1.0),
-            Point::Thr(1.0, -1.0, 1.0),
-            Point::Thr(-1.0, -1.0, 1.0),
-            Point::Thr(-1.0, 1.0, -1.0),
-            Point::Thr(1.0, 1.0, -1.0),
-            Point::Thr(1.0, -1.0, -1.0),
-            Point::Thr(-1.0, -1.0, -1.0),
+            Point::new(&[-1.0, 1.0, 1.0]),
+            Point::new(&[1.0, 1.0, 1.0]),
+            Point::new(&[1.0, -1.0, 1.0]),
+            Point::new(&[-1.0, -1.0, 1.0]),
+            Point::new(&[-1.0, 1.0, -1.0]),
+            Point::new(&[1.0, 1.0, -1.0]),
+            Point::new(&[1.0, -1.0, -1.0]),
+            Point::new(&[-1.0, -1.0, -1.0]),
         ]
         .into();
         asm.edges = Some(vec![

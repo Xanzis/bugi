@@ -15,36 +15,6 @@ pub trait IsoparElement {
     fn h_and_grad(&self, nat_coor: Point) -> Vec<(f64, (f64, f64))>;
     fn find_mats(&self, nat_coor: Point) -> ElementMats;
 
-    fn nodes_cols(&self) -> LinearMatrix {
-        let nodes = self.nodes();
-        let mut x_vals = Vec::new();
-        let mut y_vals = Vec::new();
-        let mut z_vals = Vec::new();
-
-        for n in nodes.into_iter() {
-            match n {
-                Point::One(x) => x_vals.push(x),
-                Point::Two(x, y) => {
-                    x_vals.push(x);
-                    y_vals.push(y);
-                },
-                Point::Thr(x, y, z) => {
-                    x_vals.push(x);
-                    y_vals.push(y);
-                    z_vals.push(z);
-                },
-            }
-        }
-
-        let mut rows = Vec::new();
-        rows.push(x_vals);
-        if y_vals.len() == 0 { return LinearMatrix::from_rows(rows) }
-        rows.push(y_vals);
-        if z_vals.len() == 0 { return LinearMatrix::from_rows(rows) }
-        rows.push(z_vals);
-        LinearMatrix::from_rows(rows)
-    }
-
     fn find_K_integrand(&self, nat_coor: Point, c: &LinearMatrix) -> LinearMatrix {
         let mut mats = self.find_mats(nat_coor);
 
@@ -126,7 +96,7 @@ impl IsoparElement for PlaneNNode {
         // degenerate versions are ok, but attempt to preserve node order
 
         let nodes = nodes.into_iter()
-            .map(|p| match p { Point::Two(x, y) => (x, y), _ => panic!("bad dim") })
+            .map(|p| p.try_into().unwrap())
             .collect();
         PlaneNNode {nodes}
     }
@@ -140,7 +110,7 @@ impl IsoparElement for PlaneNNode {
         // TODO: have option to only calculate desired matrices
         let interps = self.h_and_grad(nat_coor);
         let n = self.ncount();
-        let node_data = self.nodes_cols();
+        let nodes = self.nodes();
 
         let mut dxdr = 0.0;
         let mut dydr = 0.0;
@@ -157,8 +127,9 @@ impl IsoparElement for PlaneNNode {
 
         // incorporate the gradient of each interpolation function 
         for (i, (h, (dhdr, dhds))) in interps.into_iter().enumerate() {
-            let x = node_data.get((0, i)).unwrap();
-            let y = node_data.get((1, i)).unwrap();
+            let node = nodes[i];
+            let x = node[0];
+            let y = node[1];
 
             // first row of j is dx/dr, dy/dr
             dxdr += x * dhdr;
