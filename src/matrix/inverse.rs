@@ -6,6 +6,8 @@ pub trait Inverse<T>
     fn solve_gausselim(&mut self, b: T) -> Result<T, String>;
     fn lu_decompose(&self) -> (T, T);
     fn det_lu(&self) -> f64; // find the determinant by lu decomposition
+    fn determinant(&self) -> f64;
+    fn inverse(&self) -> T;
 }
 
 impl<T> Inverse<T> for T
@@ -110,5 +112,31 @@ impl<T> Inverse<T> for T
     fn det_lu(&self) -> f64 {
         let (_, u) = self.lu_decompose();
         u.diag().product()
+    }
+
+    fn determinant(&self) -> f64 {
+        // use the cheaper algorithm if possible
+        if self.shape() == (2, 2) {
+            self.get((0, 0)).unwrap() * self.get((1, 1)).unwrap() -
+            self.get((1, 0)).unwrap() * self.get((0, 1)).unwrap()
+        }
+        else {
+            self.det_lu()
+        }
+    }
+
+    fn inverse(&self) -> Self {
+        if self.shape() == (2, 2) {
+            let det = self.determinant();
+
+            let a = self.get((0, 0)).unwrap() / det;
+            let b = self.get((0, 1)).unwrap() / det;
+            let c = self.get((1, 0)).unwrap() / det;
+            let d = self.get((1, 1)).unwrap() / det;
+
+            return Self::from_flat((2, 2), vec![d, -1.0 * b, -1.0 * c, a]);
+        }
+
+        unimplemented!()
     }
 }
