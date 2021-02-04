@@ -59,17 +59,21 @@ pub trait IsoparElement {
         let j_inv = j.inverse();
         let det_j = j.determinant();
 
+        println!("nat_grad_interps:\n{:?}", nat_grad_interps);
+
         // construct the strain interpolation matrix
         let mut b = LinearMatrix::zeros((strain_rule.vec_len(), dim * n));
 
         for (i, nat_grad_interp) in nat_grad_interps.into_iter().enumerate() {
             // ngi is the natural coordinate gradient interpolation for (u, v, w)[i]
             let grad_interp = j_inv.mul(&nat_grad_interp);
+            println!("grad_interp:\n{}", grad_interp);
             // each row of gi is an interpolation for d(u/v/w)/dx, d(u/v/w)/dy ...
             for j in 0..dim {
                 // if ngi[j, ..] should be added to a row in b, add it
                 if let Some(idx) = strain_rule.dest_idx(i, j) {
-                    for (k, coeff) in nat_grad_interp.row(j).cloned().enumerate() {
+                    for (k, coeff) in grad_interp.row(j).cloned().enumerate() {
+                        println!("adding to b[({}, {})]:\n{}", idx, k, coeff);
                         b[(idx, k)] += coeff;
                     }
                 }
@@ -83,10 +87,17 @@ pub trait IsoparElement {
     fn find_k_integrand<T: StrainRule>(&self, nat_coor: Point, c: &LinearMatrix, strain_rule: T) -> LinearMatrix {
         let mut mats = self.find_mats(nat_coor, strain_rule);
 
-        let mut inter = c.mul(&mats.b);
+        println!("{}", mats.b);
+        print!("{}", mats.j);
+        println!("{}", mats.det_j);
+
+        // the integrand for K is (det J) * B_t * C * B
+        mats.b.transpose(); // transpose in place is cheap
+        let mut inter = mats.b.mul(&c);
         inter *= mats.det_j;
-        mats.b.transpose(); // modifying b in-place as .transpose() is cheap
-        mats.b.mul(&inter)
+        mats.b.transpose();
+
+        inter.mul(&mats.b)
     }
 }
 
@@ -121,11 +132,10 @@ impl IsoparElement for Bar2Node {
     }
 
     fn h_and_grad(&self, nat_coor: Point) -> Vec<(f64, Point)> {
-        unimplemented!()
-    }
-
-    fn find_mats<T: StrainRule>(&self, nat_coor: Point, strain_rule: T) -> ElementMats {
-        unimplemented!()
+        vec![
+            (0.5 * (1.0 - nat_coor[0]), Point::new(&[-0.5])),
+            (0.5 * (1.0 + nat_coor[0]), Point::new(&[0.5]))
+        ]
     }
 }
 

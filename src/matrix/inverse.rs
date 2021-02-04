@@ -129,6 +129,10 @@ where
     }
 
     fn inverse(&self) -> Self {
+        if self.shape() == (1, 1) {
+            return Self::from_flat((1, 1), vec![1.0 / self[(0, 0)]])
+        }
+
         if self.shape() == (2, 2) {
             let det = self.determinant();
 
