@@ -46,9 +46,9 @@ pub trait Material {
                 let mut res = LinearMatrix::eye(3);
                 let v = self.poisson();
                 let e = self.youngs();
-                res.put((1, 0), v);
-                res.put((0, 1), v);
-                res.put((2, 2), (1.0 - v) / 2.0);
+                res[(1, 0)] = v;
+                res[(0, 1)] = v;
+                res[(2, 2)] = (1.0 - v) / 2.0;
                 res *= e / (1.0 - (v * v));
                 res
             }
@@ -56,9 +56,9 @@ pub trait Material {
                 let mut res = LinearMatrix::eye(3);
                 let v = self.poisson();
                 let e = self.youngs();
-                res.put((1, 0), v / (1.0 - v));
-                res.put((0, 1), v / (1.0 - v));
-                res.put((2, 2), (1.0 - (2.0 * v)) / (2.0 * (1.0 - v)));
+                res[(1, 0)] = v / (1.0 - v);
+                res[(0, 1)] = v / (1.0 - v);
+                res[(2, 2)] = (1.0 - (2.0 * v)) / (2.0 * (1.0 - v));
                 res *= (e * (1.0 - v)) / ((1.0 + v) * (1.0 - (2.0 * v)));
                 res
             }
@@ -67,11 +67,11 @@ pub trait Material {
                 let v = self.poisson();
                 let e = self.poisson();
                 let x = v / (1.0 - v);
-                for (i, j) in [(0, 1), (0, 3), (3, 1)].iter() {
-                    res.put((*i, *j), x);
-                    res.put((*j, *i), x);
+                for (i, j) in [(0, 1), (0, 3), (3, 1)].iter().cloned() {
+                    res[(i, j)] = x;
+                    res[(j, i)] = x;
                 }
-                res.put((2, 2), (1.0 - (2.0 * v)) / (2.0 * (1.0 - v)));
+                res[(2, 2)] = (1.0 - (2.0 * v)) / (2.0 * (1.0 - v));
                 res *= (e * (1.0 - v)) / ((1.0 + v) * (1.0 - (2.0 * v)));
                 res
             }
@@ -80,12 +80,12 @@ pub trait Material {
                 let v = self.poisson();
                 let e = self.poisson();
                 let x = v / (1.0 - v);
-                for (i, j) in [(0, 1), (0, 2), (2, 1)].iter() {
-                    res.put((*i, *j), x);
-                    res.put((*j, *i), x);
+                for (i, j) in [(0, 1), (0, 2), (2, 1)].iter().cloned() {
+                    res[(i, j)] = x;
+                    res[(j, i)] = x;
                 }
                 for i in 3..6 {
-                    res.put((i, i), (1.0 - (2.0 * v)) / (2.0 * (1.0 - v)));
+                    res[(i, i)] = (1.0 - (2.0 * v)) / (2.0 * (1.0 - v));
                 }
                 res *= (e * (1.0 - v)) / ((1.0 + v) * (1.0 - (2.0 * v)));
                 res
@@ -95,9 +95,9 @@ pub trait Material {
                     let mut res = LinearMatrix::eye(3);
                     let v = self.poisson();
                     let e = self.youngs();
-                    res.put((1, 0), v);
-                    res.put((0, 1), v);
-                    res.put((2, 2), (1.0 - v) / 2.0);
+                    res[(1, 0)] = v;
+                    res[(0, 1)] = v;
+                    res[(2, 2)] = (1.0 - v) / 2.0;
                     res *= (e * h * h * h) / (12.0 * (1.0 - (v * v)));
                     res
                 }
