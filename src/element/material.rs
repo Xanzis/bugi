@@ -1,6 +1,6 @@
 use crate::matrix::{LinearMatrix, MatrixLike};
 
-enum ProblemType {
+pub enum ProblemType {
     // strain vector e.T in comments
     Bar,              // [e_xx]
     Beam,             // [k_xx]

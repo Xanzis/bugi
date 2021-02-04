@@ -106,11 +106,11 @@ pub struct Bar2Node {
 }
 
 pub struct ElementMats {
-    b: LinearMatrix,
-    h: Option<LinearMatrix>,
-    j: LinearMatrix,
-    j_inv: LinearMatrix,
-    det_j: f64,
+    pub b: LinearMatrix,
+    pub h: Option<LinearMatrix>,
+    pub j: LinearMatrix,
+    pub j_inv: LinearMatrix,
+    pub det_j: f64,
 }
 
 impl IsoparElement for Bar2Node {
@@ -178,9 +178,9 @@ impl IsoparElement for PlaneNNode {
         // returns (h_i, (dh_i/dr, dh_i/ds)) for i in 0..n
         let (r, s) = nat_coor.try_into().unwrap();
 
-        let mut h = vec![0.0; self.dim()];
-        let mut dhdr = vec![0.0; self.dim()];
-        let mut dhds = vec![0.0; self.dim()];
+        let mut h = vec![0.0; self.node_count()];
+        let mut dhdr = vec![0.0; self.node_count()];
+        let mut dhds = vec![0.0; self.node_count()];
 
         h[0] = 0.25 * (1.0 + r) * (1.0 + s);
         dhdr[0] = 0.25 * (1.0 + s);
