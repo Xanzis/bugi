@@ -328,7 +328,7 @@ impl MatrixLike for LowerTriangular {
         Self { dim, data }
     }
 
-    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, data: U) -> Self {
+    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(_shape: T, _data: U) -> Self {
         // don't feel like it
         unimplemented!()
     }
@@ -407,7 +407,7 @@ impl MatrixLike for UpperTriangular {
         Self { dim, data }
     }
 
-    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, data: U) -> Self {
+    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(_shape: T, _data: U) -> Self {
         unimplemented!()
     }
 }

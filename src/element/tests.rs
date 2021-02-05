@@ -2,7 +2,7 @@ use super::isopar::{IsoparElement, Bar2Node, PlaneNNode};
 use super::strain::{self, StrainRule};
 use super::material::{Aluminum6061, ProblemType, Material};
 use super::integrate::{newton_single, nd_gauss_single};
-use crate::matrix::{LinearMatrix, MatrixLike};
+use crate::matrix::{LinearMatrix, MatrixLike, Norm};
 use crate::spatial::Point;
 
 #[test]
@@ -24,7 +24,7 @@ fn rectangle_jacobians() {
 	let target = LinearMatrix::from_flat((2, 2), vec![3.0, 0.0, 0.0, 2.0]);
 
 	let mats = el.find_mats(Point::new(&[0.0, 0.0]), strain::PlaneStrain);
-	assert_eq!(mats.j, LinearMatrix::from_flat((2, 2), vec![3.0, 0.0, 0.0, 2.0]));
+	assert!((&mats.j - &target).frobenius() < 1.0e-10);
 }
 #[test]
 fn simple_integrals() {

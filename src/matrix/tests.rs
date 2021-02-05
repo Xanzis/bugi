@@ -168,7 +168,7 @@ fn triangular_u_sub() {
     assert!((&x - &target).frobenius() < 1.0e-10);
 }
 #[test]
-fn l_inverse() {
+fn lu_inverses() {
     let mut a = LowerTriangular::eye(3);
     a[(1, 0)] = 3.5;
     a[(2, 2)] = 0.2;
@@ -176,9 +176,7 @@ fn l_inverse() {
     let i: LinearMatrix = a.mul(&b);
     let target = LinearMatrix::eye(3);
     assert!((&i - &target).frobenius() < 1.0e-10);
-}
-#[test]
-fn u_inverse() {
+
     let mut a = UpperTriangular::eye(3);
     a[(0, 2)] = 0.7;
     a[(1, 1)] = 12.0;

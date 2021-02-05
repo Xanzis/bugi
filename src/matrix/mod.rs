@@ -4,9 +4,10 @@ use crate::spatial::Point;
 use std::ops::{Index, IndexMut};
 
 pub mod buffer;
-
 pub mod inverse;
 pub mod norm;
+pub use inverse::Inverse;
+pub use norm::Norm;
 
 #[cfg(test)]
 mod tests;
