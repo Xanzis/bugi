@@ -174,7 +174,7 @@ fn project(points: Vec<Point>) -> Vec<(f64, f64)> {
         panic!("bad dimension count in visual::project");
     }
 
-    let new_points = r.mul(&points);
+    let new_points: LinearMatrix = r.mul(&points);
     // return the x and y coordinates of the new points by zipping the first two rows
     new_points
         .row(0)

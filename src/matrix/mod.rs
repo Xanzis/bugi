@@ -97,7 +97,8 @@ where
         }
     }
 
-    fn mul(&self, other: &Self) -> Self {
+    fn mul<T: MatrixLike, U: MatrixLike>(&self, other: &T) -> U {
+        // generics are nice but this will be inefficient for sparse / triangular
         let a_shape = self.shape();
         let b_shape = other.shape();
 
@@ -119,7 +120,7 @@ where
                 res_vals.push(dot);
             }
         }
-        Self::from_flat(res_shape, res_vals)
+        U::from_flat(res_shape, res_vals)
     }
 
     // *****

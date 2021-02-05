@@ -66,7 +66,7 @@ pub trait IsoparElement {
 
         for (i, nat_grad_interp) in nat_grad_interps.into_iter().enumerate() {
             // ngi is the natural coordinate gradient interpolation for (u, v, w)[i]
-            let grad_interp = j_inv.mul(&nat_grad_interp);
+            let grad_interp: LinearMatrix = j_inv.mul(&nat_grad_interp);
             println!("grad_interp:\n{}", grad_interp);
             // each row of gi is an interpolation for d(u/v/w)/dx, d(u/v/w)/dy ...
             for j in 0..dim {
@@ -93,7 +93,7 @@ pub trait IsoparElement {
 
         // the integrand for K is (det J) * B_t * C * B
         mats.b.transpose(); // transpose in place is cheap
-        let mut inter = mats.b.mul(&c);
+        let mut inter: LinearMatrix = mats.b.mul(c);
         inter *= mats.det_j;
         mats.b.transpose();
 
