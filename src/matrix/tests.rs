@@ -1,4 +1,4 @@
-use super::{LinearMatrix, MatrixLike};
+use super::{LinearMatrix, MatrixLike, LowerTriangular, UpperTriangular};
 use super::inverse::Inverse;
 use super::norm::Norm;
 
@@ -115,4 +115,30 @@ fn lu_decompose() {
 fn determinant() {
     let a = LinearMatrix::from_flat((2, 2), vec![3.0, 8.0, 4.0, 6.0]);
     assert!((a.det_lu() + 14.0).abs() < 1e-10);
+}
+#[test]
+fn triangulars() {
+    let mut a = LowerTriangular::zeros(3);
+    assert_eq!(a.get((1, 2)), Some(&0.0));
+    assert_eq!(a.get((3, 2)), None);
+    let mut b = UpperTriangular::zeros(3);
+    assert_eq!(a.get((1, 2)), Some(&0.0));
+    assert_eq!(a.get((3, 2)), None);
+
+    a[(2, 1)] = 3.0;
+    assert_eq!(a[(2, 1)], 3.0);
+    b[(1, 2)] = 3.0;
+    assert_eq!(b[(1, 2)], 3.0);
+}
+#[test]
+#[should_panic]
+fn triangular_l_oob() {
+    let mut a = LowerTriangular::zeros(2);
+    a[(0, 1)] = 2.0;
+}
+#[test]
+#[should_panic]
+fn triangular_u_oob() {
+    let mut a = UpperTriangular::zeros(2);
+    a[(1, 0)] = 2.0;
 }

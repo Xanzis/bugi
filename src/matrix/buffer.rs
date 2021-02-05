@@ -10,6 +10,18 @@ pub struct LinearMatrix {
     data: Vec<f64>,
 }
 
+#[derive(Clone, Debug)]
+pub struct LowerTriangular {
+    dim: usize,
+    data: Vec<f64>,
+}
+
+#[derive(Clone, Debug)]
+pub struct UpperTriangular {
+    dim: usize,
+    data: Vec<f64>,
+}
+
 impl LinearMatrix {
     fn pos(&self, loc: (usize, usize)) -> Option<usize> {
         // find the location of the desired element in data
@@ -23,6 +35,31 @@ impl LinearMatrix {
         }
     }
 }
+
+impl LowerTriangular {
+    fn pos(&self, loc: (usize, usize)) -> Option<usize> {
+        let (row, col) = loc;
+        if (row >= self.dim) || (col >= self.dim) { return None }
+        // returns None if a non-triangular position is requested
+        // Index implementation should fill &0.0
+        // IndexMut should panic
+        if col > row { return None }
+        Some((row * (row + 1) / 2) + col)
+    }
+}
+
+impl UpperTriangular {
+    fn pos(&self, loc: (usize, usize)) -> Option<usize> {
+        let (row, col) = loc;
+        if (col >= self.dim) || (row >= self.dim) { return None }
+        if row > col { return None }
+        Some((col * (col + 1) / 2) + row)
+    }
+}
+
+// *****
+// LinearMatrix Implementations
+// *****
 
 impl MatrixLike for LinearMatrix {
     fn shape(&self) -> (usize, usize) {
@@ -182,5 +219,162 @@ impl IndexMut<(usize, usize)> for LinearMatrix {
         else {
             panic!("matrix index out of bounds")
         }
+    }
+}
+
+// *****
+// LowerTriangular Implementations
+// *****
+
+impl MatrixLike for LowerTriangular {
+    fn shape(&self) -> (usize, usize) {
+        (self.dim, self.dim)
+    }
+
+    fn get(&self, loc: (usize, usize)) -> Option<&f64> {
+        if let Some(i) = self.pos(loc) {
+            // this is fine, self.pos checks bounds
+            unsafe {Some(self.data.get_unchecked(i))}
+        }
+        else if (loc.0 < self.dim) && (loc.0 < self.dim) {
+            Some(&0.0)
+        }
+        else { None }
+    }
+
+    fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64> {
+        if let Some(i) = self.pos(loc) {
+            unsafe {Some(self.data.get_unchecked_mut(i))}
+        }
+        else { None }
+    }
+
+    fn transpose(&mut self) {
+        unimplemented!() // cannot transpose this type in place
+    }
+
+    fn zeros<T: Into<MatrixShape>>(shape: T) -> Self {
+        let shape: MatrixShape = shape.into();
+        let dim = shape.max_dim;
+        let data = vec![0.0; (dim + 1) * (dim + 2) / 2];
+        Self { dim, data }
+    }
+
+    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, data: U) -> Self {
+        // don't feel like it
+        unimplemented!()
+    }
+}
+
+impl PartialEq for LowerTriangular {
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data
+    }
+}
+
+impl fmt::Display for LowerTriangular {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.disp())
+    }
+}
+
+impl Index<(usize, usize)> for LowerTriangular {
+    type Output = f64;
+    fn index(&self, loc: (usize, usize)) -> &Self::Output {
+        if let Some(i) = self.pos(loc) {
+            // this is perfectly fine, self.pos performs bounds check
+            unsafe {self.data.get_unchecked(i)}
+        }
+        else if (loc.0 < self.dim) && (loc.1 < self.dim) {
+            &0.0
+        }
+        else {panic!("matrix index out of bounds")}
+    }
+}
+
+impl IndexMut<(usize, usize)> for LowerTriangular {
+    fn index_mut(&mut self, loc: (usize, usize)) -> &mut Self::Output {
+        if let Some(i) = self.pos(loc) {
+            unsafe {self.data.get_unchecked_mut(i)}
+        }
+        else {panic!("matrix index out of bounds")}
+    }
+}
+
+// *****
+// UpperTriangular Implementations
+// *****
+
+impl MatrixLike for UpperTriangular {
+    fn shape(&self) -> (usize, usize) {
+        (self.dim, self.dim)
+    }
+
+    fn get(&self, loc: (usize, usize)) -> Option<&f64> {
+        if let Some(i) = self.pos(loc) {
+            // this is fine, self.pos checks bounds
+            unsafe {Some(self.data.get_unchecked(i))}
+        }
+        else if (loc.0 < self.dim) && (loc.1 < self.dim) {
+            Some(&0.0)
+        }
+        else { None }
+    }
+
+    fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64> {
+        if let Some(i) = self.pos(loc) {
+            unsafe {Some(self.data.get_unchecked_mut(i))}
+        }
+        else { None }
+    }
+
+    fn transpose(&mut self) {
+        unimplemented!() // cannot transpose this type in place
+    }
+
+    fn zeros<T: Into<MatrixShape>>(shape: T) -> Self {
+        let shape: MatrixShape = shape.into();
+        let dim = shape.max_dim;
+        let data = vec![0.0; (dim + 1) * (dim + 2) / 2];
+        Self { dim, data }
+    }
+
+    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, data: U) -> Self {
+        unimplemented!()
+    }
+}
+
+impl PartialEq for UpperTriangular {
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data
+    }
+}
+
+impl fmt::Display for UpperTriangular {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.disp())
+    }
+}
+
+impl Index<(usize, usize)> for UpperTriangular {
+    type Output = f64;
+    fn index(&self, loc: (usize, usize)) -> &Self::Output {
+        if let Some(i) = self.pos(loc) {
+            // this is perfectly fine, self.pos performs bounds check
+            unsafe {self.data.get_unchecked(i)}
+        }
+        else if (loc.1 < self.dim) && (loc.0 < self.dim) {
+            &0.0
+        }
+        else {panic!("matrix index out of bounds")}
+    }
+}
+
+impl IndexMut<(usize, usize)> for UpperTriangular {
+    fn index_mut(&mut self, loc: (usize, usize)) -> &mut Self::Output {
+        if let Some(i) = self.pos(loc) {
+            unsafe {self.data.get_unchecked_mut(i)}
+        }
+        else {panic!("matrix index out of bounds")}
     }
 }

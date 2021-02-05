@@ -11,7 +11,7 @@ pub mod norm;
 #[cfg(test)]
 mod tests;
 
-pub use buffer::{LinearMatrix};
+pub use buffer::{LinearMatrix, LowerTriangular, UpperTriangular};
 //type Matrix = LinearMatrix; // default implementation
 
 // rolling my own (pretty limited) matrix math
@@ -236,6 +236,22 @@ where
     fn col_vec(data: Vec<f64>) -> Self {
         let mut res = Self::row_vec(data);
         res.transpose();
+        res
+    }
+
+    // *****
+    // matrix display methods (specialization instability prevents generic Display)
+
+    fn disp(&self) -> String {
+        let (nrow, ncol) = self.shape();
+        let mut res = format!("rows: {} cols: {}\n", nrow, ncol);
+        for i in 0..nrow {
+            for val in self.row(i) {
+                let new = format!("{:1.5} ", val);
+                res.push_str(new.as_str());
+            }
+            res.push_str("\n");
+        }
         res
     }
 }
