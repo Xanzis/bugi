@@ -46,7 +46,7 @@ fn linear_ops() {
                                                  1.0, 2.0, 1.0, 2.0]);
     let target = LinearMatrix::from_flat((2, 4), vec![9.0, 12.0, 7.0, 9.0, 
                                                       28.0, 32.0, 20.0, 23.0]);
-    let prod = a.mul(&b);
+    let prod: LinearMatrix = a.mul(&b);
     assert_eq!(target, prod);
     let mut a = LinearMatrix::from_flat((2, 2), vec![1.0, 2.0, 3.0, 4.0]);
     a += 2.0;
@@ -108,7 +108,7 @@ fn lu_decompose() {
     assert_eq!(l[(1, 1)], 1.0);
     assert_eq!(l[(0, 1)], 0.0);
     assert_eq!(u[(1, 0)], 0.0);
-    let regen = l.mul(&u);
+    let regen: LinearMatrix = l.mul(&u);
     assert!((&a - &regen).frobenius() < 1e-10);
 }
 #[test]
@@ -141,4 +141,29 @@ fn triangular_l_oob() {
 fn triangular_u_oob() {
     let mut a = UpperTriangular::zeros(2);
     a[(1, 0)] = 2.0;
+}
+#[test]
+fn triangular_l_sub() {
+    let mut a = LowerTriangular::eye(4);
+    a[(1, 0)] = -1.0;
+    a[(2, 1)] = 0.5;
+    a[(3, 2)] = 14.0;
+    a[(3, 1)] = 1.0;
+    a[(3, 0)] = 6.0;
+    let x = LinearMatrix::from_flat((4, 1), a.forward_sub(&[1.0, -1.0, 2.0, 1.0]));
+    let target = LinearMatrix::from_flat((4, 1), vec![1.0, 0.0, 2.0, -33.0]);
+    assert!((&x - &target).frobenius() < 1.0e-10);
+}
+#[test]
+fn triangular_u_sub() {
+    let mut a = UpperTriangular::zeros(3);
+    a[(0, 0)] = -4.0;
+    a[(1, 1)] = 3.5;
+    a[(2, 2)] = 3.5;
+    a[(0, 1)] = -2.0;
+    a[(1, 2)] = -1.75;
+    a[(0, 2)] = 1.0;
+    let x = LinearMatrix::from_flat((3, 1), a.backward_sub(&[-5.0, 1.75, 10.5]));
+    let target = LinearMatrix::from_flat((3, 1), vec![1.0, 2.0, 3.0]);
+    assert!((&x - &target).frobenius() < 1.0e-10);
 }

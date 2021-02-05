@@ -46,6 +46,22 @@ impl LowerTriangular {
         if col > row { return None }
         Some((row * (row + 1) / 2) + col)
     }
+
+    pub fn forward_sub(&self, b: &[f64]) -> Vec<f64> {
+        // solves Lx = b
+        // TODO consider returning a Result
+        let dim = self.dim;
+        if dim != b.len() {panic!("incompatible shapes")}
+        let mut x = vec![0.0; dim];
+        for i in 0..dim {
+            let mut temp = 0.0;
+            for j in 0..i {
+                temp += self[(j, i)] * x[j];
+            }
+            x[i] = (b[i] - temp) / self[(i, i)];
+        }
+        x
+    }
 }
 
 impl UpperTriangular {
@@ -54,6 +70,22 @@ impl UpperTriangular {
         if (col >= self.dim) || (row >= self.dim) { return None }
         if row > col { return None }
         Some((col * (col + 1) / 2) + row)
+    }
+
+    pub fn backward_sub(&self, b: &[f64]) -> Vec<f64> {
+        // solves Ux = b
+        let dim = self.dim;
+        if dim != b.len() {panic!("incompatible shapes")}
+        let mut x = vec![0.0; dim];
+        for i in (0..dim).rev() {
+            let mut temp = 0.0;
+            for j in (i + 1)..dim {
+                temp += self[(i, j)] * x[j];
+            }
+            println!("{:?}", temp);
+            x[i] = (b[i] - temp) / self[(i, i)];
+        }
+        x
     }
 }
 

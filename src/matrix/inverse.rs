@@ -1,4 +1,4 @@
-use super::MatrixLike;
+use super::{MatrixLike, UpperTriangular, LowerTriangular};
 use std::ops::Add;
 
 pub trait Inverse<T>
