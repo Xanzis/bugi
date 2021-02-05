@@ -1,4 +1,6 @@
 use crate::matrix::MatrixLike;
+use crate::spatial::Point;
+use std::convert::TryInto;
 
 // dear reader,
 // the following numbers are magic
@@ -37,11 +39,14 @@ const GAUSS_WEIGHTS_4: [f64; 4] = [0.34785_48451_37454,
 // TODO maybe there's a better way to make an API for this idk
 const NEWTON_COATES: [&[f64]; 2] = [&NEWTON_COATES_2, &NEWTON_COATES_4];
 
-const GAUSS_POINT: [&[f64]; 2] = [&GAUSS_POINTS_2, &GAUSS_POINTS_4];
-const GAUSS_WEIGHT: [&[f64]; 2] = [&GAUSS_WEIGHTS_2, &GAUSS_WEIGHTS_4];
+const GAUSS_POINTS: [&[f64]; 2] = [&GAUSS_POINTS_2, &GAUSS_POINTS_4];
+const GAUSS_WEIGHTS: [&[f64]; 2] = [&GAUSS_WEIGHTS_2, &GAUSS_WEIGHTS_4];
 
 // single-value integration: just for tests
-pub fn newton_single<T: Fn(f64) -> f64>(func: T, bounds: (f64, f64), prec: usize) -> f64 {
+pub fn newton_single<T>(func: T, bounds: (f64, f64), prec: usize) -> f64 
+where
+    T: Fn(f64) -> f64,
+{
     let nums = NEWTON_COATES[prec];
     let n = nums.len() - 1;
 
@@ -57,4 +62,35 @@ pub fn newton_single<T: Fn(f64) -> f64>(func: T, bounds: (f64, f64), prec: usize
     }
 
     (bounds.1 - bounds.0) * sum
+}
+
+pub fn nd_gauss_single<T>(func: T, dim: usize, prec:usize) -> f64
+where
+    T: Fn(Point) -> f64,
+{
+    let points = GAUSS_POINTS[prec];
+    let weights = GAUSS_WEIGHTS[prec];
+    let n = points.len();
+
+    let mut indices = [0, 0, 0];
+    let mut sum = 0.0;
+
+    loop {
+        let mut x: Vec<f64> = Vec::new();
+        let mut w = 1.0;
+        for i in 0..n {
+            x.push(points[i]);
+            w *= weights[i];
+        }
+        sum += w * func(x.try_into().unwrap());
+
+        indices[0] += 1;
+        let mut i = 0;
+        while indices[i] >= n {
+            indices[i] = 0;
+            i += 1;
+            if i >= n { return sum }
+            indices[i] += 1;
+        }
+    }
 }

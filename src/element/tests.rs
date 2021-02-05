@@ -1,7 +1,7 @@
 use super::isopar::{IsoparElement, Bar2Node, PlaneNNode};
 use super::strain::{self, StrainRule};
 use super::material::{Aluminum6061, ProblemType, Material};
-use super::integrate::newton_single;
+use super::integrate::{newton_single, nd_gauss_single};
 use crate::matrix::{LinearMatrix, MatrixLike};
 use crate::spatial::Point;
 
@@ -30,4 +30,7 @@ fn rectangle_jacobians() {
 fn simple_integrals() {
 	let val = newton_single(|x| ((2.0_f64).powf(x) - x), (0.0, 3.0), 0);
 	assert!((val - 5.656854).abs() < 1.0e-5);
+
+	let val = nd_gauss_single(|x| x[0].powi(2) * x[1].powi(2), 2, 0);
+	assert!(val - (4.0 / 9.0) < 1.0e-5);
 }
