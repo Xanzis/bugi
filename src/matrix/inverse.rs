@@ -6,9 +6,10 @@ where
     T: MatrixLike,
 {
     fn solve_gausselim(&mut self, b: T) -> Result<T, String>;
-    fn lu_decompose(&self) -> (T, T);
+    fn lu_decompose(&self) -> (LowerTriangular, UpperTriangular);
     fn det_lu(&self) -> f64; // find the determinant by lu decomposition
     fn determinant(&self) -> f64;
+    fn inv_lu(&self) -> T;
     fn inverse(&self) -> T;
 }
 
@@ -78,14 +79,14 @@ where
         Ok(x)
     }
 
-    fn lu_decompose(&self) -> (Self, Self) {
+    fn lu_decompose(&self) -> (LowerTriangular, UpperTriangular) {
         let shape = self.shape();
         if shape.0 != shape.1 {
             panic!("non-square matrix");
         }
         let dim = shape.0;
-        let mut lower = Self::zeros((dim, dim));
-        let mut upper = Self::zeros((dim, dim));
+        let mut lower = LowerTriangular::zeros((dim, dim));
+        let mut upper = UpperTriangular::zeros((dim, dim));
 
         for i in 0..dim {
             for k in i..dim {
@@ -128,6 +129,15 @@ where
         }
     }
 
+    fn inv_lu(&self) -> Self {
+        // find the inverse matrix via LU substitution
+        let (l, u) = self.lu_decompose();
+        let l_inv = l.tri_inv();
+        let u_inv = u.tri_inv();
+
+        u_inv.mul(&l_inv)
+    }
+
     fn inverse(&self) -> Self {
         if self.shape() == (1, 1) {
             return Self::from_flat((1, 1), vec![1.0 / self[(0, 0)]])
@@ -144,6 +154,6 @@ where
             return Self::from_flat((2, 2), vec![d, -1.0 * b, -1.0 * c, a]);
         }
 
-        unimplemented!()
+        self.inv_lu()
     }
 }

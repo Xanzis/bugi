@@ -167,3 +167,43 @@ fn triangular_u_sub() {
     let target = LinearMatrix::from_flat((3, 1), vec![1.0, 2.0, 3.0]);
     assert!((&x - &target).frobenius() < 1.0e-10);
 }
+#[test]
+fn l_inverse() {
+    let mut a = LowerTriangular::eye(3);
+    a[(1, 0)] = 3.5;
+    a[(2, 2)] = 0.2;
+    let b = a.tri_inv();
+    let i: LinearMatrix = a.mul(&b);
+    let target = LinearMatrix::eye(3);
+    assert!((&i - &target).frobenius() < 1.0e-10);
+}
+#[test]
+fn u_inverse() {
+    let mut a = UpperTriangular::eye(3);
+    a[(0, 2)] = 0.7;
+    a[(1, 1)] = 12.0;
+    a[(0, 1)] = 1.0;
+    let b = a.tri_inv();
+    let i: LinearMatrix = a.mul(&b);
+    let target = LinearMatrix::eye(3);
+    assert!((&i - &target).frobenius() < 1.0e-10);
+}
+fn inverses() {
+    let a = LinearMatrix::from_flat((1, 1), vec![2.0]);
+    let a_inv = a.inverse();
+    let i: LinearMatrix = a.mul(&a_inv);
+    let eye = LinearMatrix::eye(1);
+    assert!((&i - &eye).frobenius() < 1.0e-10);
+
+    let a = LinearMatrix::from_flat((2, 2), vec![2.0, 7.6, 3.2, 0.1]);
+    let a_inv = a.inverse();
+    let i: LinearMatrix = a.mul(&a_inv);
+    let eye = LinearMatrix::eye(2);
+    assert!((&i - &eye).frobenius() < 1.0e-10);
+
+    let a = LinearMatrix::from_flat((3, 3), vec![2.0, 7.0, 2.5, -1.7, -0.4, 2.3, 1.9, 0.4, 12.0]);
+    let a_inv = a.inverse();
+    let i: LinearMatrix = a.mul(&a_inv);
+    let eye = LinearMatrix::eye(3);
+    assert!((&i - &eye).frobenius() < 1.0e-10);
+}

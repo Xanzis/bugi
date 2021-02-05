@@ -50,17 +50,36 @@ impl LowerTriangular {
     pub fn forward_sub(&self, b: &[f64]) -> Vec<f64> {
         // solves Lx = b
         // TODO consider returning a Result
+        println!("this is me: {}", self);
         let dim = self.dim;
         if dim != b.len() {panic!("incompatible shapes")}
         let mut x = vec![0.0; dim];
         for i in 0..dim {
             let mut temp = 0.0;
             for j in 0..i {
-                temp += self[(j, i)] * x[j];
+                temp += self[(i, j)] * x[j];
             }
             x[i] = (b[i] - temp) / self[(i, i)];
+            println!("assigned x[{}] = {}", i, x[i]);
         }
         x
+    }
+
+    pub fn tri_inv(&self) -> Self {
+        // solves LX = I
+        let mut b = vec![0.0; self.dim];
+        let mut res = LowerTriangular::zeros(self.dim);
+        for i in 0..self.dim {
+            // invert identity vectors column-by-column
+            b[i] = 1.0;
+            let x = self.forward_sub(b.as_slice());
+            // x will begin with i 0s (since X is lower triangular)
+            for (j, val) in x.into_iter().enumerate().skip(i) {
+                res[(j, i)] = val;
+            }
+            b[i] = 0.0; // put it back :)
+        }
+        res
     }
 }
 
@@ -86,6 +105,23 @@ impl UpperTriangular {
             x[i] = (b[i] - temp) / self[(i, i)];
         }
         x
+    }
+
+    pub fn tri_inv(&self) -> Self {
+        // solves UX = I
+        let mut b = vec![0.0; self.dim];
+        let mut res = UpperTriangular::zeros(self.dim);
+        for i in 0..self.dim {
+            // invert identity vectors column-by-column
+            b[i] = 1.0;
+            let x = self.backward_sub(b.as_slice());
+            // x's first (i + 1) values will be nonzero
+            for (j, val) in x.into_iter().enumerate().take(i + 1) {
+                res[(j, i)] = val;
+            }
+            b[i] = 0.0; // put it back :)
+        }
+        res
     }
 }
 
@@ -268,7 +304,7 @@ impl MatrixLike for LowerTriangular {
             // this is fine, self.pos checks bounds
             unsafe {Some(self.data.get_unchecked(i))}
         }
-        else if (loc.0 < self.dim) && (loc.0 < self.dim) {
+        else if (loc.0 < self.dim) && (loc.1 < self.dim) {
             Some(&0.0)
         }
         else { None }
