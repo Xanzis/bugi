@@ -11,17 +11,30 @@ pub enum ProblemType {
     PlateBending,     // [k_xx k_yy k_xy]
 }
 
-pub trait Material {
-    fn youngs(&self) -> f64;
-    fn poisson(&self) -> f64;
+#[derive(Debug, Clone, Copy)]
+pub struct Material {
+    youngs: f64,
+    poisson: f64,
+}
+
+const AL6061 = Material {youngs: 6.89e10, poisson: 0.33};
+
+impl Material {
+    fn youngs(&self) -> f64 {
+        self.youngs
+    }
+
+    fn poisson(&self) -> f64 {
+        self.poisson
+    }
 
     fn inertia_moment(&self) -> Option<f64> {
-        None
+        unimplemented!()
     }
 
     fn thickness(&self) -> Option<f64> {
         // used for plate bending matrices
-        None
+        unimplemented!()
     }
 
     fn get_c(&self, problem: ProblemType) -> LinearMatrix {
@@ -106,18 +119,5 @@ pub trait Material {
                 }
             }
         }
-    }
-}
-
-pub struct Aluminum6061;
-
-impl Material for Aluminum6061 {
-    fn youngs(&self) -> f64 {
-        // SI units: Pa
-        6.89e10
-    }
-    fn poisson(&self) -> f64 {
-        // unitless
-        0.33
     }
 }

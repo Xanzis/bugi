@@ -1,6 +1,6 @@
 use super::isopar::{IsoparElement, Bar2Node, PlaneNNode};
-use super::strain::{self, StrainRule};
-use super::material::{Aluminum6061, ProblemType, Material};
+use super::strain::StrainRule;
+use super::material::Material;
 use super::integrate::{newton_single, nd_gauss_single};
 use crate::matrix::{LinearMatrix, MatrixLike, Norm};
 use crate::spatial::Point;
@@ -12,7 +12,7 @@ fn basic_bar_f() {
 	let el = Bar2Node::new(vec![a, b]);
 	let target = LinearMatrix::from_flat((2, 2), vec![0.5, -0.5, -0.5, 0.5]);
 	let c = LinearMatrix::from_flat((1, 1), vec![1.0]);
-	assert_eq!(el.find_k_integrand(Point::new(&[2.3]), &c, strain::Bar), target);
+	assert_eq!(el.find_k_integrand(Point::new(&[2.3]), &c, StrainRule::Bar), target);
 }
 #[test]
 fn rectangle_jacobians() {
@@ -23,7 +23,7 @@ fn rectangle_jacobians() {
 	let el = PlaneNNode::new(vec![a, b, c, d]);
 	let target = LinearMatrix::from_flat((2, 2), vec![3.0, 0.0, 0.0, 2.0]);
 
-	let mats = el.find_mats(Point::new(&[0.0, 0.0]), strain::PlaneStrain);
+	let mats = el.find_mats(Point::new(&[0.0, 0.0]), StrainRule::PlaneStrain);
 	assert!((&mats.j - &target).frobenius() < 1.0e-10);
 }
 #[test]
