@@ -45,8 +45,8 @@ const GAUSS_W_4: [f64; 4] = [0.34785_48451_37454,
 const NEWTON_COATES: [&[f64]; 2] = [&NEWTON_COATES_2, &NEWTON_COATES_4];
 
 // gauss-legendre integration constants, by order (0 order is nonexistent in this scheme)
-const GAUSS_POINTS: [&[f64]; 2] = [&[], &GAUSS_P_1, &GAUSS_P_2, &GAUSS_P_3, &GAUSS_P_4];
-const GAUSS_WEIGHTS: [&[f64]; 2] = [&[], &GAUSS_W_1, &GAUSS_W_2, &GAUSS_W_3, &GAUSS_W_4];
+const GAUSS_POINTS: [&[f64]; 5] = [&[], &GAUSS_P_1, &GAUSS_P_2, &GAUSS_P_3, &GAUSS_P_4];
+const GAUSS_WEIGHTS: [&[f64]; 5] = [&[], &GAUSS_W_1, &GAUSS_W_2, &GAUSS_W_3, &GAUSS_W_4];
 
 // single-value integration: just for tests
 pub fn newton_single<T>(func: T, bounds: (f64, f64), prec: usize) -> f64 
@@ -105,7 +105,7 @@ where
 
 // same as above, this time with a matrix as integrand
 // not using generics because a dense matrix will always be fine for the application
-pub fn nd_gauss_mat<T, U>(func: T, dim: usize, order: usize) -> LinearMatrix
+pub fn nd_gauss_mat<T>(func: T, dim: usize, order: usize) -> LinearMatrix
 where
     T: Fn(Point) -> LinearMatrix,
 {
@@ -116,7 +116,7 @@ where
     assert_eq!(points.len(), order);
 
     let mut indices = [0, 0, 0];
-    let mut sum = None;
+    let mut sum: Option<LinearMatrix> = None;
 
     loop {
         // TODO this isn't the inner loop but the heap allocation probably isn't ideal
@@ -133,8 +133,8 @@ where
         let mut term = func(x.try_into().unwrap());
         term *= w;
         sum = match sum {
-            Some(s) => {
-                s.add_ass(term);
+            Some(mut s) => {
+                s.add_ass(&term);
                 Some(s)
             },
             None => {
