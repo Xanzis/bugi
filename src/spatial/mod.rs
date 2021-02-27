@@ -40,8 +40,8 @@ impl Point {
         Point {n, data}
     }
 
-    pub fn zero(dim: usize) -> Self {
-        Point {dim, [0.0; 3]}
+    pub fn zero(n: usize) -> Self {
+        Point {n, data: [0.0; 3]}
     }
 }
 
