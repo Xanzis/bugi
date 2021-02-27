@@ -20,8 +20,9 @@ mod tests;
 // type containing element variety and node index information
 // TODO this is a silly indirection and hides some underlying APIs
 // once things are working, factor this out
+// TODO make this non-public once changes are applied
 #[derive(Debug, Clone)]
-enum ElementMap {
+pub enum ElementMap {
 	IsoB2N(usize, usize),
 	IsoPNN(Vec<usize>),
 }
@@ -40,7 +41,7 @@ pub struct ElementAssemblage {
 }
 
 impl ElementAssemblage {
-	fn new(dim: usize) -> Self {
+	pub fn new(dim: usize) -> Self {
 		ElementAssemblage {
 			dim,
 			nodes: Vec::new(),
@@ -53,7 +54,8 @@ impl ElementAssemblage {
 		}
 	}
 
-	fn add_nodes<T: Into<Point>>(&mut self, ns: Vec<T>) {
+	// TODO streamline adding nodes and associated elements
+	pub fn add_nodes<T: Into<Point>>(&mut self, ns: Vec<T>) {
 		for n in ns.into_iter() {
 			let p: Point = n.into();
 			if p.dim() != self.dim { panic!("bad node dimension") }
@@ -61,8 +63,16 @@ impl ElementAssemblage {
 		}
 	}
 
-	fn add_element(&mut self, el: ElementMap) {
+	pub fn add_element(&mut self, el: ElementMap) {
 		self.elements.push(el);
+	}
+
+	pub fn add_conc_force(&mut self, n: usize, force: Point) {
+		self.concentrated_forces.insert(n, force);
+	}
+
+	pub fn add_constraint(&mut self, n: usize, constraint: Constraint) {
+		self.constraints.insert(n, constraint);
 	}
 
 	fn find_dof(&self, node_idx: usize, dim_idx: usize) -> Option<usize> {
@@ -124,6 +134,8 @@ impl ElementAssemblage {
 				let el = Bar2Node::new(vec![self.nodes[a], self.nodes[b]]);
 				let strain_rule = StrainRule::Bar;
 				let c = AL6061.get_c(ProblemType::Bar);
+				// TODO el should probably internally cache some intermediate matrices
+				// right now it recomputes the interpolations each time
 				let k_func = move |p| el.find_k_integrand(p, &c, strain_rule);
 				(vec![a, b], Box::new(k_func))
 			},
@@ -162,12 +174,12 @@ impl ElementAssemblage {
 			// TODO could also reduce unnecessary checks by pre-computing a hashmap
 			for i in 0..el_k_dim {
 				// TODO following line is part to change
-				let i_node_idx = el_nodes[i / el_node_count];
-				let i_node_dof = i % el_node_count;
+				let i_node_idx = el_nodes[i / self.dim];
+				let i_node_dof = i % self.dim;
 				if let Some(i_dof) = self.find_dof(i_node_idx, i_node_dof) {
 					for j in 0..el_k_dim {
-						let j_node_idx = el_nodes[j / el_node_count];
-						let j_node_dof = j % el_node_count;
+						let j_node_idx = el_nodes[j / self.dim];
+						let j_node_dof = j % self.dim;
 						if let Some(j_dof) = self.find_dof(j_node_idx, j_node_dof) {
 							// wooo finally
 							k[(i_dof, j_dof)] = el_k[(i, j)];
@@ -217,5 +229,9 @@ impl ElementAssemblage {
 		}
 
 		self.displacements = Some(node_displacements);
+	}
+
+	pub fn displacements(&self) -> Option<Vec<Point>> {
+		self.displacements.clone()
 	}
 }
