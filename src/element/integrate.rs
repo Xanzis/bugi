@@ -107,8 +107,7 @@ where
 // not using generics because a dense matrix will always be fine for the application
 pub fn nd_gauss_mat<T, U>(func: T, dim: usize, order: usize) -> LinearMatrix
 where
-    T: Fn(Point) -> U,
-    U: LinearMatrix,
+    T: Fn(Point) -> LinearMatrix,
 {
     // order determines number of integration points to use
     let points = GAUSS_POINTS[order];
