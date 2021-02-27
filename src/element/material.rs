@@ -18,6 +18,7 @@ pub struct Material {
 }
 
 pub const AL6061: Material = Material {youngs: 6.89e10, poisson: 0.33};
+pub const TEST: Material = Material {youngs: 1.0, poisson: 0.0};
 
 impl Material {
     fn youngs(&self) -> f64 {

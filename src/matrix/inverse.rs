@@ -72,7 +72,7 @@ where
             for j in (row + 1)..dim {
                 temp += self[(row, j)] * x[(j, 0)];
             }
-            println!("{:?}", temp);
+            //println!("{:?}", temp);
             x[(row, 0)] = b[(row, 0)] - temp;
         }
 

@@ -15,10 +15,13 @@ pub trait IsoparElement {
     fn h_and_grad(&self, nat_coor: Point) -> Vec<(f64,  Point)>;
 
     fn nodes(&self) -> Vec<Point> {
-        (0..self.dim()).map(|x| self.node(x)).collect()
+        (0..self.node_count()).map(|x| self.node(x)).collect()
     }
 
     fn find_mats(&self, nat_coor: Point, strain_rule: StrainRule) -> ElementMats {
+        println!("---\nBUILDING ELEMENT MATRICES AT {}", nat_coor);
+        print!("{:?}", self.nodes());
+
         // initialize dim (spatial dimension count) and n (node count)
         let dim = self.dim();
         let n = self.node_count();
@@ -73,7 +76,7 @@ pub trait IsoparElement {
                 // if ngi[j, ..] should be added to a row in b, add it
                 if let Some(idx) = strain_rule.dest_idx(i, j) {
                     for (k, coeff) in grad_interp.row(j).cloned().enumerate() {
-                        println!("adding to b[({}, {})]:\n{}", idx, k, coeff);
+                        //println!("adding to b[({}, {})]:\n{}", idx, k, coeff);
                         b[(idx, k)] += coeff;
                     }
                 }

@@ -10,7 +10,7 @@ use crate::matrix::{LinearMatrix, MatrixLike, Inverse};
 use strain::StrainRule;
 use loading::{Constraint};
 use isopar::{IsoparElement, Bar2Node, PlaneNNode};
-use material::{ProblemType, AL6061};
+use material::{ProblemType, AL6061, TEST};
 
 use std::collections::{HashMap};
 
@@ -144,6 +144,7 @@ impl ElementAssemblage {
 				let el = PlaneNNode::new(points);
 				let strain_rule = StrainRule::PlaneStrain;
 				let c = AL6061.get_c(ProblemType::PlaneStress);
+				//let c = TEST.get_c(ProblemType::PlaneStress);
 				let k_func = move |p| el.find_k_integrand(p, &c, strain_rule);
 				(a, Box::new(k_func))
 			}
@@ -160,6 +161,9 @@ impl ElementAssemblage {
 			let el_k = integrate::nd_gauss_mat(int_func, self.dim, 2);
 			let (el_k_dim, temp) = el_k.shape();
 			assert_eq!(el_k_dim, temp);
+
+			println!("element k:\n{}", el_k);
+			println!("det element k: {}", el_k.determinant());
 
 			// TODO this is bad indirection, elements should be holding actual IsoParElements
 			// (they already have this function)
@@ -188,7 +192,8 @@ impl ElementAssemblage {
 				}
 			}
 		}
-
+		println!("{}", k);
+		println!("det K: {}", k.determinant());
 		k
 	}
 

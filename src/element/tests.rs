@@ -41,14 +41,16 @@ fn simple_integrals() {
 fn assemblage() {
 	let mut elas = ElementAssemblage::new(2);
 	elas.add_nodes(vec![(0.0, 1.0), (1.0, 1.0), (0.0, 0.0), (1.0, 0.0)]);
-	elas.add_element(ElementMap::IsoPNN(vec![0, 1, 3, 2]));
-	elas.add_conc_force(1, Point::new(&[1.0e6, 0.0]));
+	elas.add_element(ElementMap::IsoPNN(vec![0, 2, 3, 1]));
+	elas.add_conc_force(1, Point::new(&[1.0e7, 0.0]));
 	// TODO need better constructors for, like, all of this
 	elas.add_constraint(2, Constraint::PlainDof(true, true, false));
 	elas.add_constraint(3, Constraint::PlainDof(false, true, false));
 
 	elas.calc_displacements();
 	println!("{:?}", elas);
-	println!("{:?}", elas.displacements());
+	for d in elas.displacements().unwrap() {
+		println!("{}", d);
+	}
 	assert!(false);
 }
