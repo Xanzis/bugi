@@ -4,7 +4,7 @@ pub enum ProblemType {
     // strain vector e.T in comments
     Bar,              // [e_xx]
     Beam,             // [k_xx]
-    PlaneStress,      // [e_xx e_yy g_xy]
+    PlaneStress,      // [s_xx s_yy t_xy]
     PlaneStrain,      // [e_xx e_yy g_xy]
     Axisymmetric,     // [e_xx e_yy g_xy e_zz]
     ThreeDimensional, // [e_xx e_yy e_zz g_xy g_yz g_zx]
@@ -17,7 +17,7 @@ pub struct Material {
     poisson: f64,
 }
 
-const AL6061 = Material {youngs: 6.89e10, poisson: 0.33};
+pub const AL6061: Material = Material {youngs: 6.89e10, poisson: 0.33};
 
 impl Material {
     fn youngs(&self) -> f64 {
@@ -32,12 +32,12 @@ impl Material {
         unimplemented!()
     }
 
-    fn thickness(&self) -> Option<f64> {
+    pub fn thickness(&self) -> Option<f64> {
         // used for plate bending matrices
         unimplemented!()
     }
 
-    fn get_c(&self, problem: ProblemType) -> LinearMatrix {
+    pub fn get_c(&self, problem: ProblemType) -> LinearMatrix {
         // return the material matrix C for use in element calculations
         // TODO: if useful, these could be stored as symmetrical matrices
         //       (there is not yet a specialized buffer for this)

@@ -3,7 +3,7 @@ use crate::spatial::Point;
 use std::convert::TryInto;
 use super::material::Material;
 use crate::matrix::inverse::Inverse;
-use super::strain::{StrainRule};
+use super::strain::StrainRule;
 
 // constructors for isoparametric finite element matrices
 
@@ -18,7 +18,7 @@ pub trait IsoparElement {
         (0..self.dim()).map(|x| self.node(x)).collect()
     }
 
-    fn find_mats<T: StrainRule>(&self, nat_coor: Point, strain_rule: T) -> ElementMats {
+    fn find_mats(&self, nat_coor: Point, strain_rule: StrainRule) -> ElementMats {
         // initialize dim (spatial dimension count) and n (node count)
         let dim = self.dim();
         let n = self.node_count();
@@ -33,7 +33,7 @@ pub trait IsoparElement {
         }
         let mut h_mat = LinearMatrix::zeros((dim, dim * n));
 
-        let mut funcs = self.h_and_grad(nat_coor);
+        let funcs = self.h_and_grad(nat_coor);
         for (i, (h, nat_grad_h)) in funcs.into_iter().enumerate() {
             let node_loc = self.node(i);
             for x in 0..dim {
@@ -84,7 +84,7 @@ pub trait IsoparElement {
         ElementMats {b, h: Some(h_mat), j, j_inv, det_j}
     }
 
-    fn find_k_integrand<T: StrainRule>(&self, nat_coor: Point, c: &LinearMatrix, strain_rule: T) -> LinearMatrix {
+    fn find_k_integrand(&self, nat_coor: Point, c: &LinearMatrix, strain_rule: StrainRule) -> LinearMatrix {
         let mut mats = self.find_mats(nat_coor, strain_rule);
 
         println!("{}", mats.b);
