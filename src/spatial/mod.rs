@@ -39,6 +39,10 @@ impl Point {
         }
         Point {n, data}
     }
+
+    pub fn zero(dim: usize) -> Self {
+        Point {dim, [0.0; 3]}
+    }
 }
 
 impl fmt::Display for Point {
