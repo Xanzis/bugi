@@ -55,20 +55,12 @@ impl Assemblage {
 
             for (x, y) in coors.iter().cloned() {
                 x_sum += x;
-                if x > x_max {
-                    x_max = x;
-                }
-                if x < x_min {
-                    x_min = x;
-                }
+                if x > x_max { x_max = x; }
+                if x < x_min { x_min = x; }
 
                 y_sum += y;
-                if y > y_max {
-                    y_max = y;
-                }
-                if y < y_min {
-                    y_min = y;
-                }
+                if y > y_max { y_max = y; }
+                if y < y_min { y_min = y; }
             }
 
             let x_mean = x_sum / n_points;
@@ -83,10 +75,13 @@ impl Assemblage {
             let target_range = 0.8 * (IMG_SIZE as f64);
             let scaling = target_range / max_range;
 
+            let middle_x = (x_max + x_min) / 2.0;
+            let middle_y = (y_max + y_min) / 2.0;
+
             let mut pix_points: Vec<(u32, u32)> = Vec::new();
             for (x, y) in coors.iter().cloned() {
-                let x_new = ((x - x_mean) * scaling + (IMG_SIZE as f64) / 2.0).round();
-                let y_new = ((y - y_mean) * scaling + (IMG_SIZE as f64) / 2.0).round();
+                let x_new = ((x - middle_x) * scaling + (IMG_SIZE as f64) / 2.0).round();
+                let y_new = ((y - middle_y) * scaling + (IMG_SIZE as f64) / 2.0).round();
                 pix_points.push((x_new as u32, y_new as u32));
             }
             self.pix_points = Some(pix_points);
