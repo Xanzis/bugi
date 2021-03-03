@@ -5,21 +5,29 @@ use image::{Rgb, RgbImage};
 
 mod bresenham;
 
+#[cfg(test)]
+mod tests;
+
 const IMG_SIZE: u32 = 64;
+const COLORS: [Rgb<u8>; 4] = [Rgb([255, 0, 0]), Rgb([255, 255, 0]), Rgb([0, 0, 255]), Rgb([255, 0, 255])];
 
 // big ol' struct with all the stuff we're gonna need
-pub struct Assemblage {
+pub struct Visualizer {
     dim: usize,
     points: Vec<Point>,
-    proj_points: Option<Vec<(f64, f64)>>,
-    pix_points: Option<Vec<(u32, u32)>>,
+    colors: Vec<usize>,
     edges: Option<Vec<(usize, usize)>>,
 }
 
-impl Assemblage {
-    fn project(&mut self) {
+impl Visualizer {
+    fn add_points(&mut self, points: Vec<Point>, color: usize) {
+        self.colors.extend(vec![color; points.len()]);
+        self.points.extend(points);
+    }
+
+    fn project(&self) -> Vec<(f64, f64)> {
         // fill out projections of the points onto the 2d plane
-        let mut projs: Vec<(f64, f64)> = Vec::new();
+        let mut projs = Vec::new();
         match self.dim {
             1 => {
                 for p in self.points.iter() {
@@ -37,101 +45,86 @@ impl Assemblage {
             _ => panic!("bad dim"),
         }
 
-        self.proj_points = Some(projs);
+        projs
     }
 
-    fn enpixel(&mut self) {
-        // calculate the pixel positions of the assemblage points
-        if let Some(coors) = &self.proj_points {
-            let n_points = coors.len() as f64;
+    fn enpixel(&self) -> Vec<(u32, u32)> {
+        // calculate the pixel positions of the Visualizer points
+        let coors = self.project();
+        let n_points = coors.len() as f64;
+        let (xs, ys): (Vec<_>, Vec<_>) = coors.into_iter().unzip();
 
-            let mut x_sum = 0.0;
-            let mut x_max = f64::NEG_INFINITY;
-            let mut x_min = f64::INFINITY;
+        let x_max = xs.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let x_min = xs.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let y_max = ys.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let y_min = ys.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
-            let mut y_sum = 0.0;
-            let mut y_max = f64::NEG_INFINITY;
-            let mut y_min = f64::INFINITY;
+        let x_sum: f64 = xs.iter().sum();
+        let y_sum: f64 = ys.iter().sum();
 
-            for (x, y) in coors.iter().cloned() {
-                x_sum += x;
-                if x > x_max { x_max = x; }
-                if x < x_min { x_min = x; }
+        let x_mean = x_sum / n_points;
+        let y_mean = y_sum / n_points;
 
-                y_sum += y;
-                if y > y_max { y_max = y; }
-                if y < y_min { y_min = y; }
-            }
+        let x_range = x_max - x_min;
+        let y_range = y_max - y_min;
+        let max_range = if x_range > y_range { x_range } else { y_range };
 
-            let x_mean = x_sum / n_points;
-            let y_mean = y_sum / n_points;
+        // want to bring the range down to 80% of the image width
+        let target_range = 0.8 * (IMG_SIZE as f64);
+        let scaling = target_range / max_range;
 
-            let x_range = x_max - x_min;
-            let y_range = y_max - y_min;
+        let middle_x = (x_max + x_min) / 2.0;
+        let middle_y = (y_max + y_min) / 2.0;
 
-            let max_range = if x_range > y_range { x_range } else { y_range };
-
-            // want to bring the range down to 80% of the image width
-            let target_range = 0.8 * (IMG_SIZE as f64);
-            let scaling = target_range / max_range;
-
-            let middle_x = (x_max + x_min) / 2.0;
-            let middle_y = (y_max + y_min) / 2.0;
-
-            let mut pix_points: Vec<(u32, u32)> = Vec::new();
-            for (x, y) in coors.iter().cloned() {
-                let x_new = ((x - middle_x) * scaling + (IMG_SIZE as f64) / 2.0).round();
-                let y_new = ((y - middle_y) * scaling + (IMG_SIZE as f64) / 2.0).round();
-                pix_points.push((x_new as u32, y_new as u32));
-            }
-            self.pix_points = Some(pix_points);
+        let mut pix_points = Vec::new();
+        for (x, y) in xs.iter().zip(ys.iter()) {
+            let x_new = ((x - middle_x) * scaling + (IMG_SIZE as f64) / 2.0).round();
+            // flip y so the image appears in the familiar x/y orientation
+            let y_new = (-1.0 * (y - middle_y) * scaling + (IMG_SIZE as f64) / 2.0).round();
+            pix_points.push((x_new as u32, y_new as u32));
         }
+
+        pix_points
     }
 
     pub fn draw(&mut self, fileloc: &str) {
-        if self.pix_points == None {
-            if self.proj_points == None {
-                self.project();
-            }
-            self.enpixel();
-        }
+        let pix_points = self.enpixel();
         let mut img = RgbImage::new(IMG_SIZE, IMG_SIZE);
 
         // draw lines
         if let Some(edges) = &self.edges {
             for e in edges.iter() {
-                let orig = self.pix_points.as_ref().unwrap().get(e.0);
-                let end = self.pix_points.as_ref().unwrap().get(e.1);
-                if (orig == None) || (end == None) {
-                    continue;
-                }
-                let to_draw = bresenham::line_unsigned(orig.unwrap(), end.unwrap());
-                for d in to_draw {
-                    img.put_pixel(d.0, d.1, Rgb([0, 255, 0]))
+                let orig = pix_points.get(e.0);
+                let end = pix_points.get(e.1);
+                if let (Some(o), Some(e)) = (orig, end) {
+                    let to_draw = bresenham::line_unsigned(orig.unwrap(), end.unwrap());
+                    for d in to_draw {
+                        img.put_pixel(d.0, d.1, Rgb([0, 255, 0]))
+                    }
                 }
             }
         }
 
         // draw points -- TODO draw thicker points
-        for (x, y) in self.pix_points.as_ref().unwrap().iter().cloned() {
-            img.put_pixel(x, y, Rgb([255, 0, 0]));
+        for ((x, y), c) in pix_points.into_iter().zip(self.colors.iter()) {
+            img.put_pixel(x, y, COLORS[*c]);
         }
 
         img.save(fileloc).unwrap();
     }
 }
 
-impl From<Vec<Point>> for Assemblage {
+impl From<Vec<Point>> for Visualizer {
     fn from(points: Vec<Point>) -> Self {
         let dim = points[0].dim();
+        let n = points.len();
         if points.iter().any(|x| x.dim() != dim) {
-            panic!("inconsistent dimensionalities in Assemblage conversion");
+            panic!("inconsistent dimensionalities in Visualizer conversion");
         }
-        Assemblage {
+        Visualizer {
             dim,
             points,
-            proj_points: None,
-            pix_points: None,
+            colors: vec![0; n],
             edges: None,
         }
     }
@@ -176,55 +169,4 @@ fn project(points: Vec<Point>) -> Vec<(f64, f64)> {
         .cloned()
         .zip(new_points.row(1).cloned())
         .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Assemblage;
-    use crate::spatial::Point;
-
-    #[test]
-    fn one_d() {
-        let mut asm: Assemblage = vec![Point::new(&[1.0]), Point::new(&[3.5])].into();
-        asm.draw("test_generated/one.png");
-    }
-    #[test]
-    fn two_d() {
-        let mut asm: Assemblage = vec![
-            Point::new(&[1.0, 2.0]),
-            Point::new(&[-25.0, 37.0]),
-            Point::new(&[12.0, -5.0]),
-        ]
-        .into();
-        asm.draw("test_generated/two.png");
-    }
-    #[test]
-    fn three_d() {
-        let mut asm: Assemblage = vec![
-            Point::new(&[-1.0, 1.0, 1.0]),
-            Point::new(&[1.0, 1.0, 1.0]),
-            Point::new(&[1.0, -1.0, 1.0]),
-            Point::new(&[-1.0, -1.0, 1.0]),
-            Point::new(&[-1.0, 1.0, -1.0]),
-            Point::new(&[1.0, 1.0, -1.0]),
-            Point::new(&[1.0, -1.0, -1.0]),
-            Point::new(&[-1.0, -1.0, -1.0]),
-        ]
-        .into();
-        asm.edges = Some(vec![
-            (0, 1),
-            (1, 2),
-            (2, 3),
-            (3, 0),
-            (4, 5),
-            (5, 6),
-            (6, 7),
-            (7, 4),
-            (0, 4),
-            (1, 5),
-            (2, 6),
-            (3, 7),
-        ]);
-        asm.draw("test_generated/three.png");
-    }
 }
