@@ -1,6 +1,9 @@
 use std::convert::{From, TryFrom, TryInto};
 use std::fmt;
 use std::ops::{Index, IndexMut};
+use std::cmp::min;
+
+pub mod hull;
 
 #[derive(Debug)]
 pub struct SpatialError {
@@ -42,6 +45,16 @@ impl Point {
 
     pub fn zero(n: usize) -> Self {
         Point {n, data: [0.0; 3]}
+    }
+
+    pub fn mid(&self, other: Point) -> Point {
+        // find the midpoint between two points
+        // TODO make sure nothing will set a nonzero value for an invalid dimension
+        let data = [(self.data[0] + other.data[0]) / 2.0,
+                    (self.data[1] + other.data[1]) / 2.0,
+                    (self.data[2] + other.data[2]) / 2.0];
+        let n = min(self.n, other.n);
+        Point {n, data}
     }
 }
 
@@ -174,5 +187,28 @@ mod tests {
     fn bad_try() {
         let test = Point::try_from(vec![1.0, 2.0, 3.0, 4.0]);
         assert!(test.is_err())
+    }
+    #[test]
+    fn orientation() {
+        use super::hull::Orient;
+        use super::hull;
+        let a = Point::new(&[-1.0, -0.3]);
+        let b = Point::new(&[-0.5, 3.0]);
+        let c = Point::new(&[10.0, -0.2]);
+        assert_eq!(hull::triangle_dir(a, b, c), Orient::Right);
+        assert_eq!(hull::triangle_dir(b, a, c), Orient::Left);
+        assert_eq!(hull::triangle_dir(c, b, a), Orient::Left);
+    }
+    #[test]
+    fn simple_hull() {
+        use super::hull;
+        let points = vec![
+            Point::new(&[0.0, 2.0]),
+            Point::new(&[3.0, 3.0]),
+            Point::new(&[2.0, 1.0]),
+            Point::new(&[1.0, 0.0]),
+            Point::new(&[5.0, 0.0]),
+        ];
+        assert_eq!(hull::jarvis_hull(&points), vec![0, 3, 4, 1]);
     }
 }
