@@ -1,6 +1,6 @@
 use std::convert::{From, TryFrom, TryInto};
 use std::fmt;
-use std::ops::{Index, IndexMut};
+use std::ops::{Index, IndexMut, Add, Sub, Mul};
 use std::cmp::min;
 
 pub mod hull;
@@ -162,6 +162,41 @@ impl IndexMut<usize> for Point {
     }
 }
 
+impl Add for Point {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        if self.dim() != other.dim() { panic!("point dimension mismatch") }
+        let data = [self.data[0] + other.data[0],
+                    self.data[1] + other.data[1],
+                    self.data[2] + other.data[2]];
+        Point { n: self.dim(), data}
+    }
+}
+
+impl Sub for Point {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        if self.dim() != other.dim() { panic!("point dimension mismatch") }
+        let data = [self.data[0] - other.data[0],
+                    self.data[1] - other.data[1],
+                    self.data[2] - other.data[2]];
+        Point { n: self.dim(), data}
+    }
+}
+
+impl Mul<f64> for Point {
+    type Output = Self;
+
+    fn mul(self, other: f64) -> Self {
+        let data = [self.data[0] * other,
+                    self.data[1] * other,
+                    self.data[2] * other];
+        Point { n: self.dim(), data }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Point;
@@ -210,5 +245,12 @@ mod tests {
             Point::new(&[5.0, 0.0]),
         ];
         assert_eq!(hull::jarvis_hull(&points), vec![0, 3, 4, 1]);
+    }
+    #[test]
+    fn point_arithmetic() {
+        let p = Point::new(&[-1.0, 5.0]);
+        assert_eq!(p - Point::new(&[1.0, 2.0]), Point::new(&[-2.0, 3.0]));
+        assert_eq!(p + Point::new(&[1.0, 2.0]), Point::new(&[0.0, 7.0]));
+        assert_eq!(p * 2.0, Point::new(&[-2.0, 10.0]));
     }
 }
