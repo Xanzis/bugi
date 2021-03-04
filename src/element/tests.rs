@@ -39,6 +39,8 @@ fn simple_integrals() {
 }
 #[test]
 fn assemblage() {
+	use crate::visual::Visualizer;
+
 	let mut elas = ElementAssemblage::new(2);
 	elas.add_nodes(vec![(0.0, 1.0), (1.0, 1.0), (0.0, 0.0), (1.0, 0.0)]);
 	elas.add_element(ElementMap::IsoPNN(vec![0, 2, 3, 1]));
@@ -48,9 +50,9 @@ fn assemblage() {
 	elas.add_constraint(3, Constraint::PlainDof(false, true, false));
 
 	elas.calc_displacements();
-	println!("{:?}", elas);
-	for d in elas.displacements().unwrap() {
-		println!("{}", d);
-	}
-	assert!(false);
+	
+	let mut vis: Visualizer = elas.nodes().clone().into();
+	vis.add_points(elas.displaced_nodes(500.0).unwrap(), 1);
+
+	vis.draw("test_generated/disp_square.png");
 }

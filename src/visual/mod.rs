@@ -20,7 +20,7 @@ pub struct Visualizer {
 }
 
 impl Visualizer {
-    fn add_points(&mut self, points: Vec<Point>, color: usize) {
+    pub fn add_points(&mut self, points: Vec<Point>, color: usize) {
         self.colors.extend(vec![color; points.len()]);
         self.points.extend(points);
     }

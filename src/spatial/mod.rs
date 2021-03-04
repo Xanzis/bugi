@@ -56,6 +56,11 @@ impl Point {
         let n = min(self.n, other.n);
         Point {n, data}
     }
+
+    pub fn dist(&self, other: Point) -> f64 {
+        // TODO make sure nothing will set a nonzero value for an invalid dimension
+        (self.data[0].powi(2) + self.data[1].powi(2) + self.data[2].powi(2)).sqrt()
+    }
 }
 
 impl fmt::Display for Point {

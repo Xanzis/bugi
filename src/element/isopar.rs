@@ -19,8 +19,8 @@ pub trait IsoparElement {
     }
 
     fn find_mats(&self, nat_coor: Point, strain_rule: StrainRule) -> ElementMats {
-        println!("---\nBUILDING ELEMENT MATRICES AT {}", nat_coor);
-        print!("{:?}", self.nodes());
+        //println!("---\nBUILDING ELEMENT MATRICES AT {}", nat_coor);
+        //print!("{:?}", self.nodes());
 
         // initialize dim (spatial dimension count) and n (node count)
         let dim = self.dim();
@@ -62,7 +62,7 @@ pub trait IsoparElement {
         let j_inv = j.inverse();
         let det_j = j.determinant();
 
-        println!("nat_grad_interps:\n{:?}", nat_grad_interps);
+        //println!("nat_grad_interps:\n{:?}", nat_grad_interps);
 
         // construct the strain interpolation matrix
         let mut b = LinearMatrix::zeros((strain_rule.vec_len(), dim * n));
@@ -70,7 +70,7 @@ pub trait IsoparElement {
         for (i, nat_grad_interp) in nat_grad_interps.into_iter().enumerate() {
             // ngi is the natural coordinate gradient interpolation for (u, v, w)[i]
             let grad_interp: LinearMatrix = j_inv.mul(&nat_grad_interp);
-            println!("grad_interp:\n{}", grad_interp);
+            //println!("grad_interp:\n{}", grad_interp);
             // each row of gi is an interpolation for d(u/v/w)/dx, d(u/v/w)/dy ...
             for j in 0..dim {
                 // if ngi[j, ..] should be added to a row in b, add it
@@ -90,9 +90,9 @@ pub trait IsoparElement {
     fn find_k_integrand(&self, nat_coor: Point, c: &LinearMatrix, strain_rule: StrainRule) -> LinearMatrix {
         let mut mats = self.find_mats(nat_coor, strain_rule);
 
-        println!("{}", mats.b);
-        print!("{}", mats.j);
-        println!("{}", mats.det_j);
+        //println!("{}", mats.b);
+        //println!("{}", mats.j);
+        //println!("{}", mats.det_j);
 
         // the integrand for K is (det J) * B_t * C * B
         mats.b.transpose(); // transpose in place is cheap

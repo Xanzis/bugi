@@ -54,6 +54,10 @@ impl ElementAssemblage {
 		}
 	}
 
+	pub fn nodes(&self) -> Vec<Point> {
+		self.nodes.clone()
+	}
+
 	// TODO streamline adding nodes and associated elements
 	pub fn add_nodes<T: Into<Point>>(&mut self, ns: Vec<T>) {
 		for n in ns.into_iter() {
@@ -238,5 +242,16 @@ impl ElementAssemblage {
 
 	pub fn displacements(&self) -> Option<Vec<Point>> {
 		self.displacements.clone()
+	}
+
+	pub fn displaced_nodes(&self, scale: f64) -> Option<Vec<Point>> {
+		if let Some(disps) = self.displacements.clone() {
+			let mut res = Vec::new();
+			for (n, d) in self.nodes.iter().zip(disps.into_iter()) {
+				res.push(*n + (d * scale));
+			}
+			Some(res)
+		}
+		else { None }
 	}
 }
