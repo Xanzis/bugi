@@ -190,7 +190,7 @@ impl ElementAssemblage {
 						let j_node_dof = j % self.dim;
 						if let Some(j_dof) = self.find_dof(j_node_idx, j_node_dof) {
 							// wooo finally
-							k[(i_dof, j_dof)] = el_k[(i, j)];
+							k[(i_dof, j_dof)] += el_k[(i, j)];
 						}
 					}
 				}
