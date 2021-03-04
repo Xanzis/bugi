@@ -56,3 +56,38 @@ fn assemblage() {
 
 	vis.draw("test_generated/disp_square.png");
 }
+#[test]
+fn multi_element() {
+	use crate::visual::Visualizer;
+
+	let mut elas = ElementAssemblage::new(2);
+	elas.add_nodes(vec![
+		(0.0, 0.0),
+		(0.1, 0.0),
+		(0.0, 0.1),
+		(0.1, 0.1),
+		(0.0, 0.2),
+		(0.1, 0.2),
+		(0.0, 0.3),
+		(0.1, 0.3),
+		(0.0, 0.4),
+		(0.1, 0.4)]);
+	for i in 0..4 {
+		let n = 2 * i;
+		elas.add_element(ElementMap::IsoPNN(vec![n, n + 1, n + 3, n + 2]));
+	}
+	
+	elas.add_constraint(0, Constraint::PlainDof(true, true, false));
+	elas.add_constraint(1, Constraint::PlainDof(false, true, false));
+
+	elas.add_conc_force(9, Point::new(&[1.0e5, 0.0]));
+
+	elas.calc_displacements();
+
+	println!("{:?}", elas.displacements());
+
+	let mut vis: Visualizer = elas.nodes().clone().into();
+	vis.add_points(elas.displaced_nodes(500.0).unwrap(), 1);
+
+	vis.draw("test_generated/disp_tower.png");
+}
