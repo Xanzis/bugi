@@ -8,7 +8,8 @@ mod bresenham;
 #[cfg(test)]
 mod tests;
 
-const IMG_SIZE: u32 = 64;
+const IMG_SIZE: u32 = 128;
+const DOT_SIZE: u32 = 1;
 const COLORS: [Rgb<u8>; 4] = [Rgb([255, 0, 0]), Rgb([255, 255, 0]), Rgb([0, 0, 255]), Rgb([255, 0, 255])];
 
 // big ol' struct with all the stuff we're gonna need
@@ -107,7 +108,10 @@ impl Visualizer {
 
         // draw points -- TODO draw thicker points
         for ((x, y), c) in pix_points.into_iter().zip(self.colors.iter()) {
-            img.put_pixel(x, y, COLORS[*c]);
+            let to_draw = dot_points(x, y);
+            for (i, j) in to_draw.into_iter() {
+                img.put_pixel(i, j, COLORS[*c]);   
+            }
         }
 
         img.save(fileloc).unwrap();
@@ -169,4 +173,17 @@ fn project(points: Vec<Point>) -> Vec<(f64, f64)> {
         .cloned()
         .zip(new_points.row(1).cloned())
         .collect()
+}
+
+fn dot_points(center_x: u32, center_y: u32) -> Vec<(u32, u32)> {
+    // returns the points to draw for a dot
+    // just a boring ol' square, might change to a more circular thing
+    // TODO maybe handle *edge* cases better haha get it
+    let mut res = Vec::new();
+    for x in (center_x - DOT_SIZE)..=(center_x + DOT_SIZE) {
+        for y in (center_y - DOT_SIZE)..=(center_y + DOT_SIZE) {
+            res.push((x, y));
+        }
+    }
+    res
 }
