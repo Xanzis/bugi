@@ -9,33 +9,13 @@ use crate::matrix::{LinearMatrix, MatrixLike, Inverse};
 
 use strain::StrainRule;
 use loading::{Constraint};
-use isopar::{IsoparElement, Bar2Node, PlaneNNode};
-use material::{ProblemType, AL6061, TEST};
+use isopar::{IsoparElement, ElementType};
+use material::{ProblemType, Material};
 
 use std::collections::{HashMap};
 
 #[cfg(test)]
 mod tests;
-
-// type containing element variety and node index information
-// TODO this is a silly indirection and hides some underlying APIs
-// once things are working, factor this out
-// TODO make this non-public once changes are applied
-#[derive(Debug, Clone)]
-pub enum ElementMap {
-	IsoB2N(usize, usize),
-	IsoPNN(Vec<usize>),
-}
-
-// THE GAME PLAN
-// MOVE THE TRAIT ISOPARELEMENT OVER HERE, CHANGE NAME TO ELEMENT
-// ADD A 'NEW' FUNCTION (SEE PLAY.RUST-LANG) THAT RETURNS BOX DYN ELEMENT
-// ELEMENTASSEMBLAGE STORES BOXES
-// WOOOO
-// UH ALSO FREE-FLOATING FUNCTION HERE FOR TURNING A LIST OF NODE IDXS
-//   AND A REFERENCE TO THE LIST OF NODES THAT SPITS OUT A BOX DYN ELEMENT
-//   MAKES CLEVER DECISIONS ABOUT WHAT KIND OF UNDERLYING ELEMENT TO MAKE
-// AWWW YEAH
 
 // the big one - primary puclic-facing API for this crate
 #[derive(Debug, Clone)]
@@ -43,15 +23,18 @@ pub struct ElementAssemblage {
 	dim: usize,
 	nodes: Vec<Point>,
 	displacements: Option<Vec<Point>>,
-	elements: Vec<ElementMap>,
+	elements: Vec<IsoparElement>,
 	constraints: HashMap<usize, Constraint>,
 	concentrated_forces: HashMap<usize, Point>,
 	dof_lookup: Option<Vec<[Option<usize>; 3]>>,
 	dofs: usize,
+	area: Option<f64>,
+	thickness: Option<f64>,
+	material: Material,
 }
 
 impl ElementAssemblage {
-	pub fn new(dim: usize) -> Self {
+	pub fn new(dim: usize, mat: Material) -> Self {
 		ElementAssemblage {
 			dim,
 			nodes: Vec::new(),
@@ -61,14 +44,41 @@ impl ElementAssemblage {
 			concentrated_forces: HashMap::new(),
 			dof_lookup: None,
 			dofs: 0,
+			area: None,
+			thickness: None,
+			material: mat,
 		}
+	}
+
+	pub fn thickness(&self) -> Option<f64> {
+		self.thickness
+	}
+
+	pub fn set_thickness(&mut self, thickness: f64) {
+		self.thickness = Some(thickness);
+	}
+
+	pub fn area(&self) -> Option<f64> {
+		self.area
+	}
+
+	pub fn set_area(&mut self, area: f64) {
+		self.area = Some(area)
+	}
+
+	pub fn material(&self) -> Material {
+		self.material
+	}
+
+	pub fn node(&self, n: usize) -> Point {
+		// TODO maybe make a non-panicking version
+		self.nodes[n]
 	}
 
 	pub fn nodes(&self) -> Vec<Point> {
 		self.nodes.clone()
 	}
 
-	// TODO streamline adding nodes and associated elements
 	pub fn add_nodes<T: Into<Point>>(&mut self, ns: Vec<T>) {
 		for n in ns.into_iter() {
 			let p: Point = n.into();
@@ -77,9 +87,16 @@ impl ElementAssemblage {
 		}
 	}
 
-	pub fn add_element(&mut self, el: ElementMap) {
+	pub fn add_element(&mut self, node_idxs: Vec<usize>) {
+		// el should be an El::blank(), it'll get overwritten
+		let el = IsoparElement::new(&self.nodes, node_idxs, self.material());
 		self.elements.push(el);
 	}
+
+	// TODO add streamlined add_element alternative for already-created elements
+	// (to be more efficient for elements where the node ordering is already known)
+	// also allow specification of element subtypes (eg triangular/rectangular)
+	// for when it is difficult to infer (six-node triangle or 6-node rectangle?)
 
 	pub fn add_conc_force(&mut self, n: usize, force: Point) {
 		self.concentrated_forces.insert(n, force);
@@ -120,9 +137,7 @@ impl ElementAssemblage {
 					}
 					lookup.push(node_lookup);
 				}
-				else {
-					unimplemented!()
-				}
+				else { unimplemented!() }
 			}
 			else {
 				// node p is unconstrained
@@ -139,65 +154,47 @@ impl ElementAssemblage {
 		self.dofs = i;
 	}
 
-	fn k_integrand_func(&self, i: usize) -> (Vec<usize>, Box<dyn Fn(Point) -> LinearMatrix>) {
+	fn k_integrand_func(&self, i: usize) -> Box<dyn Fn(Point) -> LinearMatrix> {
 		// get a closure for computing an elements' K integrand at a given location
-		// also return a vector of the **points** used by the element, in order (constraint-agnostic)
-		// TODO add assemblage-wide material specification
-		match self.elements[i].clone() {
-			ElementMap::IsoB2N(a, b) => {
-				let el = Bar2Node::new(vec![self.nodes[a], self.nodes[b]]);
-				let strain_rule = StrainRule::Bar;
-				let c = AL6061.get_c(ProblemType::Bar);
-				// TODO el should probably internally cache some intermediate matrices
-				// right now it recomputes the interpolations each time
-				let k_func = move |p| el.find_k_integrand(p, &c, strain_rule);
-				(vec![a, b], Box::new(k_func))
-			},
-			ElementMap::IsoPNN(a) => {
-				let points: Vec<Point> = a.clone().into_iter().map(|x| self.nodes[x]).collect();
-				let el = PlaneNNode::new(points);
-				let strain_rule = StrainRule::PlaneStrain;
-				let c = AL6061.get_c(ProblemType::PlaneStress);
-				//let c = TEST.get_c(ProblemType::PlaneStress);
-				let k_func = move |p| el.find_k_integrand(p, &c, strain_rule);
-				(a, Box::new(k_func))
-			}
-		}
+		// (wraps the underlying integrand method, with a multiplier for area/thickness of element)
+		// TODO make plane strain/axisym possible to select (rolling with plane stress for now)
+		
+		let multiplier = match self.dim {
+			1 => self.area().expect("missing bar/beam area"),
+			2 => self.thickness().expect("missing plane thickness"),
+			3 => 1.0,
+			_ => unimplemented!()
+		};
+
+		let el = self.elements.get(i).expect("out of bounds element id").clone();
+
+		let k_func = move |p| {
+			let mut k = el.find_k_integrand(p);
+			k *= multiplier;
+			k
+		};
+
+		Box::new(k_func)
 	}
 
 	fn find_k(&mut self) -> LinearMatrix {
 		let mut k = LinearMatrix::zeros(self.dofs);
 
-		for i in 0..self.elements.len() {
-			let (el_nodes, int_func) = self.k_integrand_func(i);
-			// TODO choose integration order more cleverly
-			// underlying element should provide an integration order
-			let el_k = integrate::nd_gauss_mat(int_func, self.dim, 2);
+		for (i, el) in self.elements.iter().enumerate() {
+			let int_func = self.k_integrand_func(i);
+			let el_k = integrate::nd_gauss_mat(int_func, self.dim, el.integration_order());
 			let (el_k_dim, temp) = el_k.shape();
 			assert_eq!(el_k_dim, temp);
 
 			println!("element k:\n{}", el_k);
 			println!("det element k: {}", el_k.determinant());
 
-			// TODO this is bad indirection, elements should be holding actual IsoParElements
-			// (they already have this function)
-			let el_node_count = match &self.elements[i] {
-				ElementMap::IsoB2N(_, _) => 2,
-				ElementMap::IsoPNN(a) => a.len(),
-			};
-
-			// TODO this is gross, also generalize for dimensionality differences
-			// TODO underlying element should have function for relating one of its dofs
-			//   to a node index (in the element frame) and a node dof, for use in find_dof
-			// TODO could also reduce unnecessary checks by pre-computing a hashmap
+			// TODO could probably reduce unnecessary checks here by precomputing
 			for i in 0..el_k_dim {
-				// TODO following line is part to change
-				let i_node_idx = el_nodes[i / self.dim];
-				let i_node_dof = i % self.dim;
+				let (i_node_idx, i_node_dof) = el.i_to_dof(i);
 				if let Some(i_dof) = self.find_dof(i_node_idx, i_node_dof) {
 					for j in 0..el_k_dim {
-						let j_node_idx = el_nodes[j / self.dim];
-						let j_node_dof = j % self.dim;
+						let (j_node_idx, j_node_dof) = el.i_to_dof(j);
 						if let Some(j_dof) = self.find_dof(j_node_idx, j_node_dof) {
 							// wooo finally
 							k[(i_dof, j_dof)] += el_k[(i, j)];

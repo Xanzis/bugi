@@ -2,6 +2,7 @@
 pub enum StrainRule {
 	Bar,
 	PlaneStrain,
+	PlaneStress,
 	ThreeDimensional,
 }
 
@@ -10,7 +11,7 @@ impl StrainRule {
 	pub fn vec_len(&self) -> usize {
 		match self {
 			StrainRule::Bar => 1,
-			StrainRule::PlaneStrain => 3,
+			StrainRule::PlaneStrain | StrainRule::PlaneStress => 3,
 			StrainRule::ThreeDimensional => 6,
 		}
 	}
@@ -26,7 +27,7 @@ impl StrainRule {
 					_ => None,
 				}
 			},
-			StrainRule::PlaneStrain => {
+			StrainRule::PlaneStrain | StrainRule::PlaneStress => {
 				match (num, den) {
 					(0, 0) => Some(0),
 					(1, 1) => Some(1),

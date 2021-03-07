@@ -1,8 +1,8 @@
-use super::isopar::{IsoparElement, Bar2Node, PlaneNNode};
+use super::isopar::IsoparElement;
 use super::strain::StrainRule;
-use super::material::Material;
+use super::material::{Material, AL6061, TEST};
 use super::integrate::{newton_single, nd_gauss_single};
-use super::{ElementAssemblage, ElementMap};
+use super::ElementAssemblage;
 use super::loading::Constraint;
 
 use crate::matrix::{LinearMatrix, MatrixLike, Norm};
@@ -12,10 +12,9 @@ use crate::spatial::Point;
 fn basic_bar_f() {
 	let a = Point::new(&[1.5]);
 	let b = Point::new(&[2.5]);
-	let el = Bar2Node::new(vec![a, b]);
+	let el = IsoparElement::new(&vec![a, b], vec![0, 1], TEST);
 	let target = LinearMatrix::from_flat((2, 2), vec![0.5, -0.5, -0.5, 0.5]);
-	let c = LinearMatrix::from_flat((1, 1), vec![1.0]);
-	assert_eq!(el.find_k_integrand(Point::new(&[2.3]), &c, StrainRule::Bar), target);
+	assert_eq!(el.find_k_integrand(Point::new(&[2.3])), target);
 }
 #[test]
 fn rectangle_jacobians() {
@@ -23,11 +22,11 @@ fn rectangle_jacobians() {
 	let b = Point::new(&[-2.0, 1.0]);
 	let c = Point::new(&[-2.0, -3.0]);
 	let d = Point::new(&[4.0, -3.0]);
-	let el = PlaneNNode::new(vec![a, b, c, d]);
+	let el = IsoparElement::new(&vec![a, b, c, d], vec![0, 1, 2, 3], TEST);
 	let target = LinearMatrix::from_flat((2, 2), vec![3.0, 0.0, 0.0, 2.0]);
 
-	let mats = el.find_mats(Point::new(&[0.0, 0.0]), StrainRule::PlaneStrain);
-	assert!((&mats.j - &target).frobenius() < 1.0e-10);
+	let mats = el.find_mats(Point::new(&[0.0, 0.0]));
+	assert!((mats.j() - &target).frobenius() < 1.0e-10);
 }
 #[test]
 fn simple_integrals() {
@@ -41,9 +40,11 @@ fn simple_integrals() {
 fn assemblage() {
 	use crate::visual::Visualizer;
 
-	let mut elas = ElementAssemblage::new(2);
+	let mut elas = ElementAssemblage::new(2, AL6061);
+	elas.set_thickness(0.1);
+
 	elas.add_nodes(vec![(0.0, 1.0), (1.0, 1.0), (0.0, 0.0), (1.0, 0.0)]);
-	elas.add_element(ElementMap::IsoPNN(vec![0, 2, 3, 1]));
+	elas.add_element(vec![0, 2, 3, 1]);
 	elas.add_conc_force(1, Point::new(&[1.0e7, 0.0]));
 	// TODO need better constructors for, like, all of this
 	elas.add_constraint(2, Constraint::PlainDof(true, true, false));
@@ -52,7 +53,7 @@ fn assemblage() {
 	elas.calc_displacements();
 	
 	let mut vis: Visualizer = elas.nodes().clone().into();
-	vis.add_points(elas.displaced_nodes(500.0).unwrap(), 1);
+	vis.add_points(elas.displaced_nodes(50.0).unwrap(), 1);
 
 	vis.draw("test_generated/disp_square.png");
 }
@@ -60,7 +61,9 @@ fn assemblage() {
 fn multi_element() {
 	use crate::visual::Visualizer;
 
-	let mut elas = ElementAssemblage::new(2);
+	let mut elas = ElementAssemblage::new(2, AL6061);
+	elas.set_thickness(0.1);
+
 	elas.add_nodes(vec![
 		(0.0, 0.0),
 		(0.1, 0.0),
@@ -74,7 +77,7 @@ fn multi_element() {
 		(0.1, 0.4)]);
 	for i in 0..4 {
 		let n = 2 * i;
-		elas.add_element(ElementMap::IsoPNN(vec![n, n + 1, n + 3, n + 2]));
+		elas.add_element(vec![n, n + 1, n + 3, n + 2]);
 	}
 	
 	elas.add_constraint(0, Constraint::PlainDof(true, true, false));
@@ -87,7 +90,7 @@ fn multi_element() {
 	println!("{:?}", elas.displacements());
 
 	let mut vis: Visualizer = elas.nodes().clone().into();
-	vis.add_points(elas.displaced_nodes(500.0).unwrap(), 1);
+	vis.add_points(elas.displaced_nodes(50.0).unwrap(), 1);
 
 	vis.draw("test_generated/disp_tower.png");
 }
