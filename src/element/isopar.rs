@@ -234,8 +234,8 @@ impl ElementType {
 }
 
 impl ElementMats {
-    pub fn j(&self) -> &LinearMatrix {
-        &self.j
+    pub fn det_j(&self) -> f64 {
+        self.det_j
     }
 }
 

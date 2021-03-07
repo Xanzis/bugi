@@ -26,7 +26,8 @@ fn rectangle_jacobians() {
 	let target = LinearMatrix::from_flat((2, 2), vec![3.0, 0.0, 0.0, 2.0]);
 
 	let mats = el.find_mats(Point::new(&[0.0, 0.0]));
-	assert!((mats.j() - &target).frobenius() < 1.0e-10);
+
+	assert_eq!(mats.det_j(), 6.0);
 }
 #[test]
 fn simple_integrals() {
