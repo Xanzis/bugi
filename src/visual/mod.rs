@@ -8,9 +8,14 @@ mod bresenham;
 #[cfg(test)]
 mod tests;
 
-const IMG_SIZE: u32 = 128;
+const IMG_SIZE: u32 = 256;
 const DOT_SIZE: u32 = 1;
-const COLORS: [Rgb<u8>; 4] = [Rgb([255, 0, 0]), Rgb([255, 255, 0]), Rgb([0, 0, 255]), Rgb([255, 0, 255])];
+const COLORS: [Rgb<u8>; 4] = [
+    Rgb([255, 0, 0]),
+    Rgb([255, 255, 0]),
+    Rgb([0, 0, 255]),
+    Rgb([255, 0, 255]),
+];
 
 // big ol' struct with all the stuff we're gonna need
 pub struct Visualizer {
@@ -110,7 +115,7 @@ impl Visualizer {
         for ((x, y), c) in pix_points.into_iter().zip(self.colors.iter()) {
             let to_draw = dot_points(x, y);
             for (i, j) in to_draw.into_iter() {
-                img.put_pixel(i, j, COLORS[*c]);   
+                img.put_pixel(i, j, COLORS[*c]);
             }
         }
 

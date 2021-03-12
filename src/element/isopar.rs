@@ -1,9 +1,9 @@
-use crate::matrix::{LinearMatrix, MatrixLike};
-use crate::spatial::{Point, hull};
-use std::convert::TryInto;
 use super::material::{Material, ProblemType};
-use crate::matrix::inverse::Inverse;
 use super::strain::StrainRule;
+use crate::matrix::inverse::Inverse;
+use crate::matrix::{LinearMatrix, MatrixLike};
+use crate::spatial::{hull, Point};
+use std::convert::TryInto;
 
 // constructors for isoparametric finite element matrices
 
@@ -22,6 +22,7 @@ pub struct IsoparElement {
 pub enum ElementType {
     Bar2Node,
     PlaneNNode,
+    Triangle3Node,
 }
 
 pub struct ElementMats {
@@ -36,9 +37,11 @@ impl IsoparElement {
     pub fn new(all_nodes: &Vec<Point>, node_idxs: Vec<usize>, material: Material) -> Self {
         // initialize an element do the logic to arrange the element type
 
-        let node_points: Vec<Point> = node_idxs.iter()
+        let node_points: Vec<Point> = node_idxs
+            .iter()
             .map(|x| all_nodes.get(*x).expect("out of bounds node index"))
-            .cloned().collect();
+            .cloned()
+            .collect();
 
         let (el_type, ordering) = arrange_element(&node_points);
 
@@ -50,15 +53,22 @@ impl IsoparElement {
         let strain_rule = match el_type {
             ElementType::Bar2Node => StrainRule::Bar,
             ElementType::PlaneNNode => StrainRule::PlaneStress,
+            ElementType::Triangle3Node => StrainRule::PlaneStress,
         };
 
-        IsoparElement {node_idxs, node_points, el_type, strain_rule, material}
+        IsoparElement {
+            node_idxs,
+            node_points,
+            el_type,
+            strain_rule,
+            material,
+        }
     }
 
     pub fn dim(&self) -> usize {
         // uhh maybe give this its own field but storage is getting big?
         self.node_points.first().unwrap().dim()
-    } 
+    }
 
     pub fn i_to_dof(&self, i: usize) -> (usize, usize) {
         // finds the node idx (global) and its degree of freedom for the given index (say, in K)
@@ -152,7 +162,13 @@ impl IsoparElement {
             }
         }
         // return it all :)
-        ElementMats {b, h: Some(h_mat), j, j_inv, det_j}
+        ElementMats {
+            b,
+            h: Some(h_mat),
+            j,
+            j_inv,
+            det_j,
+        }
     }
 
     pub fn find_k_integrand(&self, nat_coor: Point) -> LinearMatrix {
@@ -187,8 +203,7 @@ fn arrange_element(nodes: &Vec<Point>) -> (ElementType, Vec<usize>) {
             3 => unimplemented!("3D elements unavailable"),
             _ => panic!("unreachable"),
         }
-    }
-    else {
+    } else {
         panic!("empty node list")
     }
 }
@@ -203,32 +218,36 @@ fn arrange_element_1d(nodes: &Vec<Point>) -> (ElementType, Vec<usize>) {
 fn arrange_element_2d(nodes: &Vec<Point>) -> (ElementType, Vec<usize>) {
     // TODO handle higher-order elements
     match nodes.len() {
+        3 => {
+            let (p, q, r) = (nodes[0], nodes[1], nodes[2]);
+            match hull::triangle_dir(p, q, r) {
+                hull::Orient::Left => (ElementType::Triangle3Node, vec![0, 1, 2]),
+                hull::Orient::Right => (ElementType::Triangle3Node, vec![2, 1, 0]),
+                hull::Orient::Line => panic!("degenerate element"),
+            }
+        }
         4 => {
             let node_hull = hull::jarvis_hull(nodes);
             if node_hull.len() == 4 {
                 // all nodes are on the hull
                 (ElementType::PlaneNNode, node_hull)
-            }
-            else {
+            } else {
                 panic!("nonconvex element")
             }
         }
-        _ => unimplemented!("N-node plane element unavailable")
+        _ => unimplemented!("N-node plane element unavailable"),
     }
 }
 
 impl ElementType {
     fn h_and_grad(&self, nat_coor: Point, node_count: usize) -> Vec<(f64, Point)> {
         match self {
-            ElementType::Bar2Node => {
-                vec![
-                    (0.5 * (1.0 - nat_coor[0]), Point::new(&[-0.5])),
-                    (0.5 * (1.0 + nat_coor[0]), Point::new(&[0.5]))
-                ]
-            },
-            ElementType::PlaneNNode => {
-                plane_n_node_h_and_grad(nat_coor, node_count)
-            }
+            ElementType::Bar2Node => vec![
+                (0.5 * (1.0 - nat_coor[0]), Point::new(&[-0.5])),
+                (0.5 * (1.0 + nat_coor[0]), Point::new(&[0.5])),
+            ],
+            ElementType::PlaneNNode => plane_n_node_h_and_grad(nat_coor, node_count),
+            ElementType::Triangle3Node => triangle_3_node_h_and_grad(nat_coor),
         }
     }
 }
@@ -244,7 +263,9 @@ fn plane_n_node_h_and_grad(nat_coor: Point, node_count: usize) -> Vec<(f64, Poin
     // calculate interpolation functions and their derivatives
     // interpolation is x = sum( h_i(r, s)*x_i )
     // returns (h_i, (dh_i/dr, dh_i/ds)) for i in 0..n
-    if node_count < 4 { panic!("bad node count") }
+    if node_count < 4 {
+        panic!("bad node count")
+    }
 
     let (r, s) = nat_coor.try_into().unwrap();
 
@@ -269,7 +290,7 @@ fn plane_n_node_h_and_grad(nat_coor: Point, node_count: usize) -> Vec<(f64, Poin
     dhds[3] = -0.25 * (1.0 + r);
 
     if node_count <= 4 {
-        return collect_pnn_hag(h, dhdr, dhds)
+        return collect_pnn_hag(h, dhdr, dhds);
     }
 
     let temp_h = 0.5 * (1.0 - (r * r)) * (1.0 + s);
@@ -286,7 +307,7 @@ fn plane_n_node_h_and_grad(nat_coor: Point, node_count: usize) -> Vec<(f64, Poin
     dhds[1] -= 0.5 * temp_h;
 
     if node_count <= 5 {
-        return collect_pnn_hag(h, dhdr, dhds)
+        return collect_pnn_hag(h, dhdr, dhds);
     }
 
     let temp_h = 0.5 * (1.0 - (s * s)) * (1.0 - r);
@@ -303,7 +324,7 @@ fn plane_n_node_h_and_grad(nat_coor: Point, node_count: usize) -> Vec<(f64, Poin
     dhds[2] -= 0.5 * temp_h;
 
     if node_count <= 6 {
-        return collect_pnn_hag(h, dhdr, dhds)
+        return collect_pnn_hag(h, dhdr, dhds);
     }
 
     let temp_h = 0.5 * (1.0 - (r * r)) * (1.0 - s);
@@ -320,7 +341,7 @@ fn plane_n_node_h_and_grad(nat_coor: Point, node_count: usize) -> Vec<(f64, Poin
     dhds[3] -= 0.5 * temp_h;
 
     if node_count <= 7 {
-        return collect_pnn_hag(h, dhdr, dhds)
+        return collect_pnn_hag(h, dhdr, dhds);
     }
 
     let temp_h = 0.5 * (1.0 - (s * s)) * (1.0 + r);
@@ -337,7 +358,7 @@ fn plane_n_node_h_and_grad(nat_coor: Point, node_count: usize) -> Vec<(f64, Poin
     dhds[3] -= 0.5 * temp_h;
 
     if node_count <= 7 {
-        return collect_pnn_hag(h, dhdr, dhds)
+        return collect_pnn_hag(h, dhdr, dhds);
     }
 
     let temp_h = (1.0 - (r * r)) * (1.0 - (s * s));
@@ -357,7 +378,7 @@ fn plane_n_node_h_and_grad(nat_coor: Point, node_count: usize) -> Vec<(f64, Poin
         dhds[i] -= 0.5 * temp_dhds;
     }
 
-    return collect_pnn_hag(h, dhdr, dhds)
+    return collect_pnn_hag(h, dhdr, dhds);
 }
 
 fn collect_pnn_hag(h: Vec<f64>, dhdr: Vec<f64>, dhds: Vec<f64>) -> Vec<(f64, Point)> {
@@ -365,4 +386,18 @@ fn collect_pnn_hag(h: Vec<f64>, dhdr: Vec<f64>, dhds: Vec<f64>) -> Vec<(f64, Poi
         .zip(dhdr.into_iter().zip(dhds.into_iter()))
         .map(|(x, y)| (x, y.into()))
         .collect()
+}
+
+fn triangle_3_node_h_and_grad(nat_coor: Point) -> Vec<(f64, Point)> {
+    let (r, s) = nat_coor.try_into().expect("bad point input");
+
+    let h = [1.0 - r - s, r, s];
+    let dhdr = [-1.0, 1.0, 0.0];
+    let dhds = [-1.0, 0.0, 1.0];
+
+    vec![
+        (h[0], (dhdr[0], dhds[0]).into()),
+        (h[1], (dhdr[1], dhds[1]).into()),
+        (h[2], (dhdr[2], dhds[2]).into()),
+    ]
 }

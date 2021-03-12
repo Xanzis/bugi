@@ -54,15 +54,23 @@ fn more_points() {
     ]
     .into();
 
-    asm.add_points(vec![Point::new(&[1.0, 5.0]),
-                        Point::new(&[-25.0, 40.0]),
-                        Point::new(&[12.0, -2.0]),],
-                        1);
+    asm.add_points(
+        vec![
+            Point::new(&[1.0, 5.0]),
+            Point::new(&[-25.0, 40.0]),
+            Point::new(&[12.0, -2.0]),
+        ],
+        1,
+    );
 
-    asm.add_points(vec![Point::new(&[4.0, 2.0]),
-                        Point::new(&[-22.0, 37.0]),
-                        Point::new(&[15.0, -5.0]),],
-                        2);
+    asm.add_points(
+        vec![
+            Point::new(&[4.0, 2.0]),
+            Point::new(&[-22.0, 37.0]),
+            Point::new(&[15.0, -5.0]),
+        ],
+        2,
+    );
 
     asm.draw("test_generated/more.png");
 }
