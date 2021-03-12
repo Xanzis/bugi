@@ -114,13 +114,13 @@ fn triangles() {
     }
 
     elas.add_constraint(0, Constraint::PlainDof(true, true, false));
-    elas.add_constraint(10, Constraint::PlainDof(false, true, false));
+    elas.add_constraint(29, Constraint::PlainDof(false, true, false));
 
     elas.add_conc_force(39, Point::new(&[0.0, -1.0e5]));
     elas.calc_displacements();
 
     let mut vis: Visualizer = elas.nodes().into();
-    vis.add_points(elas.displaced_nodes(50.0).unwrap(), 1);
+    vis.add_points(elas.displaced_nodes(300.0).unwrap(), 1);
 
     vis.draw("test_generated/triangles.png");
 }
