@@ -1,7 +1,7 @@
+use std::cmp::min;
 use std::convert::{From, TryFrom, TryInto};
 use std::fmt;
-use std::ops::{Index, IndexMut, Add, Sub, Mul};
-use std::cmp::min;
+use std::ops::{Add, Index, IndexMut, Mul, Sub};
 
 pub mod hull;
 
@@ -18,7 +18,9 @@ impl fmt::Display for SpatialError {
 
 impl SpatialError {
     fn new(msg: &str) -> SpatialError {
-        SpatialError {msg: msg.to_string()}
+        SpatialError {
+            msg: msg.to_string(),
+        }
     }
 }
 
@@ -36,25 +38,29 @@ impl Point {
     pub fn new(vals: &[f64]) -> Self {
         let mut data = [0.0; 3];
         let n = vals.len();
-        if n > 3 { panic!("dimension too high") }
+        if n > 3 {
+            panic!("dimension too high")
+        }
         for i in 0..n {
             data[i] = vals[i];
         }
-        Point {n, data}
+        Point { n, data }
     }
 
     pub fn zero(n: usize) -> Self {
-        Point {n, data: [0.0; 3]}
+        Point { n, data: [0.0; 3] }
     }
 
     pub fn mid(&self, other: Point) -> Point {
         // find the midpoint between two points
         // TODO make sure nothing will set a nonzero value for an invalid dimension
-        let data = [(self.data[0] + other.data[0]) / 2.0,
-                    (self.data[1] + other.data[1]) / 2.0,
-                    (self.data[2] + other.data[2]) / 2.0];
+        let data = [
+            (self.data[0] + other.data[0]) / 2.0,
+            (self.data[1] + other.data[1]) / 2.0,
+            (self.data[2] + other.data[2]) / 2.0,
+        ];
         let n = min(self.n, other.n);
-        Point {n, data}
+        Point { n, data }
     }
 
     pub fn dist(&self, other: Point) -> f64 {
@@ -68,7 +74,11 @@ impl fmt::Display for Point {
         match self.dim() {
             1 => write!(f, "({:1.4})", self.data[0]),
             2 => write!(f, "({:1.4}, {:1.4})", self.data[0], self.data[1]),
-            3 => write!(f, "({:1.4}, {:1.4}, {:1.4})", self.data[0], self.data[1], self.data[2]),
+            3 => write!(
+                f,
+                "({:1.4}, {:1.4}, {:1.4})",
+                self.data[0], self.data[1], self.data[2]
+            ),
             _ => panic!("illegal point"),
         }
     }
@@ -85,7 +95,7 @@ impl TryInto<f64> for Point {
     fn try_into(self) -> Result<f64, SpatialError> {
         match self.dim() {
             1 => Ok(self[0]),
-            _ => Err(SpatialError::new("bad dimensions in conversion"))
+            _ => Err(SpatialError::new("bad dimensions in conversion")),
         }
     }
 }
@@ -101,7 +111,7 @@ impl TryInto<(f64, f64)> for Point {
     fn try_into(self) -> Result<(f64, f64), SpatialError> {
         match self.dim() {
             2 => Ok((self[0], self[1])),
-            _ => Err(SpatialError::new("bad dimensions in conversion"))
+            _ => Err(SpatialError::new("bad dimensions in conversion")),
         }
     }
 }
@@ -117,7 +127,7 @@ impl TryInto<(f64, f64, f64)> for Point {
     fn try_into(self) -> Result<(f64, f64, f64), SpatialError> {
         match self.dim() {
             3 => Ok((self[0], self[1], self[2])),
-            _ => Err(SpatialError::new("bad dimensions in conversion"))
+            _ => Err(SpatialError::new("bad dimensions in conversion")),
         }
     }
 }
@@ -171,11 +181,18 @@ impl Add for Point {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        if self.dim() != other.dim() { panic!("point dimension mismatch") }
-        let data = [self.data[0] + other.data[0],
-                    self.data[1] + other.data[1],
-                    self.data[2] + other.data[2]];
-        Point { n: self.dim(), data}
+        if self.dim() != other.dim() {
+            panic!("point dimension mismatch")
+        }
+        let data = [
+            self.data[0] + other.data[0],
+            self.data[1] + other.data[1],
+            self.data[2] + other.data[2],
+        ];
+        Point {
+            n: self.dim(),
+            data,
+        }
     }
 }
 
@@ -183,11 +200,18 @@ impl Sub for Point {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        if self.dim() != other.dim() { panic!("point dimension mismatch") }
-        let data = [self.data[0] - other.data[0],
-                    self.data[1] - other.data[1],
-                    self.data[2] - other.data[2]];
-        Point { n: self.dim(), data}
+        if self.dim() != other.dim() {
+            panic!("point dimension mismatch")
+        }
+        let data = [
+            self.data[0] - other.data[0],
+            self.data[1] - other.data[1],
+            self.data[2] - other.data[2],
+        ];
+        Point {
+            n: self.dim(),
+            data,
+        }
     }
 }
 
@@ -195,10 +219,15 @@ impl Mul<f64> for Point {
     type Output = Self;
 
     fn mul(self, other: f64) -> Self {
-        let data = [self.data[0] * other,
-                    self.data[1] * other,
-                    self.data[2] * other];
-        Point { n: self.dim(), data }
+        let data = [
+            self.data[0] * other,
+            self.data[1] * other,
+            self.data[2] * other,
+        ];
+        Point {
+            n: self.dim(),
+            data,
+        }
     }
 }
 
@@ -230,8 +259,8 @@ mod tests {
     }
     #[test]
     fn orientation() {
-        use super::hull::Orient;
         use super::hull;
+        use super::hull::Orient;
         let a = Point::new(&[-1.0, -0.3]);
         let b = Point::new(&[-0.5, 3.0]);
         let c = Point::new(&[10.0, -0.2]);
@@ -257,5 +286,20 @@ mod tests {
         assert_eq!(p - Point::new(&[1.0, 2.0]), Point::new(&[-2.0, 3.0]));
         assert_eq!(p + Point::new(&[1.0, 2.0]), Point::new(&[0.0, 7.0]));
         assert_eq!(p * 2.0, Point::new(&[-2.0, 10.0]));
+    }
+    #[test]
+    fn point_in_triangle() {
+        use super::hull;
+
+        let p = Point::new(&[1.0, 1.0]);
+        let q = Point::new(&[3.0, 1.0]);
+        let a = Point::new(&[0.0, 1.0]);
+        let b = Point::new(&[1.0, 2.0]);
+        let c = Point::new(&[2.0, -1.0]);
+
+        assert!(hull::in_triangle(p, [a, b, c]));
+        assert!(hull::in_triangle(p, [c, b, a]));
+        assert!(!hull::in_triangle(q, [a, b, c]));
+        assert!(!hull::in_triangle(q, [c, b, a]));
     }
 }
