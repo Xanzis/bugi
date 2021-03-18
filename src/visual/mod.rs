@@ -65,12 +65,6 @@ impl Visualizer {
         let y_max = ys.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
         let y_min = ys.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
-        let x_sum: f64 = xs.iter().sum();
-        let y_sum: f64 = ys.iter().sum();
-
-        let x_mean = x_sum / n_points;
-        let y_mean = y_sum / n_points;
-
         let x_range = x_max - x_min;
         let y_range = y_max - y_min;
         let max_range = if x_range > y_range { x_range } else { y_range };
@@ -103,7 +97,7 @@ impl Visualizer {
                 let orig = pix_points.get(e.0);
                 let end = pix_points.get(e.1);
                 if let (Some(o), Some(e)) = (orig, end) {
-                    let to_draw = bresenham::line_unsigned(orig.unwrap(), end.unwrap());
+                    let to_draw = bresenham::line_unsigned(o, e);
                     for d in to_draw {
                         img.put_pixel(d.0, d.1, Rgb([0, 255, 0]))
                     }
