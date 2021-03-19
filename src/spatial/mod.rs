@@ -116,6 +116,12 @@ impl TryInto<(f64, f64)> for Point {
     }
 }
 
+impl From<(u32, u32)> for Point {
+    fn from(x: (u32, u32)) -> Self {
+        Point::new(&[x.0 as f64, x.1 as f64])
+    }
+}
+
 impl From<(f64, f64, f64)> for Point {
     fn from(x: (f64, f64, f64)) -> Self {
         Point::new(&[x.0, x.1, x.2])
