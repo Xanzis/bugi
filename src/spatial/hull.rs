@@ -55,10 +55,9 @@ pub fn jarvis_hull(points: &Vec<Point>) -> Vec<usize> {
     }
 }
 
-pub fn in_triangle(p: Point, tri: [Point; 3]) -> bool {
-    // determine whether p is within the given triangle
-
-    let [p1, p2, p3] = tri;
+pub fn bary_coor(tri: (Point, Point, Point), p: Point) -> (f64, f64, f64) {
+    // returns the barymetric coordinates of a point in a triangle
+    let (p1, p2, p3) = tri;
     let (x1, y1) = p1.try_into().unwrap();
     let (x2, y2) = p2.try_into().unwrap();
     let (x3, y3) = p3.try_into().unwrap();
@@ -68,6 +67,11 @@ pub fn in_triangle(p: Point, tri: [Point; 3]) -> bool {
     let a = ((y2 - y3) * (x - x3) + (x3 - x2) * (y - y3)) / denom;
     let b = ((y3 - y1) * (x - x3) + (x1 - x3) * (y - y3)) / denom;
     let c = 1.0 - a - b;
+    (a, b, c)
+}
 
-    return 0.0 <= a && 1.0 >= a && 0.0 <= b && 1.0 >= b && 0.0 <= c && 1.0 >= c;
+pub fn in_triangle(p: Point, tri: (Point, Point, Point)) -> bool {
+    // determine whether p is within the given triangle
+    let (a, b, c) = bary_coor(tri, p);
+    0.0 <= a && 1.0 >= a && 0.0 <= b && 1.0 >= b && 0.0 <= c && 1.0 >= c
 }

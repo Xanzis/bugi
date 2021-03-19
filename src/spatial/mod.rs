@@ -297,9 +297,9 @@ mod tests {
         let b = Point::new(&[1.0, 2.0]);
         let c = Point::new(&[2.0, -1.0]);
 
-        assert!(hull::in_triangle(p, [a, b, c]));
-        assert!(hull::in_triangle(p, [c, b, a]));
-        assert!(!hull::in_triangle(q, [a, b, c]));
-        assert!(!hull::in_triangle(q, [c, b, a]));
+        assert!(hull::in_triangle(p, (a, b, c)));
+        assert!(hull::in_triangle(p, (c, b, a)));
+        assert!(!hull::in_triangle(q, (a, b, c)));
+        assert!(!hull::in_triangle(q, (c, b, a)));
     }
 }
