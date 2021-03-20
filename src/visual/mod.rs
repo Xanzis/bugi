@@ -19,12 +19,47 @@ pub struct Visualizer {
     points: Vec<Point>,
     colors: Vec<usize>,
     edges: Option<Vec<(usize, usize)>>,
+    triangles: Option<Vec<(usize, usize, usize)>>,
+    node_vals: Option<Vec<f64>>,
+    val_range: Option<(f64, f64)>,
 }
 
 impl Visualizer {
     pub fn add_points(&mut self, points: Vec<Point>, color: usize) {
+        // TODO hacky hacky hacky rethink this stuff
+        if self.node_vals.is_some() { panic!("can't add points to assemblage with defined node values") }
+
         self.colors.extend(vec![color; points.len()]);
         self.points.extend(points);
+    }
+
+    pub fn set_vals(&mut self, vals: Vec<f64>) {
+        // normalize the values to [0, 1] and set the visualizer field
+        // TODO el<->vis interfaces need to be improved, value interpolation + extra point overlay should be ok
+        if vals.len() != self.points.len() {
+            panic!("node values must have same count as nodes");
+        }
+
+        let min = vals.iter().min_by(|x, y| x.partial_cmp(y).unwrap()).unwrap().clone();
+        let max = vals.iter().max_by(|x, y| x.partial_cmp(y).unwrap()).unwrap().clone();
+
+        self.val_range = Some((min, max));
+        
+        let range = max - min;
+        self.node_vals = Some(
+            vals.into_iter()
+            .map(|x| (x - min) / range)
+            .map(|x| x.min(1.0))
+            .map(|x| x.max(0.0))
+            .collect());
+    }
+
+    pub fn set_edges(&mut self, edges: Vec<(usize, usize)>) {
+        if edges.len() > 0 { self.edges = Some(edges); }
+    }
+
+    pub fn set_triangles(&mut self, tris: Vec<(usize, usize, usize)>) {
+        if tris.len() > 0 { self.triangles = Some(tris); }
     }
 
     fn project(&self) -> Vec<(f64, f64)> {
@@ -87,6 +122,20 @@ impl Visualizer {
         let pix_points = self.enpixel();
         let mut img = RgbImage::new(IMG_SIZE, IMG_SIZE);
 
+        // draw triangles if present
+        if let (Some(triangles), Some(node_vals)) = (self.triangles.clone(), self.node_vals.clone()) {
+            for t in triangles.iter() {
+                let (a, b, c) = t.clone();
+                let tri = [pix_points[a], pix_points[b], pix_points[c]];
+                let vals = [node_vals[a], node_vals[b], node_vals[c]];
+
+                let to_draw = fill::triangle_interp(tri, vals);
+                for (loc, v) in to_draw.into_iter() {
+                    img.put_pixel(loc.0, loc.1, color::hot_map(v));
+                }
+            }
+        }
+
         // draw lines
         if let Some(edges) = &self.edges {
             for e in edges.iter() {
@@ -101,7 +150,7 @@ impl Visualizer {
             }
         }
 
-        // draw points -- TODO draw thicker points
+        // draw points
         for ((x, y), c) in pix_points.into_iter().zip(self.colors.iter()) {
             let to_draw = fill::dot_points(x, y);
             for (i, j) in to_draw.into_iter() {
@@ -125,6 +174,9 @@ impl From<Vec<Point>> for Visualizer {
             points,
             colors: vec![0; n],
             edges: None,
+            triangles: None,
+            node_vals: None,
+            val_range: None,
         }
     }
 }

@@ -98,6 +98,39 @@ impl IsoparElement {
         2
     }
 
+    pub fn edges(&self) -> Option<Vec<(usize, usize)>> {
+        // pairs of indices in the global point list which give the element edges
+        match self.el_type {
+            ElementType::Bar2Node => Some(vec![(self.node_idxs[0], self.node_idxs[1])]),
+            ElementType::PlaneNNode => {
+                let mut res = Vec::new();
+                for i in 0..(self.node_idxs.len() - 1) {
+                    res.push((self.node_idxs[i], self.node_idxs[i + 1]));
+                }
+                res.push((self.node_idxs[0], self.node_idxs.last().unwrap().clone()));
+                Some(res)
+            }
+            ElementType::Triangle3Node => Some(vec![
+                (self.node_idxs[0], self.node_idxs[1]),
+                (self.node_idxs[1], self.node_idxs[2]),
+                (self.node_idxs[2], self.node_idxs[0]),
+            ]),
+        }
+    }
+
+    pub fn triangles(&self) -> Option<Vec<(usize, usize, usize)>> {
+        // triplets of indices in the global point list which give the element face triangles
+        match self.el_type {
+            ElementType::Bar2Node => None,
+            ElementType::PlaneNNode => plane_n_node_triangles(&self.node_idxs),
+            ElementType::Triangle3Node => Some(vec![(
+                self.node_idxs[0],
+                self.node_idxs[1],
+                self.node_idxs[2],
+            )]),
+        }
+    }
+
     pub fn h_and_grad(&self, nat_coor: Point) -> Vec<(f64, Point)> {
         // depending on underlying type, return h and its gradient
         self.el_type.h_and_grad(nat_coor, self.node_count())
@@ -400,4 +433,16 @@ fn triangle_3_node_h_and_grad(nat_coor: Point) -> Vec<(f64, Point)> {
         (h[1], (dhdr[1], dhds[1]).into()),
         (h[2], (dhdr[2], dhds[2]).into()),
     ]
+}
+
+fn plane_n_node_triangles(node_idxs: &Vec<usize>) -> Option<Vec<(usize, usize, usize)>> {
+    // find the triplets of node indices representing regions of the n-node plane element
+
+    match node_idxs.len() {
+        4 => Some(vec![
+            (node_idxs[0], node_idxs[1], node_idxs[2]),
+            (node_idxs[0], node_idxs[2], node_idxs[3]),
+        ]),
+        _ => unimplemented!("triangles not implemented for this order of plane node"),
+    }
 }

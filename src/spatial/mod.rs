@@ -63,9 +63,15 @@ impl Point {
         Point { n, data }
     }
 
-    pub fn dist(&self, other: Point) -> f64 {
+    pub fn dist(self, other: Point) -> f64 {
         // TODO make sure nothing will set a nonzero value for an invalid dimension
-        (self.data[0].powi(2) + self.data[1].powi(2) + self.data[2].powi(2)).sqrt()
+        let v = self - other;
+        (v.data[0].powi(2) + v.data[1].powi(2) + v.data[2].powi(2)).sqrt()
+    }
+
+    pub fn norm(self) -> f64 {
+        // TODO same as above
+        ((self.data[0].powi(2) + self.data[1].powi(2) + self.data[2].powi(2)).sqrt())
     }
 }
 

@@ -53,9 +53,7 @@ fn assemblage() {
 
     elas.calc_displacements();
 
-    let mut vis: Visualizer = elas.nodes().clone().into();
-    vis.add_points(elas.displaced_nodes(50.0).unwrap(), 1);
-
+    let mut vis = elas.visualize_displacements(50.0);
     vis.draw("test_generated/disp_square.png");
 }
 #[test]
