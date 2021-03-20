@@ -4,8 +4,8 @@ use crate::spatial::Point;
 use image::{Rgb, RgbImage};
 
 mod bresenham;
-mod fill;
 mod color;
+mod fill;
 
 #[cfg(test)]
 mod tests;
@@ -27,7 +27,9 @@ pub struct Visualizer {
 impl Visualizer {
     pub fn add_points(&mut self, points: Vec<Point>, color: usize) {
         // TODO hacky hacky hacky rethink this stuff
-        if self.node_vals.is_some() { panic!("can't add points to assemblage with defined node values") }
+        if self.node_vals.is_some() {
+            panic!("can't add points to assemblage with defined node values")
+        }
 
         self.colors.extend(vec![color; points.len()]);
         self.points.extend(points);
@@ -40,26 +42,39 @@ impl Visualizer {
             panic!("node values must have same count as nodes");
         }
 
-        let min = vals.iter().min_by(|x, y| x.partial_cmp(y).unwrap()).unwrap().clone();
-        let max = vals.iter().max_by(|x, y| x.partial_cmp(y).unwrap()).unwrap().clone();
+        let min = vals
+            .iter()
+            .min_by(|x, y| x.partial_cmp(y).unwrap())
+            .unwrap()
+            .clone();
+        let max = vals
+            .iter()
+            .max_by(|x, y| x.partial_cmp(y).unwrap())
+            .unwrap()
+            .clone();
 
         self.val_range = Some((min, max));
-        
+
         let range = max - min;
         self.node_vals = Some(
             vals.into_iter()
-            .map(|x| (x - min) / range)
-            .map(|x| x.min(1.0))
-            .map(|x| x.max(0.0))
-            .collect());
+                .map(|x| (x - min) / range)
+                .map(|x| x.min(1.0))
+                .map(|x| x.max(0.0))
+                .collect(),
+        );
     }
 
     pub fn set_edges(&mut self, edges: Vec<(usize, usize)>) {
-        if edges.len() > 0 { self.edges = Some(edges); }
+        if edges.len() > 0 {
+            self.edges = Some(edges);
+        }
     }
 
     pub fn set_triangles(&mut self, tris: Vec<(usize, usize, usize)>) {
-        if tris.len() > 0 { self.triangles = Some(tris); }
+        if tris.len() > 0 {
+            self.triangles = Some(tris);
+        }
     }
 
     fn project(&self) -> Vec<(f64, f64)> {
@@ -123,7 +138,8 @@ impl Visualizer {
         let mut img = RgbImage::new(IMG_SIZE, IMG_SIZE);
 
         // draw triangles if present
-        if let (Some(triangles), Some(node_vals)) = (self.triangles.clone(), self.node_vals.clone()) {
+        if let (Some(triangles), Some(node_vals)) = (self.triangles.clone(), self.node_vals.clone())
+        {
             for t in triangles.iter() {
                 let (a, b, c) = t.clone();
                 let tri = [pix_points[a], pix_points[b], pix_points[c]];

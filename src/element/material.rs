@@ -17,8 +17,14 @@ pub struct Material {
     poisson: f64,
 }
 
-pub const AL6061: Material = Material {youngs: 6.89e10, poisson: 0.33};
-pub const TEST: Material = Material {youngs: 1.0, poisson: 0.0};
+pub const AL6061: Material = Material {
+    youngs: 6.89e10,
+    poisson: 0.33,
+};
+pub const TEST: Material = Material {
+    youngs: 1.0,
+    poisson: 0.0,
+};
 
 impl Material {
     fn youngs(&self) -> f64 {
@@ -45,17 +51,14 @@ impl Material {
         use ProblemType::*;
 
         match problem {
-            Bar => {
-                LinearMatrix::from_flat((1, 1), vec![self.youngs()])
-            },
+            Bar => LinearMatrix::from_flat((1, 1), vec![self.youngs()]),
             Beam => {
                 if let Some(v) = self.inertia_moment() {
-                    LinearMatrix::from_flat((1, 1), vec![v*self.youngs()])
-                }
-                else {
+                    LinearMatrix::from_flat((1, 1), vec![v * self.youngs()])
+                } else {
                     panic!("inertia moment required for ProblemType::Beam but not supplied")
                 }
-            },
+            }
             PlaneStress => {
                 let mut res = LinearMatrix::eye(3);
                 let v = self.poisson();
@@ -114,8 +117,7 @@ impl Material {
                     res[(2, 2)] = (1.0 - v) / 2.0;
                     res *= (e * h * h * h) / (12.0 * (1.0 - (v * v)));
                     res
-                }
-                else {
+                } else {
                     panic!("thickness required for ProblemType::PlateBending but not supplied");
                 }
             }

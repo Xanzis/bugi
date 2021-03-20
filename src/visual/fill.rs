@@ -1,5 +1,5 @@
-use crate::spatial::{hull, Point};
 use super::DOT_SIZE;
+use crate::spatial::{hull, Point};
 
 pub fn dot_points(center_x: u32, center_y: u32) -> Vec<(u32, u32)> {
     // returns the points to draw for a dot

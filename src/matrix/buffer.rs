@@ -1,7 +1,7 @@
-use super::{MatrixShape, MatrixLike};
+use super::{MatrixLike, MatrixShape};
 use std::cmp::PartialEq;
-use std::ops::{Add, Sub, AddAssign, MulAssign, Index, IndexMut};
 use std::fmt;
+use std::ops::{Add, AddAssign, Index, IndexMut, MulAssign, Sub};
 
 #[derive(Clone, Debug)]
 pub struct LinearMatrix {
@@ -26,11 +26,12 @@ impl LinearMatrix {
     fn pos(&self, loc: (usize, usize)) -> Option<usize> {
         // find the location of the desired element in data
         // read differently for row/column major orders of buffer
-        if (loc.1 >= self.dims.1) || (loc.0 >= self.dims.0) { return None }
+        if (loc.1 >= self.dims.1) || (loc.0 >= self.dims.0) {
+            return None;
+        }
         if self.row_maj {
             Some((self.dims.1 * loc.0) + loc.1)
-        }
-        else {
+        } else {
             Some((self.dims.0 * loc.1) + loc.0)
         }
     }
@@ -39,11 +40,15 @@ impl LinearMatrix {
 impl LowerTriangular {
     fn pos(&self, loc: (usize, usize)) -> Option<usize> {
         let (row, col) = loc;
-        if (row >= self.dim) || (col >= self.dim) { return None }
+        if (row >= self.dim) || (col >= self.dim) {
+            return None;
+        }
         // returns None if a non-triangular position is requested
         // Index implementation should fill &0.0
         // IndexMut should panic
-        if col > row { return None }
+        if col > row {
+            return None;
+        }
         Some((row * (row + 1) / 2) + col)
     }
 
@@ -52,7 +57,9 @@ impl LowerTriangular {
         // TODO consider returning a Result
         println!("this is me: {}", self);
         let dim = self.dim;
-        if dim != b.len() {panic!("incompatible shapes")}
+        if dim != b.len() {
+            panic!("incompatible shapes")
+        }
         let mut x = vec![0.0; dim];
         for i in 0..dim {
             let mut temp = 0.0;
@@ -86,15 +93,21 @@ impl LowerTriangular {
 impl UpperTriangular {
     fn pos(&self, loc: (usize, usize)) -> Option<usize> {
         let (row, col) = loc;
-        if (col >= self.dim) || (row >= self.dim) { return None }
-        if row > col { return None }
+        if (col >= self.dim) || (row >= self.dim) {
+            return None;
+        }
+        if row > col {
+            return None;
+        }
         Some((col * (col + 1) / 2) + row)
     }
 
     pub fn backward_sub(&self, b: &[f64]) -> Vec<f64> {
         // solves Ux = b
         let dim = self.dim;
-        if dim != b.len() {panic!("incompatible shapes")}
+        if dim != b.len() {
+            panic!("incompatible shapes")
+        }
         let mut x = vec![0.0; dim];
         for i in (0..dim).rev() {
             let mut temp = 0.0;
@@ -137,16 +150,18 @@ impl MatrixLike for LinearMatrix {
     fn get(&self, loc: (usize, usize)) -> Option<&f64> {
         if let Some(i) = self.pos(loc) {
             // this is fine, self.pos checks bounds
-            unsafe {Some(self.data.get_unchecked(i))}
+            unsafe { Some(self.data.get_unchecked(i)) }
+        } else {
+            None
         }
-        else { None }
     }
 
     fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64> {
         if let Some(i) = self.pos(loc) {
-            unsafe {Some(self.data.get_unchecked_mut(i))}
+            unsafe { Some(self.data.get_unchecked_mut(i)) }
+        } else {
+            None
         }
-        else { None }
     }
 
     fn transpose(&mut self) {
@@ -158,7 +173,11 @@ impl MatrixLike for LinearMatrix {
         let shape: MatrixShape = shape.into();
         let dims = (shape.nrow, shape.ncol);
         let data = vec![0.0; dims.0 * dims.1];
-        Self { dims, row_maj: true, data }
+        Self {
+            dims,
+            row_maj: true,
+            data,
+        }
     }
     fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, data: U) -> Self {
         // turn a row-major vector of values into a matrix
@@ -168,22 +187,30 @@ impl MatrixLike for LinearMatrix {
         if (dims.0 * dims.1) != data.len() {
             panic!("bad shape {:?} for data length {}", dims, data.len())
         }
-        Self { dims, row_maj: true, data }
+        Self {
+            dims,
+            row_maj: true,
+            data,
+        }
     }
 }
 
 impl PartialEq for LinearMatrix {
     fn eq(&self, other: &Self) -> bool {
-        if self.shape() != other.shape() { return false }
+        if self.shape() != other.shape() {
+            return false;
+        }
         if self.row_maj == other.row_maj {
             // data is arranged the same
-            return self.data == other.data
+            return self.data == other.data;
         }
         // if the data orders don't align, check the slow way
         let (nrow, ncol) = self.shape();
         for i in 0..nrow {
             for j in 0..ncol {
-                if self.get((i, j)) != other.get((i, j)) { return false }
+                if self.get((i, j)) != other.get((i, j)) {
+                    return false;
+                }
             }
         }
         true
@@ -207,20 +234,30 @@ impl fmt::Display for LinearMatrix {
 impl<'a> Add<&'a LinearMatrix> for &'a LinearMatrix {
     type Output = LinearMatrix;
     fn add(self, rhs: Self) -> Self::Output {
-        if self.dims != rhs.dims { panic!("incompatible shapes") }
-        if self.row_maj == rhs.row_maj {
-            let new_data = self.data.iter()
-                                    .zip(rhs.data.iter())
-                                    .map(|(x, y)| x + y)
-                                    .collect();
-            LinearMatrix {dims: self.dims, row_maj: self.row_maj, data: new_data}
+        if self.dims != rhs.dims {
+            panic!("incompatible shapes")
         }
-        else {
-            let mut res = LinearMatrix {dims: self.dims, row_maj: true, data: Vec::new()};
+        if self.row_maj == rhs.row_maj {
+            let new_data = self
+                .data
+                .iter()
+                .zip(rhs.data.iter())
+                .map(|(x, y)| x + y)
+                .collect();
+            LinearMatrix {
+                dims: self.dims,
+                row_maj: self.row_maj,
+                data: new_data,
+            }
+        } else {
+            let mut res = LinearMatrix {
+                dims: self.dims,
+                row_maj: true,
+                data: Vec::new(),
+            };
             for i in 0..self.dims.0 {
-                res.data.extend(self.row(i)
-                                    .zip(rhs.row(i))
-                                    .map(|(x, y)| x + y));
+                res.data
+                    .extend(self.row(i).zip(rhs.row(i)).map(|(x, y)| x + y));
             }
             res
         }
@@ -230,20 +267,30 @@ impl<'a> Add<&'a LinearMatrix> for &'a LinearMatrix {
 impl<'a> Sub<&'a LinearMatrix> for &'a LinearMatrix {
     type Output = LinearMatrix;
     fn sub(self, rhs: Self) -> Self::Output {
-        if self.dims != rhs.dims { panic!("incompatible shapes") }
-        if self.row_maj == rhs.row_maj {
-            let new_data = self.data.iter()
-                                    .zip(rhs.data.iter())
-                                    .map(|(x, y)| x - y)
-                                    .collect();
-            LinearMatrix {dims: self.dims, row_maj: self.row_maj, data: new_data}
+        if self.dims != rhs.dims {
+            panic!("incompatible shapes")
         }
-        else {
-            let mut res = LinearMatrix {dims: self.dims, row_maj: true, data: Vec::new()};
+        if self.row_maj == rhs.row_maj {
+            let new_data = self
+                .data
+                .iter()
+                .zip(rhs.data.iter())
+                .map(|(x, y)| x - y)
+                .collect();
+            LinearMatrix {
+                dims: self.dims,
+                row_maj: self.row_maj,
+                data: new_data,
+            }
+        } else {
+            let mut res = LinearMatrix {
+                dims: self.dims,
+                row_maj: true,
+                data: Vec::new(),
+            };
             for i in 0..self.dims.0 {
-                res.data.extend(self.row(i)
-                                    .zip(rhs.row(i))
-                                    .map(|(x, y)| x - y));
+                res.data
+                    .extend(self.row(i).zip(rhs.row(i)).map(|(x, y)| x - y));
             }
             res
         }
@@ -267,11 +314,8 @@ impl Index<(usize, usize)> for LinearMatrix {
     fn index(&self, loc: (usize, usize)) -> &Self::Output {
         if let Some(i) = self.pos(loc) {
             // this is perfectly fine, self.pos performs bounds check
-            unsafe {
-                self.data.get_unchecked(i)
-            }
-        }
-        else {
+            unsafe { self.data.get_unchecked(i) }
+        } else {
             panic!("matrix index out of bounds")
         }
     }
@@ -280,11 +324,8 @@ impl Index<(usize, usize)> for LinearMatrix {
 impl IndexMut<(usize, usize)> for LinearMatrix {
     fn index_mut(&mut self, loc: (usize, usize)) -> &mut Self::Output {
         if let Some(i) = self.pos(loc) {
-            unsafe {
-                self.data.get_unchecked_mut(i)
-            }
-        }
-        else {
+            unsafe { self.data.get_unchecked_mut(i) }
+        } else {
             panic!("matrix index out of bounds")
         }
     }
@@ -302,19 +343,20 @@ impl MatrixLike for LowerTriangular {
     fn get(&self, loc: (usize, usize)) -> Option<&f64> {
         if let Some(i) = self.pos(loc) {
             // this is fine, self.pos checks bounds
-            unsafe {Some(self.data.get_unchecked(i))}
-        }
-        else if (loc.0 < self.dim) && (loc.1 < self.dim) {
+            unsafe { Some(self.data.get_unchecked(i)) }
+        } else if (loc.0 < self.dim) && (loc.1 < self.dim) {
             Some(&0.0)
+        } else {
+            None
         }
-        else { None }
     }
 
     fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64> {
         if let Some(i) = self.pos(loc) {
-            unsafe {Some(self.data.get_unchecked_mut(i))}
+            unsafe { Some(self.data.get_unchecked_mut(i)) }
+        } else {
+            None
         }
-        else { None }
     }
 
     fn transpose(&mut self) {
@@ -351,21 +393,22 @@ impl Index<(usize, usize)> for LowerTriangular {
     fn index(&self, loc: (usize, usize)) -> &Self::Output {
         if let Some(i) = self.pos(loc) {
             // this is perfectly fine, self.pos performs bounds check
-            unsafe {self.data.get_unchecked(i)}
-        }
-        else if (loc.0 < self.dim) && (loc.1 < self.dim) {
+            unsafe { self.data.get_unchecked(i) }
+        } else if (loc.0 < self.dim) && (loc.1 < self.dim) {
             &0.0
+        } else {
+            panic!("matrix index out of bounds")
         }
-        else {panic!("matrix index out of bounds")}
     }
 }
 
 impl IndexMut<(usize, usize)> for LowerTriangular {
     fn index_mut(&mut self, loc: (usize, usize)) -> &mut Self::Output {
         if let Some(i) = self.pos(loc) {
-            unsafe {self.data.get_unchecked_mut(i)}
+            unsafe { self.data.get_unchecked_mut(i) }
+        } else {
+            panic!("matrix index out of bounds")
         }
-        else {panic!("matrix index out of bounds")}
     }
 }
 
@@ -381,19 +424,20 @@ impl MatrixLike for UpperTriangular {
     fn get(&self, loc: (usize, usize)) -> Option<&f64> {
         if let Some(i) = self.pos(loc) {
             // this is fine, self.pos checks bounds
-            unsafe {Some(self.data.get_unchecked(i))}
-        }
-        else if (loc.0 < self.dim) && (loc.1 < self.dim) {
+            unsafe { Some(self.data.get_unchecked(i)) }
+        } else if (loc.0 < self.dim) && (loc.1 < self.dim) {
             Some(&0.0)
+        } else {
+            None
         }
-        else { None }
     }
 
     fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64> {
         if let Some(i) = self.pos(loc) {
-            unsafe {Some(self.data.get_unchecked_mut(i))}
+            unsafe { Some(self.data.get_unchecked_mut(i)) }
+        } else {
+            None
         }
-        else { None }
     }
 
     fn transpose(&mut self) {
@@ -429,20 +473,21 @@ impl Index<(usize, usize)> for UpperTriangular {
     fn index(&self, loc: (usize, usize)) -> &Self::Output {
         if let Some(i) = self.pos(loc) {
             // this is perfectly fine, self.pos performs bounds check
-            unsafe {self.data.get_unchecked(i)}
-        }
-        else if (loc.1 < self.dim) && (loc.0 < self.dim) {
+            unsafe { self.data.get_unchecked(i) }
+        } else if (loc.1 < self.dim) && (loc.0 < self.dim) {
             &0.0
+        } else {
+            panic!("matrix index out of bounds")
         }
-        else {panic!("matrix index out of bounds")}
     }
 }
 
 impl IndexMut<(usize, usize)> for UpperTriangular {
     fn index_mut(&mut self, loc: (usize, usize)) -> &mut Self::Output {
         if let Some(i) = self.pos(loc) {
-            unsafe {self.data.get_unchecked_mut(i)}
+            unsafe { self.data.get_unchecked_mut(i) }
+        } else {
+            panic!("matrix index out of bounds")
         }
-        else {panic!("matrix index out of bounds")}
     }
 }

@@ -1,4 +1,4 @@
-use super::{MatrixLike, UpperTriangular, LowerTriangular};
+use super::{LowerTriangular, MatrixLike, UpperTriangular};
 use std::ops::Add;
 
 pub trait Inverse<T>
@@ -15,7 +15,7 @@ where
 
 impl<T> Inverse<T> for T
 where
-    T: MatrixLike
+    T: MatrixLike,
 {
     fn solve_gausselim(&mut self, mut b: T) -> Result<T, String> {
         // solve the system Ax=b for x. WARNING: A (self) is not preserved
@@ -100,8 +100,7 @@ where
             for k in i..dim {
                 if i == k {
                     lower[(i, i)] = 1.0;
-                }
-                else {
+                } else {
                     let mut sum = 0.0;
                     for j in 0..i {
                         sum += lower[(k, j)] * upper[(j, i)];
@@ -121,10 +120,8 @@ where
     fn determinant(&self) -> f64 {
         // use the cheaper algorithm if possible
         if self.shape() == (2, 2) {
-            self[(0, 0)] * self[(1, 1)] -
-            self[(1, 0)] * self[(0, 1)]
-        }
-        else {
+            self[(0, 0)] * self[(1, 1)] - self[(1, 0)] * self[(0, 1)]
+        } else {
             self.det_lu()
         }
     }
@@ -140,7 +137,7 @@ where
 
     fn inverse(&self) -> Self {
         if self.shape() == (1, 1) {
-            return Self::from_flat((1, 1), vec![1.0 / self[(0, 0)]])
+            return Self::from_flat((1, 1), vec![1.0 / self[(0, 0)]]);
         }
 
         if self.shape() == (2, 2) {

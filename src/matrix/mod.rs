@@ -1,6 +1,6 @@
-use std::fmt;
-use std::cmp::max;
 use crate::spatial::Point;
+use std::cmp::max;
+use std::fmt;
 use std::ops::{Index, IndexMut};
 
 pub mod buffer;
@@ -28,7 +28,7 @@ pub struct MatrixShape {
 
 impl From<(usize, usize)> for MatrixShape {
     fn from(dims: (usize, usize)) -> Self {
-        MatrixShape{
+        MatrixShape {
             nrow: dims.0,
             ncol: dims.1,
             max_dim: max(dims.0, dims.1),
@@ -38,7 +38,7 @@ impl From<(usize, usize)> for MatrixShape {
 
 impl From<usize> for MatrixShape {
     fn from(dim: usize) -> Self {
-        MatrixShape{
+        MatrixShape {
             nrow: dim,
             ncol: dim,
             max_dim: dim,
@@ -49,7 +49,7 @@ impl From<usize> for MatrixShape {
 pub trait MatrixLike
 where
     Self: Sized + Clone + fmt::Debug + fmt::Display,
-    Self: Index<(usize, usize), Output = f64> + IndexMut<(usize, usize), Output = f64>
+    Self: Index<(usize, usize), Output = f64> + IndexMut<(usize, usize), Output = f64>,
 {
     // basic required methods
     fn shape(&self) -> (usize, usize);
@@ -61,7 +61,7 @@ where
 
     // provided methods
 
-    fn put(&mut self, loc:(usize, usize), val: f64) {
+    fn put(&mut self, loc: (usize, usize), val: f64) {
         if let Some(x) = self.get_mut(loc) {
             *x = val;
         }
@@ -71,7 +71,9 @@ where
     where
         F: FnMut(&mut f64),
     {
-        if let Some(x) = self.get_mut(loc) { f(x); }
+        if let Some(x) = self.get_mut(loc) {
+            f(x);
+        }
     }
 
     fn add_ass(&mut self, other: &Self) {
@@ -115,9 +117,7 @@ where
 
         for r in 0..res_shape.0 {
             for c in 0..res_shape.1 {
-                let dot = self.row(r)
-                    .zip(other.col(c))
-                    .map(|x| x.0 * x.1).sum();
+                let dot = self.row(r).zip(other.col(c)).map(|x| x.0 * x.1).sum();
                 res_vals.push(dot);
             }
         }
@@ -129,20 +129,33 @@ where
 
     fn row(&self, i: usize) -> MatrixRow<Self> {
         if i < self.shape().0 {
-            return MatrixRow { source: &self, row: i, pos: 0 };
+            return MatrixRow {
+                source: &self,
+                row: i,
+                pos: 0,
+            };
+        } else {
+            panic!("index out of bounds")
         }
-        else { panic!("index out of bounds") }
     }
 
     fn col(&self, i: usize) -> MatrixCol<Self> {
         if i < self.shape().1 {
-            return MatrixCol { source: &self, col: i, pos: 0 };
+            return MatrixCol {
+                source: &self,
+                col: i,
+                pos: 0,
+            };
+        } else {
+            panic!("index out of bounds")
         }
-        else { panic!("index out of bounds") }
     }
 
     fn diag(&self) -> MatrixDiag<Self> {
-        MatrixDiag {source: &self, pos: 0}
+        MatrixDiag {
+            source: &self,
+            pos: 0,
+        }
     }
 
     fn flat(&self) -> MatrixAll<Self> {
@@ -151,14 +164,18 @@ where
     }
 
     fn set_row(&mut self, i: usize, new: Vec<f64>) {
-        if new.len() != self.shape().1 { panic!("incompatible row length") }
+        if new.len() != self.shape().1 {
+            panic!("incompatible row length")
+        }
         for (c, val) in new.into_iter().enumerate() {
             self.put((i, c), val);
         }
     }
 
     fn set_col(&mut self, i: usize, new: Vec<f64>) {
-        if new.len() != self.shape().0 { panic!("incompatible column length") }
+        if new.len() != self.shape().0 {
+            panic!("incompatible column length")
+        }
         for (r, val) in new.into_iter().enumerate() {
             self.put((r, i), val);
         }
@@ -201,18 +218,25 @@ where
         let shape = dim.into();
         let mut res = Self::zeros(shape.max_dim);
         // this is the naive way - this can certainly be done faster
-        for i in 0..shape.max_dim { res.put((i, i), 1.0); }
+        for i in 0..shape.max_dim {
+            res.put((i, i), 1.0);
+        }
         res
     }
 
     fn from_rows(data: Vec<Vec<f64>>) -> Self {
         let mut total = Vec::new();
         let nrow = data.len();
-        if nrow == 0 { panic!("empty data") }
+        if nrow == 0 {
+            panic!("empty data")
+        }
         let ncol = data.get(0).unwrap().len();
         data.into_iter().for_each(|x| {
-            if x.len() != ncol { panic!("inconstent row lengths") }
-            total.extend(x); });
+            if x.len() != ncol {
+                panic!("inconstent row lengths")
+            }
+            total.extend(x);
+        });
 
         Self::from_flat((nrow, ncol), total)
     }
@@ -223,7 +247,9 @@ where
         let dim = points[0].dim();
 
         for p in points.into_iter() {
-            if p.dim() != dim { panic!("inconsistent point dims") }
+            if p.dim() != dim {
+                panic!("inconsistent point dims")
+            }
             rows.push(p.into());
         }
 
@@ -259,7 +285,8 @@ where
 }
 
 pub struct MatrixRow<'a, T>
-    where T: MatrixLike
+where
+    T: MatrixLike,
 {
     source: &'a T,
     row: usize,
@@ -267,7 +294,8 @@ pub struct MatrixRow<'a, T>
 }
 
 pub struct MatrixCol<'a, T>
-    where T: MatrixLike
+where
+    T: MatrixLike,
 {
     source: &'a T,
     col: usize,
@@ -275,14 +303,16 @@ pub struct MatrixCol<'a, T>
 }
 
 pub struct MatrixDiag<'a, T>
-    where T: MatrixLike
+where
+    T: MatrixLike,
 {
     source: &'a T,
     pos: usize,
 }
 
 pub struct MatrixAll<'a, T>
-    where T: MatrixLike
+where
+    T: MatrixLike,
 {
     source: &'a T,
     row_pos: usize,
@@ -290,7 +320,8 @@ pub struct MatrixAll<'a, T>
 }
 
 impl<'a, T> Iterator for MatrixCol<'a, T>
-    where T: MatrixLike
+where
+    T: MatrixLike,
 {
     type Item = &'a f64;
 
@@ -302,7 +333,8 @@ impl<'a, T> Iterator for MatrixCol<'a, T>
 }
 
 impl<'a, T> Iterator for MatrixRow<'a, T>
-    where T: MatrixLike
+where
+    T: MatrixLike,
 {
     type Item = &'a f64;
 
@@ -314,7 +346,8 @@ impl<'a, T> Iterator for MatrixRow<'a, T>
 }
 
 impl<'a, T> Iterator for MatrixDiag<'a, T>
-    where T: MatrixLike
+where
+    T: MatrixLike,
 {
     type Item = &'a f64;
 
@@ -326,7 +359,8 @@ impl<'a, T> Iterator for MatrixDiag<'a, T>
 }
 
 impl<'a, T> Iterator for MatrixAll<'a, T>
-    where T: MatrixLike
+where
+    T: MatrixLike,
 {
     type Item = &'a f64;
 
@@ -342,9 +376,14 @@ impl<'a, T> Iterator for MatrixAll<'a, T>
 }
 
 impl<'a, T> MatrixAll<'a, T>
-    where T: MatrixLike
+where
+    T: MatrixLike,
 {
     fn new(source: &'a T) -> Self {
-        MatrixAll{ source, row_pos: 0, col_pos: 0 }
+        MatrixAll {
+            source,
+            row_pos: 0,
+            col_pos: 0,
+        }
     }
 }

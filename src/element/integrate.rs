@@ -1,4 +1,4 @@
-use crate::matrix::{MatrixLike, LinearMatrix};
+use crate::matrix::{LinearMatrix, MatrixLike};
 use crate::spatial::Point;
 use std::convert::TryInto;
 
@@ -6,39 +6,41 @@ use std::convert::TryInto;
 // the following numbers are magic
 // don't touch them
 
-
 // two-interval newton-coates numbers
-const NEWTON_COATES_2: [f64; 3] = [1.0 / 6.0,
-                                   4.0 / 6.0,
-                                   1.0 / 6.0];
+const NEWTON_COATES_2: [f64; 3] = [1.0 / 6.0, 4.0 / 6.0, 1.0 / 6.0];
 // four-interval newton-coates numbers
-const NEWTON_COATES_4: [f64; 5] = [7.0 / 90.0,
-                                   32.0 / 90.0,
-                                   12.0 / 90.0,
-                                   32.0 / 90.0,
-                                   7.0 / 90.0];
+const NEWTON_COATES_4: [f64; 5] = [
+    7.0 / 90.0,
+    32.0 / 90.0,
+    12.0 / 90.0,
+    32.0 / 90.0,
+    7.0 / 90.0,
+];
 
 // gauss-legendre sample points and weights
 // on the interval -1 to +1 for various orders
 const GAUSS_P_1: [f64; 1] = [0.0];
 const GAUSS_W_1: [f64; 1] = [2.0];
-const GAUSS_P_2: [f64; 2] = [-0.57735_02691_89626,
-                             0.57735_02691_89626];
+const GAUSS_P_2: [f64; 2] = [-0.57735_02691_89626, 0.57735_02691_89626];
 const GAUSS_W_2: [f64; 2] = [1.0, 1.0];
-const GAUSS_P_3: [f64; 3] = [-0.77459_66692_41483,
-                             0.0,
-                             0.77459_66692_41483];
-const GAUSS_W_3: [f64; 3] = [0.55555_55555_55555,
-                             0.88888_88888_88888,
-                             0.55555_55555_55555];
-const GAUSS_P_4: [f64; 4] = [-0.86113_63115_94053,
-                             -0.33998_10435_84856,
-                             0.33998_10435_84856,
-                             0.86113_63115_94053];
-const GAUSS_W_4: [f64; 4] = [0.34785_48451_37454,
-                             0.65214_51548_62546,
-                             0.65214_51548_62546,
-                             0.34785_48451_37454];
+const GAUSS_P_3: [f64; 3] = [-0.77459_66692_41483, 0.0, 0.77459_66692_41483];
+const GAUSS_W_3: [f64; 3] = [
+    0.55555_55555_55555,
+    0.88888_88888_88888,
+    0.55555_55555_55555,
+];
+const GAUSS_P_4: [f64; 4] = [
+    -0.86113_63115_94053,
+    -0.33998_10435_84856,
+    0.33998_10435_84856,
+    0.86113_63115_94053,
+];
+const GAUSS_W_4: [f64; 4] = [
+    0.34785_48451_37454,
+    0.65214_51548_62546,
+    0.65214_51548_62546,
+    0.34785_48451_37454,
+];
 
 // references to high- and low- precision arrays (&[f64] impls IntoIter<Item=&f64>)
 // TODO maybe there's a better way to make an API for this idk
@@ -49,7 +51,7 @@ const GAUSS_POINTS: [&[f64]; 5] = [&[], &GAUSS_P_1, &GAUSS_P_2, &GAUSS_P_3, &GAU
 const GAUSS_WEIGHTS: [&[f64]; 5] = [&[], &GAUSS_W_1, &GAUSS_W_2, &GAUSS_W_3, &GAUSS_W_4];
 
 // single-value integration: just for tests
-pub fn newton_single<T>(func: T, bounds: (f64, f64), prec: usize) -> f64 
+pub fn newton_single<T>(func: T, bounds: (f64, f64), prec: usize) -> f64
 where
     T: Fn(f64) -> f64,
 {
@@ -97,7 +99,9 @@ where
         while indices[i] >= order {
             indices[i] = 0;
             i += 1;
-            if i >= dim { return sum }
+            if i >= dim {
+                return sum;
+            }
             indices[i] += 1;
         }
     }
@@ -136,10 +140,8 @@ where
             Some(mut s) => {
                 s.add_ass(&term);
                 Some(s)
-            },
-            None => {
-                Some(term)
-            },
+            }
+            None => Some(term),
         };
 
         // update the gauss sample point indices
@@ -148,7 +150,9 @@ where
         while indices[i] >= order {
             indices[i] = 0;
             i += 1;
-            if i >= dim { return sum.unwrap() }
+            if i >= dim {
+                return sum.unwrap();
+            }
             indices[i] += 1;
         }
     }
