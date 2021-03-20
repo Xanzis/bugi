@@ -87,9 +87,7 @@ fn multi_element() {
 
     elas.calc_displacements();
 
-    let mut vis: Visualizer = elas.nodes().into();
-    vis.add_points(elas.displaced_nodes(50.0).unwrap(), 1);
-
+    let mut vis = elas.visualize_displacements(50.0);
     vis.draw("test_generated/disp_tower.png");
 }
 #[test]
@@ -117,8 +115,7 @@ fn triangles() {
     elas.add_conc_force(39, Point::new(&[0.0, -1.0e5]));
     elas.calc_displacements();
 
-    let mut vis: Visualizer = elas.nodes().into();
-    vis.add_points(elas.displaced_nodes(300.0).unwrap(), 1);
+    let mut vis = elas.visualize_displacements(300.0);
 
     vis.draw("test_generated/triangles.png");
 }
