@@ -316,6 +316,7 @@ impl ElementAssemblage {
         let mut vis: Visualizer = dispn.into();
         vis.set_edges(self.edges());
         vis.set_triangles(self.triangles());
+        vis.set_vals(self.displacement_norms().unwrap());
 
         vis
     }

@@ -71,7 +71,7 @@ impl Point {
 
     pub fn norm(self) -> f64 {
         // TODO same as above
-        ((self.data[0].powi(2) + self.data[1].powi(2) + self.data[2].powi(2)).sqrt())
+        (self.data[0].powi(2) + self.data[1].powi(2) + self.data[2].powi(2)).sqrt()
     }
 }
 

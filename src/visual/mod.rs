@@ -144,8 +144,8 @@ impl Visualizer {
                 let (a, b, c) = t.clone();
                 let tri = [pix_points[a], pix_points[b], pix_points[c]];
                 let vals = [node_vals[a], node_vals[b], node_vals[c]];
-
                 let to_draw = fill::triangle_interp(tri, vals);
+
                 for (loc, v) in to_draw.into_iter() {
                     img.put_pixel(loc.0, loc.1, color::hot_map(v));
                 }
