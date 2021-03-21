@@ -1,6 +1,6 @@
 pub mod integrate;
 pub mod isopar;
-mod loading;
+pub mod loading;
 pub mod material;
 pub mod strain;
 
@@ -105,6 +105,7 @@ impl ElementAssemblage {
     }
 
     pub fn add_constraint(&mut self, n: usize, constraint: Constraint) {
+        // TODO avoid overwriting existing constraints
         self.constraints.insert(n, constraint);
     }
 

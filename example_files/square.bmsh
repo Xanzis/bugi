@@ -1,0 +1,32 @@
+# A simple square element with an applied force
+# Equivalent to the square test in src/element
+$Header
+version 1
+dim 2
+material AL6061
+thickness 0.1
+$EndHeader
+
+$Nodes
+count 4
+0 0.0/1.0
+1 1.0/1.0
+2 0.0/0.0
+3 1.0/0.0
+$EndNodes
+
+
+$Elements
+count 1
+0 3 0/2/3/1
+$EndElements
+$Constraints
+count 2
+2 0 1/1/0
+3 0 0/1/0
+# ew this is kind of gross should fix
+$EndConstraints
+$Forces
+count 1
+1 1e7/0.0
+$EndForces
