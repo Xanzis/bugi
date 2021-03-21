@@ -1,5 +1,4 @@
 use super::{LowerTriangular, MatrixLike, UpperTriangular};
-use std::ops::Add;
 
 pub trait Inverse<T>
 where

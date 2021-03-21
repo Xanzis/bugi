@@ -1,11 +1,10 @@
 use super::integrate::{nd_gauss_single, newton_single};
 use super::isopar::IsoparElement;
 use super::loading::Constraint;
-use super::material::{Material, AL6061, TEST};
-use super::strain::StrainRule;
+use super::material::{AL6061, TEST};
 use super::ElementAssemblage;
 
-use crate::matrix::{LinearMatrix, MatrixLike, Norm};
+use crate::matrix::{LinearMatrix, MatrixLike};
 use crate::spatial::Point;
 
 #[test]
@@ -23,7 +22,7 @@ fn rectangle_jacobians() {
     let c = Point::new(&[-2.0, -3.0]);
     let d = Point::new(&[4.0, -3.0]);
     let el = IsoparElement::new(&vec![a, b, c, d], vec![0, 1, 2, 3], TEST);
-    let target = LinearMatrix::from_flat((2, 2), vec![3.0, 0.0, 0.0, 2.0]);
+    //let target = LinearMatrix::from_flat((2, 2), vec![3.0, 0.0, 0.0, 2.0]);
 
     let mats = el.find_mats(Point::new(&[0.0, 0.0]));
 
@@ -39,8 +38,6 @@ fn simple_integrals() {
 }
 #[test]
 fn assemblage() {
-    use crate::visual::Visualizer;
-
     let mut elas = ElementAssemblage::new(2, AL6061);
     elas.set_thickness(0.1);
 
@@ -58,8 +55,6 @@ fn assemblage() {
 }
 #[test]
 fn multi_element() {
-    use crate::visual::Visualizer;
-
     let mut elas = ElementAssemblage::new(2, AL6061);
     elas.set_thickness(0.1);
 
@@ -92,8 +87,6 @@ fn multi_element() {
 }
 #[test]
 fn triangles() {
-    use crate::visual::Visualizer;
-
     let mut elas = ElementAssemblage::new(2, AL6061);
     elas.set_thickness(0.2);
 

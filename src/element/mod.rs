@@ -8,10 +8,9 @@ use crate::matrix::{Inverse, LinearMatrix, MatrixLike};
 use crate::spatial::Point;
 use crate::visual::Visualizer;
 
-use isopar::{ElementType, IsoparElement};
+use isopar::IsoparElement;
 use loading::Constraint;
-use material::{Material, ProblemType};
-use strain::StrainRule;
+use material::Material;
 
 use std::collections::{HashMap, HashSet};
 

@@ -140,13 +140,12 @@ impl IsoparElement {
         // initialize dim (spatial dimension count) and n (node count)
         let dim = self.dim();
         let n = self.node_count();
-        let nodes = self.nodes();
         let strain_rule = self.strain_rule;
 
         // initialize matrices for construction
         let mut j = LinearMatrix::zeros((dim, dim));
         let mut nat_grad_interps = Vec::new();
-        for i in 0..dim {
+        for _ in 0..dim {
             nat_grad_interps.push(LinearMatrix::zeros((dim, dim * n)));
         }
         let mut h_mat = LinearMatrix::zeros((dim, dim * n));

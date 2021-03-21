@@ -103,7 +103,6 @@ impl Visualizer {
     fn enpixel(&self) -> Vec<(u32, u32)> {
         // calculate the pixel positions of the Visualizer points
         let coors = self.project();
-        let n_points = coors.len() as f64;
         let (xs, ys): (Vec<_>, Vec<_>) = coors.into_iter().unzip();
 
         let x_max = xs.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
