@@ -131,7 +131,7 @@ impl IsoparElement {
         }
     }
 
-    pub fn h_and_grad(&self, nat_coor: Point) -> Vec<(f64, Point)> {
+    fn h_and_grad(&self, nat_coor: Point) -> Vec<(f64, Point)> {
         // depending on underlying type, return h and its gradient
         self.el_type.h_and_grad(nat_coor, self.node_count())
     }
@@ -287,6 +287,18 @@ impl ElementType {
 impl ElementMats {
     pub fn det_j(&self) -> f64 {
         self.det_j
+    }
+
+    pub fn j<'a>(&'a self) -> &'a LinearMatrix {
+        &self.j
+    }
+
+    pub fn j_inv<'a>(&'a self) -> &'a LinearMatrix {
+        &self.j_inv
+    }
+
+    pub fn get_h<'a>(&'a self) -> Option<&'a LinearMatrix> {
+        self.h.as_ref()
     }
 }
 

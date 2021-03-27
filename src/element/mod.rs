@@ -50,6 +50,10 @@ impl ElementAssemblage {
         }
     }
 
+    pub fn dim(&self) -> usize {
+        self.dim
+    }
+
     pub fn thickness(&self) -> Option<f64> {
         self.thickness
     }
@@ -92,6 +96,11 @@ impl ElementAssemblage {
     pub fn add_element(&mut self, node_idxs: Vec<usize>) {
         // el should be an El::blank(), it'll get overwritten
         let el = IsoparElement::new(&self.nodes, node_idxs, self.material());
+        // check the element jacobian at the natural coordinate center
+        let mats = el.find_mats(Point::zero(self.dim()));
+        if mats.det_j() < 0.033 {
+            eprintln!("WARNING: element Jacobian is low ({:?})", el);
+        }
         self.elements.push(el);
     }
 
