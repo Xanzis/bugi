@@ -2,6 +2,7 @@ use crate::element::ElementAssemblage;
 use std::fs;
 use std::path::Path;
 use std::fmt;
+use std::error;
 
 mod bmsh;
 
@@ -27,6 +28,8 @@ pub enum FileError {
 	BadParse(String),
 	BadType(String),
 }
+
+impl error::Error for FileError {}
 
 impl fmt::Display for FileError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
