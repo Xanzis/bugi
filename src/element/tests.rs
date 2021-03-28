@@ -30,11 +30,21 @@ fn rectangle_jacobians() {
 }
 #[test]
 fn simple_integrals() {
+    // single integral of (2^x - x) with Newton samples
     let val = newton_single(|x| ((2.0_f64).powf(x) - x), (0.0, 3.0), 0);
     assert!((val - 5.656854).abs() < 1.0e-5);
 
+    // single integral of (x^2) with gauss samples
+    let val = nd_gauss_single(|x| x[0].powi(2), 1, 2);
+    assert!((val - (2.0/3.0)).abs() < 1.0e-6);
+
+    // double integral of (x^2 * y^2) with gauss samples
     let val = nd_gauss_single(|x| x[0].powi(2) * x[1].powi(2), 2, 2);
-    assert!(val - (4.0 / 9.0) < 1.0e-5);
+    assert!((val - (4.0 / 9.0)).abs() < 1.0e-6);
+
+    // triple integral of (x * y^2 * z^3) with gauss samples
+    let val = nd_gauss_single(|x| x[0] * x[1].powi(2) * x[2].powi(3), 3, 3);
+    assert!(val.abs() < 1.0e-6);
 }
 #[test]
 fn assemblage() {

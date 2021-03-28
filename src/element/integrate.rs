@@ -72,39 +72,69 @@ where
     (bounds.1 - bounds.0) * sum
 }
 
+#[derive(Clone, Debug)]
+pub struct NdGaussSamples<'a> {
+    dim: usize,
+    order: usize,
+    i: usize,
+    len: usize,
+    points: &'a[f64],
+    weights: &'a[f64],
+}
+
+impl<'a> NdGaussSamples<'a> {
+    pub fn new(dim: usize, order: usize) -> Self {
+        if !(0 < dim && dim <= 3) {
+            panic!("invalid dimension for gauss sample iterator: {}", dim)
+        }
+
+        Self {
+            dim,
+            order,
+            i: 0,
+            len: order.pow(dim as u32),
+            points: GAUSS_POINTS[order],
+            weights: GAUSS_WEIGHTS[order],
+        }
+    }
+}
+
+impl<'a> Iterator for NdGaussSamples<'a> {
+    type Item = (Point, f64);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.i >= self.len {
+            return None
+        }
+
+        let idxs = [self.i % self.order, 
+                   (self.i / self.order) % self.order, 
+                   (self.i / self.order) / self.order];
+
+        let p_vals = [self.points[idxs[0]], self.points[idxs[1]], self.points[idxs[2]]];
+        let w_vals = [self.weights[idxs[0]], self.weights[idxs[1]], self.weights[idxs[2]]];
+
+        let p = Point::new(&p_vals[0..self.dim]);
+        let w = w_vals[0..self.dim].iter().product();
+
+        self.i += 1;
+        Some((p, w))
+    }
+}
+
 // integrate via gauss-legendre method in <dim> dimensions over bounds [-1, 1]
 pub fn nd_gauss_single<T>(func: T, dim: usize, order: usize) -> f64
 where
     T: Fn(Point) -> f64,
 {
-    let points = GAUSS_POINTS[order];
-    let weights = GAUSS_WEIGHTS[order];
-    // sanity check for the constants
-    assert_eq!(points.len(), order);
-
-    let mut indices = [0, 0, 0];
+    let mut samples = NdGaussSamples::new(dim, order);
     let mut sum = 0.0;
 
-    loop {
-        let mut x: Vec<f64> = Vec::new();
-        let mut w = 1.0;
-        for i in 0..dim {
-            x.push(points[indices[i]]);
-            w *= weights[indices[i]];
-        }
-        sum += w * func(x.try_into().unwrap());
-
-        indices[0] += 1;
-        let mut i = 0;
-        while indices[i] >= order {
-            indices[i] = 0;
-            i += 1;
-            if i >= dim {
-                return sum;
-            }
-            indices[i] += 1;
-        }
+    while let Some((p, w)) = samples.next() {
+        sum += func(p) * w;
     }
+
+    sum
 }
 
 // same as above, this time with a matrix as integrand
