@@ -97,9 +97,17 @@ impl ElementAssemblage {
         // el should be an El::blank(), it'll get overwritten
         let el = IsoparElement::new(&self.nodes, node_idxs, self.material());
         // check the element jacobian at the natural coordinate center
-        let mats = el.find_mats(Point::zero(self.dim()));
-        if mats.det_j() < 0.033 {
-            eprintln!("WARNING: element Jacobian is low ({:?})", el);
+        let j_ratio = el.jacobian_ratio();
+        // TODO handle this error condition with a result return
+        if j_ratio < 0.0 {
+            panic!("distorted element: jacobian ratio is {}", j_ratio)
+        }
+        if j_ratio < 0.033 {
+            eprintln!(
+                "WARNING: element {} Jacobian is low ({})",
+                self.elements.len(),
+                j_ratio
+            );
         }
         self.elements.push(el);
     }

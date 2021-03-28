@@ -1,3 +1,4 @@
+use super::integrate::NdGaussSamples;
 use super::material::{Material, ProblemType};
 use super::strain::StrainRule;
 use crate::matrix::inverse::Inverse;
@@ -200,6 +201,31 @@ impl IsoparElement {
             j,
             j_inv,
             det_j,
+        }
+    }
+
+    pub fn jacobian_ratio(&self) -> f64 {
+        // returns the ratio of smallest jacobian to largest
+        // with an edge case for opposite-sign jacobians
+        let samples = NdGaussSamples::new(self.dim(), self.integration_order());
+        let jacobians: Vec<f64> = samples.map(|(p, _)| self.find_mats(p).det_j).collect();
+
+        // unwrap here is ok because jacobians should never be an empty list
+        let a = jacobians
+            .iter()
+            .max_by(|x, y| x.partial_cmp(y).unwrap())
+            .unwrap();
+        let b = jacobians
+            .iter()
+            .min_by(|x, y| x.partial_cmp(y).unwrap())
+            .unwrap();
+
+        // note this may return a negative number
+        // if so, the element is likely unusably distorted, handle this downstream
+        if a.abs() < b.abs() {
+            a / b
+        } else {
+            b / a
         }
     }
 

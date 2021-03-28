@@ -36,7 +36,7 @@ fn simple_integrals() {
 
     // single integral of (x^2) with gauss samples
     let val = nd_gauss_single(|x| x[0].powi(2), 1, 2);
-    assert!((val - (2.0/3.0)).abs() < 1.0e-6);
+    assert!((val - (2.0 / 3.0)).abs() < 1.0e-6);
 
     // double integral of (x^2 * y^2) with gauss samples
     let val = nd_gauss_single(|x| x[0].powi(2) * x[1].powi(2), 2, 2);

@@ -77,8 +77,8 @@ pub struct NdGaussSamples<'a> {
     order: usize,
     i: usize,
     len: usize,
-    points: &'a[f64],
-    weights: &'a[f64],
+    points: &'a [f64],
+    weights: &'a [f64],
 }
 
 impl<'a> NdGaussSamples<'a> {
@@ -103,15 +103,25 @@ impl<'a> Iterator for NdGaussSamples<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.i >= self.len {
-            return None
+            return None;
         }
 
-        let idxs = [self.i % self.order, 
-                   (self.i / self.order) % self.order, 
-                   (self.i / self.order) / self.order];
+        let idxs = [
+            self.i % self.order,
+            (self.i / self.order) % self.order,
+            (self.i / self.order) / self.order,
+        ];
 
-        let p_vals = [self.points[idxs[0]], self.points[idxs[1]], self.points[idxs[2]]];
-        let w_vals = [self.weights[idxs[0]], self.weights[idxs[1]], self.weights[idxs[2]]];
+        let p_vals = [
+            self.points[idxs[0]],
+            self.points[idxs[1]],
+            self.points[idxs[2]],
+        ];
+        let w_vals = [
+            self.weights[idxs[0]],
+            self.weights[idxs[1]],
+            self.weights[idxs[2]],
+        ];
 
         let p = Point::new(&p_vals[0..self.dim]);
         let w = w_vals[0..self.dim].iter().product();
