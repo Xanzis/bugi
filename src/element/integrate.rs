@@ -1,6 +1,5 @@
 use crate::matrix::{LinearMatrix, MatrixLike};
 use crate::spatial::Point;
-use std::convert::TryInto;
 
 // dear reader,
 // the following numbers are magic
@@ -143,47 +142,19 @@ pub fn nd_gauss_mat<T>(func: T, dim: usize, order: usize) -> LinearMatrix
 where
     T: Fn(Point) -> LinearMatrix,
 {
-    // order determines number of integration points to use
-    let points = GAUSS_POINTS[order];
-    let weights = GAUSS_WEIGHTS[order];
-    // sanity check for the constants
-    assert_eq!(points.len(), order);
+    let mut samples = NdGaussSamples::new(dim, order);
 
-    let mut indices = [0, 0, 0];
-    let mut sum: Option<LinearMatrix> = None;
+    let (first_p, first_w) = samples.next().expect("empty integration sampler");
+    let mut first_term = func(first_p);
+    first_term *= first_w;
 
-    loop {
-        // TODO this isn't the inner loop but the heap allocation probably isn't ideal
-        let mut x: Vec<f64> = Vec::new();
-        let mut w = 1.0;
-        // set up the point x at which to evaluate the integrand
-        // x is bounded by [-1, 1] in R1, R2, or R3
-        for i in 0..dim {
-            x.push(points[indices[i]]);
-            w *= weights[indices[i]];
-        }
+    let mut sum: LinearMatrix = first_term;
 
-        // update the integrand weighted sum
-        let mut term = func(x.try_into().unwrap());
+    while let Some((p, w)) = samples.next() {
+        let mut term = func(p);
         term *= w;
-        sum = match sum {
-            Some(mut s) => {
-                s.add_ass(&term);
-                Some(s)
-            }
-            None => Some(term),
-        };
-
-        // update the gauss sample point indices
-        indices[0] += 1;
-        let mut i = 0;
-        while indices[i] >= order {
-            indices[i] = 0;
-            i += 1;
-            if i >= dim {
-                return sum.unwrap();
-            }
-            indices[i] += 1;
-        }
+        sum.add_ass(&term);
     }
+
+    sum
 }

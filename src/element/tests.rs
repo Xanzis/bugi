@@ -43,8 +43,8 @@ fn simple_integrals() {
     assert!((val - (4.0 / 9.0)).abs() < 1.0e-6);
 
     // triple integral of (x * y^2 * z^3) with gauss samples
-    let val = nd_gauss_single(|x| x[0] * x[1].powi(2) * x[2].powi(3), 3, 3);
-    assert!(val.abs() < 1.0e-6);
+    let val = nd_gauss_single(|x| x[0].powi(2) * x[1].powi(2) * x[2].powi(4), 3, 4);
+    assert!((val - (8.0 / 45.0)).abs() < 1.0e-6);
 }
 #[test]
 fn assemblage() {
