@@ -168,6 +168,7 @@ fn lu_inverses() {
     let target = LinearMatrix::eye(3);
     assert!((&i - &target).frobenius() < 1.0e-10);
 }
+#[test]
 fn inverses() {
     let a = LinearMatrix::from_flat((1, 1), vec![2.0]);
     let a_inv = a.inverse();
