@@ -14,6 +14,8 @@ use material::Material;
 
 use std::collections::{HashMap, HashSet};
 
+use image::Rgb;
+
 #[cfg(test)]
 mod tests;
 
@@ -325,7 +327,9 @@ impl ElementAssemblage {
         res.into_iter().collect()
     }
 
-    pub fn visualize_displacements(&self, scale: f64) -> Visualizer {
+    // TODO should factor this (quite involved) visual stuff out of element
+    pub fn visualize_displacements(&self, scale: f64, color_map: Box<dyn Fn(f64) -> Rgb<u8>>) -> Visualizer
+    {
         let dispn = self
             .displaced_nodes(scale)
             .expect("displacements must first be calculated");
@@ -334,6 +338,8 @@ impl ElementAssemblage {
         vis.set_edges(self.edges());
         vis.set_triangles(self.triangles());
         vis.set_vals(self.displacement_norms().unwrap());
+
+        vis.set_color_map(color_map);
 
         vis
     }

@@ -61,12 +61,15 @@ impl fmt::Display for FileError {
 mod tests {
     #[test]
     fn load_test() {
+        use crate::visual::color;
+
         let elas_out = super::read_to_elas("example_files/square.bmsh");
         assert!(elas_out.is_ok());
         let mut elas = elas_out.unwrap();
         elas.calc_displacements();
 
-        let mut vis = elas.visualize_displacements(50.0);
+        let color_map = color::rgb_map_boxed();
+        let mut vis = elas.visualize_displacements(50.0, color_map);
         vis.draw("test_generated/disp_bmsh_square.png");
     }
 }

@@ -6,6 +6,7 @@ use super::ElementAssemblage;
 
 use crate::matrix::{LinearMatrix, MatrixLike};
 use crate::spatial::Point;
+use crate::visual::color;
 
 #[test]
 fn basic_bar_f() {
@@ -60,7 +61,8 @@ fn assemblage() {
 
     elas.calc_displacements();
 
-    let mut vis = elas.visualize_displacements(50.0);
+    let color_map = color::rgb_map_boxed();
+    let mut vis = elas.visualize_displacements(50.0, color_map);
     vis.draw("test_generated/disp_square.png");
 }
 #[test]
@@ -92,7 +94,8 @@ fn multi_element() {
 
     elas.calc_displacements();
 
-    let mut vis = elas.visualize_displacements(50.0);
+    let color_map = color::rgb_map_boxed();
+    let mut vis = elas.visualize_displacements(50.0, color_map);
     vis.draw("test_generated/disp_tower.png");
 }
 #[test]
@@ -118,7 +121,8 @@ fn triangles() {
     elas.add_conc_force(39, Point::new(&[0.0, -1.0e5]));
     elas.calc_displacements();
 
-    let mut vis = elas.visualize_displacements(300.0);
+    let color_map = color::rgb_map_boxed();
+    let mut vis = elas.visualize_displacements(50.0, color_map);
 
     vis.draw("test_generated/triangles.png");
 }

@@ -6,6 +6,9 @@ use std::fmt;
 use std::path;
 
 use bugi::file;
+use bugi::visual::color;
+
+use image::Rgb;
 
 const VERSION: &str = "0.1.0";
 
@@ -71,7 +74,14 @@ fn linear(args: Args) -> Result<(), BugiError> {
 
     elas.calc_displacements();
 
-    let mut vis = elas.visualize_displacements(50.0);
+    let color_map: Box<dyn Fn(f64) -> Rgb<u8>> = match args.arg_val("colormap") {
+        None => Box::new(|x| color::hot_map(x)),
+        Some("hot") => Box::new(|x| color::hot_map(x)),
+        Some("rgb") => Box::new(|x| color::rgb_map(x)),
+        _ => return Err(BugiError::arg_error("unimplemented colormap name"))
+    };
+
+    let mut vis = elas.visualize_displacements(50.0, color_map);
 
     let out_path = match args.arg_val("out") {
         Some(s) => path::Path::new(s),
