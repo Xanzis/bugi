@@ -4,7 +4,7 @@ use crate::spatial::Point;
 #[test]
 fn one_d() {
     let mut asm: Visualizer = vec![Point::new(&[1.0]), Point::new(&[3.5])].into();
-    asm.draw("test_generated/one.png");
+    asm.draw("test_generated/one.png", ());
 }
 #[test]
 fn two_d() {
@@ -14,7 +14,7 @@ fn two_d() {
         Point::new(&[12.0, -5.0]),
     ]
     .into();
-    asm.draw("test_generated/two.png");
+    asm.draw("test_generated/two.png", ());
 }
 #[test]
 fn three_d() {
@@ -43,7 +43,7 @@ fn three_d() {
         (2, 6),
         (3, 7),
     ]);
-    asm.draw("test_generated/three.png");
+    asm.draw("test_generated/three.png", ());
 }
 #[test]
 fn more_points() {
@@ -72,5 +72,5 @@ fn more_points() {
         2,
     );
 
-    asm.draw("test_generated/more.png");
+    asm.draw("test_generated/more.png", ());
 }

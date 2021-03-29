@@ -61,9 +61,8 @@ fn assemblage() {
 
     elas.calc_displacements();
 
-    let color_map = color::rgb_map_boxed();
-    let mut vis = elas.visualize_displacements(50.0, color_map);
-    vis.draw("test_generated/disp_square.png");
+    let mut vis = elas.visualize_displacements(50.0);
+    vis.draw("test_generated/disp_square.png", ());
 }
 #[test]
 fn multi_element() {
@@ -94,9 +93,8 @@ fn multi_element() {
 
     elas.calc_displacements();
 
-    let color_map = color::rgb_map_boxed();
-    let mut vis = elas.visualize_displacements(50.0, color_map);
-    vis.draw("test_generated/disp_tower.png");
+    let mut vis = elas.visualize_displacements(50.0);
+    vis.draw("test_generated/disp_tower.png", ());
 }
 #[test]
 fn triangles() {
@@ -121,8 +119,7 @@ fn triangles() {
     elas.add_conc_force(39, Point::new(&[0.0, -1.0e5]));
     elas.calc_displacements();
 
-    let color_map = color::rgb_map_boxed();
-    let mut vis = elas.visualize_displacements(50.0, color_map);
+    let mut vis = elas.visualize_displacements(50.0);
 
-    vis.draw("test_generated/triangles.png");
+    vis.draw("test_generated/triangles.png", ());
 }

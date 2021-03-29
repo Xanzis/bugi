@@ -221,7 +221,10 @@ pub fn lines_to_elas<'a, T: Iterator<Item = &'a str>>(
                     } else {
                         let (id, p) = id_and_point(no, line)?;
                         if id >= nodes.len() {
-                            return Err(parse_error(no, "force refers to out-of-bounds node index"));
+                            return Err(parse_error(
+                                no,
+                                "force refers to out-of-bounds node index",
+                            ));
                         }
                         forces.push((id, p));
                         ReadState::Forces { in_body: true }

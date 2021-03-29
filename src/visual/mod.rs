@@ -13,6 +13,26 @@ mod tests;
 const IMG_SIZE: u32 = 256;
 const DOT_SIZE: u32 = 1;
 
+pub struct VisOptions {
+    color_map: Option<Box<dyn Fn(f64) -> Rgb<u8>>>,
+}
+
+impl VisOptions {
+    pub fn with_color_map(map: Box<dyn Fn(f64) -> Rgb<u8>>) -> Self {
+        Self {
+            color_map: Some(map),
+        }
+    }
+}
+
+impl From<()> for VisOptions {
+    fn from(_x: ()) -> Self {
+        Self {
+            color_map: Some(color::hot_map_boxed()),
+        }
+    }
+}
+
 // big ol' struct with all the stuff we're gonna need
 pub struct Visualizer {
     dim: usize,
@@ -22,7 +42,6 @@ pub struct Visualizer {
     triangles: Option<Vec<(usize, usize, usize)>>,
     node_vals: Option<Vec<f64>>,
     val_range: Option<(f64, f64)>,
-    color_map: Option<Box<dyn Fn(f64) -> Rgb<u8>>>
 }
 
 impl Visualizer {
@@ -76,10 +95,6 @@ impl Visualizer {
         if tris.len() > 0 {
             self.triangles = Some(tris);
         }
-    }
-
-    pub fn set_color_map(&mut self, map: Box<dyn Fn(f64) -> Rgb<u8>>) {
-        self.color_map = Some(map);
     }
 
     fn project(&self) -> Vec<(f64, f64)> {
@@ -137,7 +152,11 @@ impl Visualizer {
         pix_points
     }
 
-    pub fn draw(&mut self, fileloc: &str) {
+    pub fn draw<T>(&mut self, fileloc: &str, options: T)
+    where
+        T: Into<VisOptions>,
+    {
+        let options = options.into();
         let pix_points = self.enpixel();
         let mut img = RgbImage::new(IMG_SIZE, IMG_SIZE);
 
@@ -151,7 +170,7 @@ impl Visualizer {
                 let to_draw = fill::triangle_interp(tri, vals);
 
                 for (loc, v) in to_draw.into_iter() {
-                    if let Some(cm) = self.color_map.as_ref() {
+                    if let Some(cm) = options.color_map.as_ref() {
                         img.put_pixel(loc.0, loc.1, cm(v));
                     } else {
                         img.put_pixel(loc.0, loc.1, color::hot_map(v));
@@ -201,7 +220,6 @@ impl From<Vec<Point>> for Visualizer {
             triangles: None,
             node_vals: None,
             val_range: None,
-            color_map: None,
         }
     }
 }

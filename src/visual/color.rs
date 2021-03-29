@@ -17,25 +17,25 @@ pub fn hot_map(val: f64) -> Rgb<u8> {
 }
 
 pub fn hot_map_boxed() -> Box<dyn Fn(f64) -> Rgb<u8>> {
-	Box::new(|x| hot_map(x))
+    Box::new(|x| hot_map(x))
 }
 
 fn peak(top: (f64, f64), slope: f64, val: f64) -> f64 {
-	if val < top.0 {
-		slope * (val - top.0) + top.1
-	} else {
-		-1.0 * slope * (val - top.0) + top.1
-	}
+    if val < top.0 {
+        slope * (val - top.0) + top.1
+    } else {
+        -1.0 * slope * (val - top.0) + top.1
+    }
 }
 
 pub fn rgb_map(val: f64) -> Rgb<u8> {
-	let r = (peak((0.75, 1.5), 4.0, val) * 255.0).clamp(0.0, 255.0);
-	let g = (peak((0.50, 1.5), 4.0, val) * 255.0).clamp(0.0, 255.0);
-	let b = (peak((0.25, 1.5), 4.0, val) * 255.0).clamp(0.0, 255.0);
+    let r = (peak((0.75, 1.5), 4.0, val) * 255.0).clamp(0.0, 255.0);
+    let g = (peak((0.50, 1.5), 4.0, val) * 255.0).clamp(0.0, 255.0);
+    let b = (peak((0.25, 1.5), 4.0, val) * 255.0).clamp(0.0, 255.0);
 
-	Rgb([r.round() as u8, g.round() as u8, b.round() as u8])
+    Rgb([r.round() as u8, g.round() as u8, b.round() as u8])
 }
 
 pub fn rgb_map_boxed() -> Box<dyn Fn(f64) -> Rgb<u8>> {
-	Box::new(|x| rgb_map(x))
+    Box::new(|x| rgb_map(x))
 }

@@ -68,8 +68,7 @@ mod tests {
         let mut elas = elas_out.unwrap();
         elas.calc_displacements();
 
-        let color_map = color::rgb_map_boxed();
-        let mut vis = elas.visualize_displacements(50.0, color_map);
-        vis.draw("test_generated/disp_bmsh_square.png");
+        let mut vis = elas.visualize_displacements(50.0);
+        vis.draw("test_generated/disp_bmsh_square.png", ());
     }
 }
