@@ -387,3 +387,26 @@ where
         }
     }
 }
+
+// miscellaneous math functionality
+
+pub struct Average {
+    n: usize,
+    avg: f64,
+}
+
+impl Average {
+    pub fn new() -> Self {
+        Self { n: 0, avg: 0.0 }
+    }
+
+    pub fn update(&mut self, val: f64) {
+        let temp = self.avg * (self.n as f64) + val;
+        self.n += 1;
+        self.avg = temp / (self.n as usize);
+    }
+
+    pub fn avg(&self) -> f64 {
+        self.avg
+    }
+}
