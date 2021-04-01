@@ -214,9 +214,6 @@ impl ElementAssemblage {
             let (el_k_dim, temp) = el_k.shape();
             assert_eq!(el_k_dim, temp);
 
-            println!("element k:\n{}", el_k);
-            println!("det element k: {}", el_k.determinant());
-
             // TODO could probably reduce unnecessary checks here by precomputing
             for i in 0..el_k_dim {
                 let (i_node_idx, i_node_dof) = el.i_to_dof(i);
@@ -231,8 +228,6 @@ impl ElementAssemblage {
                 }
             }
         }
-        println!("{}", k);
-        println!("det K: {}", k.determinant());
         k
     }
 
