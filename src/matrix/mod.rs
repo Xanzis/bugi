@@ -337,8 +337,8 @@ where
     T: MatrixLike,
 {
     source: &'a T,
-    row_pos: usize,
-    col_pos: usize,
+    row: usize,
+    col: usize,
 }
 
 impl<'a, T> Iterator for MatrixCol<'a, T>
@@ -387,11 +387,11 @@ where
     type Item = &'a f64;
 
     fn next(&mut self) -> Option<&'a f64> {
-        let x = self.source.get((self.row_pos, self.col_pos));
-        self.row_pos += 1;
-        if self.row_pos >= self.source.shape().1 {
-            self.row_pos = 0;
-            self.col_pos += 1;
+        let x = self.source.get((self.row, self.col));
+        self.col += 1;
+        if self.col >= self.source.shape().1 {
+            self.col = 0;
+            self.row += 1;
         }
         x
     }
@@ -404,8 +404,8 @@ where
     fn new(source: &'a T) -> Self {
         MatrixAll {
             source,
-            row_pos: 0,
-            col_pos: 0,
+            row: 0,
+            col: 0,
         }
     }
 }

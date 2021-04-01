@@ -72,6 +72,13 @@ fn linear_swaps() {
     assert_eq!(a, target_b);
 }
 #[test]
+fn iterators() {
+    let a = LinearMatrix::from_flat((2, 2), vec![1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(a.row(0).cloned().collect::<Vec<f64>>(), vec![1.0, 2.0]);
+    assert_eq!(a.col(0).cloned().collect::<Vec<f64>>(), vec![1.0, 3.0]);
+    assert_eq!(a.flat().cloned().collect::<Vec<f64>>(), vec![1.0, 2.0, 3.0, 4.0]);
+}
+#[test]
 fn solve_gauss() {
     let mut a = LinearMatrix::from_flat((2, 2), vec![1.0, 2.0, 3.0, 4.0]);
 
