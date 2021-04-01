@@ -6,7 +6,6 @@ use super::ElementAssemblage;
 
 use crate::matrix::{LinearMatrix, MatrixLike};
 use crate::spatial::Point;
-use crate::visual::color;
 
 #[test]
 fn basic_bar_f() {

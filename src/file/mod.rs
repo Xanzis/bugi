@@ -61,8 +61,6 @@ impl fmt::Display for FileError {
 mod tests {
     #[test]
     fn load_test() {
-        use crate::visual::color;
-
         let elas_out = super::read_to_elas("example_files/square.bmsh");
         assert!(elas_out.is_ok());
         let mut elas = elas_out.unwrap();
