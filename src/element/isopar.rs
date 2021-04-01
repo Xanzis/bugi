@@ -1,6 +1,7 @@
 use super::integrate::NdGaussSamples;
 use super::material::{Material, ProblemType};
 use super::strain::StrainRule;
+use super::stress::StressState;
 use crate::matrix::inverse::Inverse;
 use crate::matrix::{LinearMatrix, MatrixLike};
 use crate::spatial::{hull, Point};
@@ -71,8 +72,16 @@ impl IsoparElement {
         self.node_points.first().unwrap().dim()
     }
 
+    pub fn dofs(&self) -> usize {
+        // return the number of degrees of freedom in the element
+        self.dim() * self.node_idxs.len()
+    }
+
     pub fn i_to_dof(&self, i: usize) -> (usize, usize) {
         // finds the node idx (global) and its degree of freedom for the given index (say, in K)
+        if i >= self.dofs() {
+            panic!("out of bounds dof request");
+        }
         (self.node_idxs[i / self.dim()], i % self.dim())
     }
 
@@ -84,9 +93,42 @@ impl IsoparElement {
         self.node_points[i]
     }
 
+    pub fn node_natural(&self, i: usize) -> Point {
+        // returns the node's natural coordinates
+        match self.el_type {
+            ElementType::Bar2Node => match i {
+                0 => Point::new(&[-1.0]),
+                1 => Point::new(&[1.0]),
+                _ => panic!("out of range node request"),
+            },
+            ElementType::Triangle3Node => match i {
+                0 => Point::new(&[0.0, 0.0]),
+                1 => Point::new(&[1.0, 0.0]),
+                2 => Point::new(&[0.0, 1.0]),
+                _ => panic!("out of range node request"),
+            },
+            ElementType::PlaneNNode => match i {
+                0 => Point::new(&[1.0, 1.0]),
+                1 => Point::new(&[-1.0, 1.0]),
+                2 => Point::new(&[-1.0, -1.0]),
+                3 => Point::new(&[1.0, -1.0]),
+                4 => Point::new(&[0.0, 1.0]),
+                5 => Point::new(&[-1.0, 0.0]),
+                6 => Point::new(&[0.0, -1.0]),
+                7 => Point::new(&[1.0, 0.0]),
+                8 => Point::new(&[0.0, 0.0]),
+                _ => panic!("out of range node request"),
+            },
+        }
+    }
+
     pub fn node_idxs(&self) -> Vec<usize> {
         // the node indices in the global list
         self.node_idxs.clone()
+    }
+
+    pub fn node_idx(&self, i: usize) -> usize {
+        self.node_idxs[i]
     }
 
     pub fn node_count(&self) -> usize {
@@ -96,6 +138,7 @@ impl IsoparElement {
     pub fn integration_order(&self) -> usize {
         // choose the gauss integration order appropriate for the element
         // simple for now
+        // TODO be more clever about this
         2
     }
 
@@ -229,18 +272,22 @@ impl IsoparElement {
         }
     }
 
-    pub fn find_k_integrand(&self, nat_coor: Point) -> LinearMatrix {
-        let mut mats = self.find_mats(nat_coor);
-
-        let material_problem = match self.strain_rule {
+    // TODO this should be an API somewhere else
+    // ProblemType / StrainRule / StressType are all doing similar things and should be combined
+    fn material_problem(&self) -> ProblemType {
+        match self.strain_rule {
             StrainRule::Bar => ProblemType::Bar,
             StrainRule::PlaneStress => ProblemType::PlaneStress,
             StrainRule::PlaneStrain => ProblemType::PlaneStrain,
             StrainRule::ThreeDimensional => ProblemType::ThreeDimensional,
-        };
+        }
+    }
+
+    pub fn find_k_integrand(&self, nat_coor: Point) -> LinearMatrix {
+        let mut mats = self.find_mats(nat_coor);
 
         // TODO compute C once and store for performance improvement
-        let c = self.material.get_c(material_problem);
+        let c = self.material.get_c(self.material_problem());
 
         // the integrand for K is (det J) * B_t * C * B
         mats.b.transpose(); // transpose in place is cheap
@@ -249,6 +296,24 @@ impl IsoparElement {
         mats.b.transpose();
 
         inter.mul(&mats.b)
+    }
+
+    pub fn node_stress(&self, node_idx: usize, u: Vec<f64>) -> StressState {
+        // find the stress of the given node (node_idx is the index in the local node list)
+        // u is a displacement vector like [u1 v1 w1 u2 v2 w2 ...]
+        // TODO better interface for constructing U, elas handles it right now
+
+        let nat_coor = self.node_natural(node_idx);
+        let mats = self.find_mats(nat_coor);
+
+        let u = LinearMatrix::from_flat((u.len(), 1), u);
+        let c = self.material.get_c(self.material_problem());
+
+        // compute CBU
+        let mut res = c;
+        res = res.mul(&mats.b);
+        res = res.mul(&u);
+        StressState::from_vector(res)
     }
 }
 

@@ -3,14 +3,16 @@ pub mod isopar;
 pub mod loading;
 pub mod material;
 pub mod strain;
+pub mod stress;
 
-use crate::matrix::{Inverse, LinearMatrix, MatrixLike};
+use crate::matrix::{Average, Inverse, LinearMatrix, MatrixLike};
 use crate::spatial::Point;
 use crate::visual::Visualizer;
 
 use isopar::IsoparElement;
 use loading::Constraint;
 use material::Material;
+use stress::StressState;
 
 use std::collections::{HashMap, HashSet};
 
@@ -299,6 +301,48 @@ impl ElementAssemblage {
         } else {
             None
         }
+    }
+
+    pub fn stresses(&self) -> Vec<Option<stress::StressState>> {
+        // TODO streamline this, maybe compute disps if necessary
+        // TODO take out panics :)
+
+        // set up displacements and stress average structures
+        let disps = self
+            .displacements
+            .as_ref()
+            .expect("compute displacements first");
+
+        let mut stress_averages: Vec<Average<StressState>> = Vec::new();
+        for _ in 0..self.nodes.len() {
+            stress_averages.push(Average::new());
+        }
+
+        // compute stresses for each node, averaging for shared nodes
+        for el in self.elements.iter() {
+            let mut el_u: Vec<f64> = Vec::new();
+            for i in 0..el.dofs() {
+                let (idx, dof) = el.i_to_dof(i);
+                // idx is already an idnex in the global node list
+                // dof is the degree of freedom of the node (x/y/z)
+                el_u.push(disps[idx][dof]);
+            }
+            for i in 0..el.node_count() {
+                let nstress = el.node_stress(i, el_u.clone());
+                stress_averages[el.node_idx(i)].update(nstress);
+            }
+        }
+
+        // collect average stresses, setting the stress to None when the average is uninitialized
+        stress_averages.into_iter().map(|x| x.consume()).collect()
+    }
+
+    pub fn von_mises(&self) -> Vec<f64> {
+        // compute the mean von mises yield criterion value for each node, with 0 for unused nodes
+        self.stresses()
+            .into_iter()
+            .map(|x| x.map(|y| y.von_mises()).unwrap_or(0.0))
+            .collect()
     }
 
     pub fn triangles(&self) -> Vec<(usize, usize, usize)> {

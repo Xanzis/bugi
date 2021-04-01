@@ -187,7 +187,7 @@ NAME
 	bugi - a finite element solver
 
 SYNOPSIS
-	bugi [--version] [--help] [-colormap <name>]
+	bugi [--version] [--help] [-colormap=<name>]
 		 <command> [<args>]
 
 OPTIONS
@@ -197,8 +197,11 @@ OPTIONS
 	--help
 		prints this text
 
-	-colormap <name>
-		sets the color map for graphic outputs. 
+	-colormap=<name>
+		sets the color map for graphic outputs
+
+    -plot=<value name>
+        sets the node value type to visualize; default is displacement
 
 COMMANDS
 	bugi linear <path>

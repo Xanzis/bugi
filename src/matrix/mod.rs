@@ -1,7 +1,8 @@
 use crate::spatial::Point;
 use std::cmp::max;
+use std::error;
 use std::fmt;
-use std::ops::{Index, IndexMut};
+use std::ops::{Add, Div, Index, IndexMut, Mul};
 
 pub mod buffer;
 pub mod inverse;
@@ -17,6 +18,27 @@ pub use buffer::{LinearMatrix, LowerTriangular, UpperTriangular};
 
 // rolling my own (pretty limited) matrix math
 // standard order for shape is (row, col)
+
+#[derive(Debug, Clone)]
+pub enum MatrixError {
+    ConvertError(String),
+}
+
+impl MatrixError {
+    fn convert<T: ToString>(msg: T) -> Self {
+        MatrixError::ConvertError(msg.to_string())
+    }
+}
+
+impl fmt::Display for MatrixError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MatrixError::ConvertError(s) => write!(f, "ConvertError: {}", s),
+        }
+    }
+}
+
+impl error::Error for MatrixError {}
 
 // data type for matrix shapes
 // will eventually add fields to help initialize sparse matrices
@@ -390,23 +412,40 @@ where
 
 // miscellaneous math functionality
 
-pub struct Average {
+#[derive(Clone, Debug)]
+pub struct Average<T>
+//    where T: Clone + Div<f64> + Mul<f64> + Add
+where
+    T: Div<f64, Output = T> + Mul<f64, Output = T> + Add<Output = T> + Clone,
+{
     n: usize,
-    avg: f64,
+    avg: Option<T>,
 }
 
-impl Average {
+impl<T> Average<T>
+where
+    T: Div<f64, Output = T> + Mul<f64, Output = T> + Add<Output = T> + Clone,
+{
     pub fn new() -> Self {
-        Self { n: 0, avg: 0.0 }
+        Self { n: 0, avg: None }
     }
 
-    pub fn update(&mut self, val: f64) {
-        let temp = self.avg * (self.n as f64) + val;
-        self.n += 1;
-        self.avg = temp / (self.n as usize);
+    pub fn update(&mut self, val: T) {
+        if let Some(avg) = self.avg.clone() {
+            let temp = avg * (self.n as f64) + val;
+            self.n += 1;
+            self.avg = Some(temp / (self.n as f64));
+        } else {
+            self.n = 1;
+            self.avg = Some(val);
+        }
     }
 
-    pub fn avg(&self) -> f64 {
+    pub fn avg(&self) -> Option<T> {
+        self.avg.clone()
+    }
+
+    pub fn consume(self) -> Option<T> {
         self.avg
     }
 }
