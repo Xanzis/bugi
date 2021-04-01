@@ -61,7 +61,8 @@ fn assemblage() {
 
     elas.calc_displacements();
 
-    let mut vis = elas.visualize_displacements(50.0);
+    let mut vis = elas.visualize(50.0);
+    vis.set_vals(elas.displacement_norms().unwrap());
     vis.draw("test_generated/disp_square.png", ());
 }
 #[test]
@@ -93,7 +94,8 @@ fn multi_element() {
 
     elas.calc_displacements();
 
-    let mut vis = elas.visualize_displacements(50.0);
+    let mut vis = elas.visualize(50.0);
+    vis.set_vals(elas.displacement_norms().unwrap());
     vis.draw("test_generated/disp_tower.png", ());
 }
 #[test]
@@ -119,7 +121,8 @@ fn triangles() {
     elas.add_conc_force(39, Point::new(&[0.0, -1.0e5]));
     elas.calc_displacements();
 
-    let mut vis = elas.visualize_displacements(50.0);
+    let mut vis = elas.visualize(50.0);
+    vis.set_vals(elas.displacement_norms().unwrap());
 
     vis.draw("test_generated/triangles.png", ());
 }

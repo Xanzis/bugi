@@ -72,7 +72,15 @@ fn linear(args: Args) -> Result<(), BugiError> {
 
     elas.calc_displacements();
 
-    let mut vis = elas.visualize_displacements(50.0);
+    let mut vis = elas.visualize(50.0);
+
+    let node_vals = match args.arg_val("nodevalue") {
+        None | Some("displacement") => elas.displacement_norms().unwrap(),
+        Some("vonmises") => elas.von_mises(),
+        _ => return Err(BugiError::arg_error("unimplemented node value name")),
+    };
+
+    vis.set_vals(node_vals);
 
     let out_path = match args.arg_val("out") {
         Some(s) => path::Path::new(s),
@@ -200,7 +208,7 @@ OPTIONS
 	-colormap=<name>
 		sets the color map for graphic outputs
 
-    -plot=<value name>
+    -nodevalue=<value name>
         sets the node value type to visualize; default is displacement
 
 COMMANDS

@@ -370,7 +370,7 @@ impl ElementAssemblage {
     }
 
     // TODO should factor this (quite involved) visual stuff out of element
-    pub fn visualize_displacements(&self, scale: f64) -> Visualizer {
+    pub fn visualize(&self, scale: f64) -> Visualizer {
         let dispn = self
             .displaced_nodes(scale)
             .expect("displacements must first be calculated");
@@ -378,7 +378,6 @@ impl ElementAssemblage {
         let mut vis: Visualizer = dispn.into();
         vis.set_edges(self.edges());
         vis.set_triangles(self.triangles());
-        vis.set_vals(self.displacement_norms().unwrap());
 
         vis
     }

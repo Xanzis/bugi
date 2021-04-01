@@ -68,7 +68,8 @@ mod tests {
         let mut elas = elas_out.unwrap();
         elas.calc_displacements();
 
-        let mut vis = elas.visualize_displacements(50.0);
+        let mut vis = elas.visualize(50.0);
+        vis.set_vals(elas.displacement_norms().unwrap());
         vis.draw("test_generated/disp_bmsh_square.png", ());
     }
 }
