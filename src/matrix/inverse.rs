@@ -1,10 +1,10 @@
-use super::{LowerTriangular, MatrixLike, UpperTriangular};
+use super::{LowerTriangular, MatrixLike, UpperTriangular, MatrixError};
 
 pub trait Inverse<T>
 where
     T: MatrixLike,
 {
-    fn solve_gausselim(&mut self, b: T) -> Result<T, String>;
+    fn solve_gausselim(&mut self, b: T) -> Result<T, MatrixError>;
     fn lu_decompose(&self) -> (LowerTriangular, UpperTriangular);
     fn det_lu(&self) -> f64; // find the determinant by lu decomposition
     fn determinant(&self) -> f64;
@@ -16,19 +16,19 @@ impl<T> Inverse<T> for T
 where
     T: MatrixLike,
 {
-    fn solve_gausselim(&mut self, mut b: T) -> Result<T, String> {
+    fn solve_gausselim(&mut self, mut b: T) -> Result<T, MatrixError> {
         // solve the system Ax=b for x. WARNING: A (self) is not preserved
         let shape = self.shape();
         if shape.0 != shape.1 {
-            return Err(format!("square matrix required"));
+            return Err(MatrixError::solve("square matrix required"));
         }
         let dim = shape.0;
         if (b.shape().1 != 1) || (b.shape().0 != dim) {
-            return Err(format!(
+            return Err(MatrixError::solve(format!(
                 "b must have shape ({}, 1) but has shape {:?}",
                 dim,
                 b.shape()
-            ));
+            )));
         }
 
         // triangularize the matrix
@@ -41,7 +41,7 @@ where
                 .skip(col)
                 .max_by(|(_, &x), (_, y)| x.partial_cmp(y).unwrap());
             if max == None {
-                return Err(format!("solve error 1"));
+                return Err(MatrixError::solve("no non-zero values remain in column"));
             }
             let (max_idx, _) = max.unwrap();
 
@@ -56,11 +56,9 @@ where
             for row in (col + 1)..dim {
                 let scaling = self[(row, col)];
                 for i in col..dim {
-                    let to_subtract = self[(col, i)] * scaling;
-                    self[(row, i)] -= to_subtract;
+                    self[(row, i)] -= self[(col, i)] * scaling;
                 }
-                let to_subtract = b[(col, 0)] * scaling;
-                b[(row, 0)] -= to_subtract;
+                b[(row, 0)] -= b[(col, 0)] * scaling;
             }
         }
 
@@ -71,7 +69,6 @@ where
             for j in (row + 1)..dim {
                 temp += self[(row, j)] * x[(j, 0)];
             }
-            //println!("{:?}", temp);
             x[(row, 0)] = b[(row, 0)] - temp;
         }
 
@@ -89,10 +86,7 @@ where
 
         for i in 0..dim {
             for k in i..dim {
-                let mut sum = 0.0;
-                for j in 0..i {
-                    sum += lower[(i, j)] * upper[(j, k)];
-                }
+                let sum = upper.col(k).dot(lower.row(i).take(i)).end();
                 upper[(i, k)] = self[(i, k)] - sum;
             }
 
@@ -100,10 +94,7 @@ where
                 if i == k {
                     lower[(i, i)] = 1.0;
                 } else {
-                    let mut sum = 0.0;
-                    for j in 0..i {
-                        sum += lower[(k, j)] * upper[(j, i)];
-                    }
+                    let sum = lower.row(k).dot(upper.col(i)).end();
                     lower[(k, i)] = (self[(k, i)] - sum) / upper[(i, i)];
                 }
             }

@@ -21,19 +21,19 @@ pub use buffer::{LinearMatrix, LowerTriangular, UpperTriangular};
 
 #[derive(Debug, Clone)]
 pub enum MatrixError {
-    ConvertError(String),
+    SolveError(String),
 }
 
 impl MatrixError {
-    fn convert<T: ToString>(msg: T) -> Self {
-        MatrixError::ConvertError(msg.to_string())
+    fn solve<T: ToString>(msg: T) -> Self {
+        MatrixError::SolveError(msg.to_string())
     }
 }
 
 impl fmt::Display for MatrixError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MatrixError::ConvertError(s) => write!(f, "ConvertError: {}", s),
+            MatrixError::SolveError(s) => write!(f, "SolveError: {}", s),
         }
     }
 }
@@ -139,8 +139,7 @@ where
 
         for r in 0..res_shape.0 {
             for c in 0..res_shape.1 {
-                let dot = self.row(r).zip(other.col(c)).map(|x| x.0 * x.1).sum();
-                res_vals.push(dot);
+                res_vals.push(self.row(r).dot(other.col(c)).end());
             }
         }
         U::from_flat(res_shape, res_vals)
@@ -354,6 +353,18 @@ where
     }
 }
 
+impl<'a, T> MatrixCol<'a, T>
+    where T: MatrixLike,
+{
+    fn dot<U: Iterator<Item=&'a f64>>(self, other: U) -> Dot<'a, Self, U> {
+        Dot {
+            a: self,
+            b: other,
+            sum: 0.0,
+        }
+    }
+} 
+
 impl<'a, T> Iterator for MatrixRow<'a, T>
 where
     T: MatrixLike,
@@ -366,6 +377,18 @@ where
         self.source.get((self.row, loc))
     }
 }
+
+impl<'a, T> MatrixRow<'a, T>
+    where T: MatrixLike,
+{
+    fn dot<U: Iterator<Item=&'a f64>>(self, other: U) -> Dot<'a, Self, U> {
+        Dot {
+            a: self,
+            b: other,
+            sum: 0.0,
+        }
+    }
+} 
 
 impl<'a, T> Iterator for MatrixDiag<'a, T>
 where
@@ -447,5 +470,42 @@ where
 
     pub fn consume(self) -> Option<T> {
         self.avg
+    }
+}
+
+pub struct Dot<'a, T, U>
+where
+    T: Iterator<Item=&'a f64>,
+    U: Iterator<Item=&'a f64>,
+{
+    a: T,
+    b: U,
+    sum: f64,
+}
+
+impl<'a, T, U> Iterator for Dot<'a, T, U>
+where
+    T: Iterator<Item=&'a f64>,
+    U: Iterator<Item=&'a f64>,
+{
+    type Item = f64;
+
+    fn next(&mut self) -> Option<f64> {
+        if let (Some(x), Some(y)) = (self.a.next(), self.b.next()) {
+            self.sum += x * y;
+            Some(self.sum)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a, T, U> Dot<'a, T, U>
+where
+    T: Iterator<Item=&'a f64>,
+    U: Iterator<Item=&'a f64>,
+{
+    fn end(self) -> f64 {
+        self.last().unwrap_or(0.0)
     }
 }
