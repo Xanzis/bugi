@@ -251,13 +251,13 @@ where
         if nrow == 0 {
             panic!("empty data")
         }
-        let ncol = data.get(0).unwrap().len();
-        data.into_iter().for_each(|x| {
+        let ncol = data.get(0).expect("empty first row").len();
+        for x in data.into_iter() {
             if x.len() != ncol {
-                panic!("inconstent row lengths")
+                panic!("inconsistent row lengths");
             }
             total.extend(x);
-        });
+        }
 
         Self::from_flat((nrow, ncol), total)
     }
