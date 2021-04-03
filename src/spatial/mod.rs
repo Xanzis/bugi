@@ -2,6 +2,7 @@ use std::cmp::min;
 use std::convert::{From, TryFrom, TryInto};
 use std::fmt;
 use std::ops::{Add, Index, IndexMut, Mul, Sub};
+use std::error;
 
 pub mod hull;
 
@@ -23,6 +24,8 @@ impl SpatialError {
         }
     }
 }
+
+impl error::Error for SpatialError {}
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Point {
@@ -53,7 +56,6 @@ impl Point {
 
     pub fn mid(&self, other: Point) -> Point {
         // find the midpoint between two points
-        // TODO make sure nothing will set a nonzero value for an invalid dimension
         let data = [
             (self.data[0] + other.data[0]) / 2.0,
             (self.data[1] + other.data[1]) / 2.0,
@@ -64,13 +66,11 @@ impl Point {
     }
 
     pub fn dist(self, other: Point) -> f64 {
-        // TODO make sure nothing will set a nonzero value for an invalid dimension
         let v = self - other;
         (v.data[0].powi(2) + v.data[1].powi(2) + v.data[2].powi(2)).sqrt()
     }
 
     pub fn norm(self) -> f64 {
-        // TODO same as above
         (self.data[0].powi(2) + self.data[1].powi(2) + self.data[2].powi(2)).sqrt()
     }
 }
