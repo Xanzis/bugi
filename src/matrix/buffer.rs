@@ -54,20 +54,14 @@ impl LowerTriangular {
 
     pub fn forward_sub(&self, b: &[f64]) -> Vec<f64> {
         // solves Lx = b
-        // TODO consider returning a Result
-        println!("this is me: {}", self);
         let dim = self.dim;
         if dim != b.len() {
             panic!("incompatible shapes")
         }
         let mut x = vec![0.0; dim];
         for i in 0..dim {
-            let mut temp = 0.0;
-            for j in 0..i {
-                temp += self[(i, j)] * x[j];
-            }
+            let temp: f64 = self.row(i).zip(x.iter()).map(|(x, y)| x * y).take(i).sum();
             x[i] = (b[i] - temp) / self[(i, i)];
-            println!("assigned x[{}] = {}", i, x[i]);
         }
         x
     }
@@ -114,7 +108,6 @@ impl UpperTriangular {
             for j in (i + 1)..dim {
                 temp += self[(i, j)] * x[j];
             }
-            println!("{:?}", temp);
             x[i] = (b[i] - temp) / self[(i, i)];
         }
         x
@@ -179,6 +172,7 @@ impl MatrixLike for LinearMatrix {
             data,
         }
     }
+
     fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, data: U) -> Self {
         // turn a row-major vector of values into a matrix
         let shape: MatrixShape = shape.into();
@@ -205,15 +199,7 @@ impl PartialEq for LinearMatrix {
             return self.data == other.data;
         }
         // if the data orders don't align, check the slow way
-        let (nrow, ncol) = self.shape();
-        for i in 0..nrow {
-            for j in 0..ncol {
-                if self.get((i, j)) != other.get((i, j)) {
-                    return false;
-                }
-            }
-        }
-        true
+        self.flat().zip(other.flat()).all(|(x, y)| x == y)
     }
 }
 
@@ -222,8 +208,8 @@ impl fmt::Display for LinearMatrix {
         let (nrow, ncol) = self.shape();
         write!(f, "rows: {} cols: {}\n", nrow, ncol)?;
         for i in 0..nrow {
-            for j in 0..ncol {
-                write!(f, "{:1.5} ", self.get((i, j)).unwrap())?;
+            for x in self.row(i) {
+                write!(f, "{:1.5} ", x)?;
             }
             write!(f, "\n")?;
         }
@@ -237,30 +223,7 @@ impl<'a> Add<&'a LinearMatrix> for &'a LinearMatrix {
         if self.dims != rhs.dims {
             panic!("incompatible shapes")
         }
-        if self.row_maj == rhs.row_maj {
-            let new_data = self
-                .data
-                .iter()
-                .zip(rhs.data.iter())
-                .map(|(x, y)| x + y)
-                .collect();
-            LinearMatrix {
-                dims: self.dims,
-                row_maj: self.row_maj,
-                data: new_data,
-            }
-        } else {
-            let mut res = LinearMatrix {
-                dims: self.dims,
-                row_maj: true,
-                data: Vec::new(),
-            };
-            for i in 0..self.dims.0 {
-                res.data
-                    .extend(self.row(i).zip(rhs.row(i)).map(|(x, y)| x + y));
-            }
-            res
-        }
+        LinearMatrix::from_flat(self.dims, self.flat().zip(rhs.flat()).map(|(x, y)| x + y))
     }
 }
 
@@ -270,30 +233,7 @@ impl<'a> Sub<&'a LinearMatrix> for &'a LinearMatrix {
         if self.dims != rhs.dims {
             panic!("incompatible shapes")
         }
-        if self.row_maj == rhs.row_maj {
-            let new_data = self
-                .data
-                .iter()
-                .zip(rhs.data.iter())
-                .map(|(x, y)| x - y)
-                .collect();
-            LinearMatrix {
-                dims: self.dims,
-                row_maj: self.row_maj,
-                data: new_data,
-            }
-        } else {
-            let mut res = LinearMatrix {
-                dims: self.dims,
-                row_maj: true,
-                data: Vec::new(),
-            };
-            for i in 0..self.dims.0 {
-                res.data
-                    .extend(self.row(i).zip(rhs.row(i)).map(|(x, y)| x - y));
-            }
-            res
-        }
+        LinearMatrix::from_flat(self.dims, self.flat().zip(rhs.flat()).map(|(x, y)| x - y))
     }
 }
 
@@ -366,7 +306,7 @@ impl MatrixLike for LowerTriangular {
     fn zeros<T: Into<MatrixShape>>(shape: T) -> Self {
         let shape: MatrixShape = shape.into();
         let dim = shape.max_dim;
-        let data = vec![0.0; (dim + 1) * (dim + 2) / 2];
+        let data = vec![0.0; ((dim + 1) * (dim + 2)) / 2];
         Self { dim, data }
     }
 
@@ -447,7 +387,7 @@ impl MatrixLike for UpperTriangular {
     fn zeros<T: Into<MatrixShape>>(shape: T) -> Self {
         let shape: MatrixShape = shape.into();
         let dim = shape.max_dim;
-        let data = vec![0.0; (dim + 1) * (dim + 2) / 2];
+        let data = vec![0.0; ((dim + 1) * (dim + 2)) / 2];
         Self { dim, data }
     }
 
