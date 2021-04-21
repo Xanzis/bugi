@@ -1,5 +1,5 @@
 use super::DOT_SIZE;
-use crate::spatial::{hull, Point};
+use crate::spatial::{predicates, Point};
 
 pub fn dot_points(center_x: u32, center_y: u32) -> Vec<(u32, u32)> {
     // returns the points to draw for a dot
@@ -27,8 +27,8 @@ pub fn triangle_interp(points: [(u32, u32); 3], vals: [f64; 3]) -> Vec<((u32, u3
     for x in x_min..=x_max {
         for y in y_min..=y_max {
             let p: Point = (x, y).into();
-            if hull::in_triangle(p, tri) {
-                let weights = hull::bary_coor(p, tri);
+            if predicates::in_triangle(p, tri) {
+                let weights = predicates::bary_coor(p, tri);
                 let weighted_val = weights.0 * vals[0] + weights.1 * vals[1] + weights.2 * vals[2];
                 res.push(((x, y), weighted_val));
             }

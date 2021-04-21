@@ -5,6 +5,7 @@ use std::ops::{Add, Index, IndexMut, Mul, Sub};
 use std::error;
 
 pub mod hull;
+pub mod predicates;
 
 #[derive(Debug)]
 pub struct SpatialError {
@@ -271,14 +272,14 @@ mod tests {
     }
     #[test]
     fn orientation() {
-        use super::hull;
-        use super::hull::Orient;
+        use super::predicates;
+        use super::predicates::Orient;
         let a = Point::new(&[-1.0, -0.3]);
         let b = Point::new(&[-0.5, 3.0]);
         let c = Point::new(&[10.0, -0.2]);
-        assert_eq!(hull::triangle_dir(a, b, c), Orient::Right);
-        assert_eq!(hull::triangle_dir(b, a, c), Orient::Left);
-        assert_eq!(hull::triangle_dir(c, b, a), Orient::Left);
+        assert_eq!(predicates::triangle_dir(a, b, c), Orient::Right);
+        assert_eq!(predicates::triangle_dir(b, a, c), Orient::Left);
+        assert_eq!(predicates::triangle_dir(c, b, a), Orient::Left);
     }
     #[test]
     fn simple_hull() {
@@ -301,7 +302,7 @@ mod tests {
     }
     #[test]
     fn point_in_triangle() {
-        use super::hull;
+        use super::predicates;
 
         let p = Point::new(&[1.0, 1.0]);
         let q = Point::new(&[3.0, 1.0]);
@@ -309,9 +310,9 @@ mod tests {
         let b = Point::new(&[1.0, 2.0]);
         let c = Point::new(&[2.0, -1.0]);
 
-        assert!(hull::in_triangle(p, (a, b, c)));
-        assert!(hull::in_triangle(p, (c, b, a)));
-        assert!(!hull::in_triangle(q, (a, b, c)));
-        assert!(!hull::in_triangle(q, (c, b, a)));
+        assert!(predicates::in_triangle(p, (a, b, c)));
+        assert!(predicates::in_triangle(p, (c, b, a)));
+        assert!(!predicates::in_triangle(q, (a, b, c)));
+        assert!(!predicates::in_triangle(q, (c, b, a)));
     }
 }
