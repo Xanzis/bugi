@@ -86,7 +86,10 @@ fn dots() {
     let a = LinearMatrix::from_flat(2, vec![1.0, 2.0, 3.0, 4.0]);
     let b = LinearMatrix::from_flat(2, vec![2.0, 3.0, 4.0, 5.0]);
 
-    assert_eq!(a.row(0).dot(b.col(1)).last().unwrap_or(0.0), b.col(1).dot(a.row(0)).last().unwrap_or(0.0));
+    assert_eq!(
+        a.row(0).dot(b.col(1)).last().unwrap_or(0.0),
+        b.col(1).dot(a.row(0)).last().unwrap_or(0.0)
+    );
     assert_eq!(a.row(0).dot(b.col(1)).last().unwrap_or(0.0), 13.0);
 }
 

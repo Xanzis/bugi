@@ -1,8 +1,8 @@
 use std::cmp::min;
 use std::convert::{From, TryFrom, TryInto};
+use std::error;
 use std::fmt;
 use std::ops::{Add, Index, IndexMut, Mul, Sub};
-use std::error;
 
 pub mod hull;
 pub mod predicates;

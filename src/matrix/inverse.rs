@@ -1,4 +1,4 @@
-use super::{LowerTriangular, MatrixLike, UpperTriangular, MatrixError};
+use super::{LowerTriangular, MatrixError, MatrixLike, UpperTriangular};
 
 pub trait Inverse<T>
 where

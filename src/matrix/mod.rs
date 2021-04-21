@@ -354,16 +354,17 @@ where
 }
 
 impl<'a, T> MatrixCol<'a, T>
-    where T: MatrixLike,
+where
+    T: MatrixLike,
 {
-    fn dot<U: Iterator<Item=&'a f64>>(self, other: U) -> Dot<'a, Self, U> {
+    fn dot<U: Iterator<Item = &'a f64>>(self, other: U) -> Dot<'a, Self, U> {
         Dot {
             a: self,
             b: other,
             sum: 0.0,
         }
     }
-} 
+}
 
 impl<'a, T> Iterator for MatrixRow<'a, T>
 where
@@ -379,16 +380,17 @@ where
 }
 
 impl<'a, T> MatrixRow<'a, T>
-    where T: MatrixLike,
+where
+    T: MatrixLike,
 {
-    fn dot<U: Iterator<Item=&'a f64>>(self, other: U) -> Dot<'a, Self, U> {
+    fn dot<U: Iterator<Item = &'a f64>>(self, other: U) -> Dot<'a, Self, U> {
         Dot {
             a: self,
             b: other,
             sum: 0.0,
         }
     }
-} 
+}
 
 impl<'a, T> Iterator for MatrixDiag<'a, T>
 where
@@ -475,8 +477,8 @@ where
 
 pub struct Dot<'a, T, U>
 where
-    T: Iterator<Item=&'a f64>,
-    U: Iterator<Item=&'a f64>,
+    T: Iterator<Item = &'a f64>,
+    U: Iterator<Item = &'a f64>,
 {
     a: T,
     b: U,
@@ -485,8 +487,8 @@ where
 
 impl<'a, T, U> Iterator for Dot<'a, T, U>
 where
-    T: Iterator<Item=&'a f64>,
-    U: Iterator<Item=&'a f64>,
+    T: Iterator<Item = &'a f64>,
+    U: Iterator<Item = &'a f64>,
 {
     type Item = f64;
 
@@ -502,8 +504,8 @@ where
 
 impl<'a, T, U> Dot<'a, T, U>
 where
-    T: Iterator<Item=&'a f64>,
-    U: Iterator<Item=&'a f64>,
+    T: Iterator<Item = &'a f64>,
+    U: Iterator<Item = &'a f64>,
 {
     fn end(self) -> f64 {
         self.last().unwrap_or(0.0)

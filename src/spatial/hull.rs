@@ -1,5 +1,5 @@
+use super::predicates::{triangle_dir, Orient};
 use super::Point;
-use super::predicates::{Orient, triangle_dir};
 
 pub fn jarvis_hull(points: &Vec<Point>) -> Vec<usize> {
     // find the indices of a counterclockwise hull around the supplied points
