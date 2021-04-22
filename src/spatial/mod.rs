@@ -277,9 +277,9 @@ mod tests {
         let a = Point::new(&[-1.0, -0.3]);
         let b = Point::new(&[-0.5, 3.0]);
         let c = Point::new(&[10.0, -0.2]);
-        assert_eq!(predicates::triangle_dir((a, b, c)), Orient::Right);
-        assert_eq!(predicates::triangle_dir((b, a, c)), Orient::Left);
-        assert_eq!(predicates::triangle_dir((c, b, a)), Orient::Left);
+        assert_eq!(predicates::triangle_dir((a, b, c)), Orient::Negative);
+        assert_eq!(predicates::triangle_dir((b, a, c)), Orient::Positive);
+        assert_eq!(predicates::triangle_dir((c, b, a)), Orient::Positive);
     }
     #[test]
     fn simple_hull() {

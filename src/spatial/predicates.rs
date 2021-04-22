@@ -6,26 +6,27 @@ use super::Point;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Orient {
-    Right,
-    Left,
-    Line,
+    Negative,
+    Positive,
+    Zero,
 }
 
 pub fn triangle_dir(tri: (Point, Point, Point)) -> Orient {
-    // return the direction triangle (p, q, r) turns
+    // return whether the triangle (p, q, r) turns counterclockwise
+    // postive is natural (ccw), negative is cw
     let (p, q, r) = tri;
     let val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1]);
     if val == 0.0 {
-        Orient::Line
+        Orient::Zero
     } else if val > 0.0 {
-        Orient::Right
+        Orient::Negative
     } else {
-        Orient::Left
+        Orient::Positive
     }
 }
 
 pub fn tetrahedron_dir(tet: (Point, Point, Point, Point)) -> Orient {
-    // return the orientation of a tetrahedron - right is positive, line is planar
+    // return the orientation of a tetrahedron
     let (a, b, c, d) = tet;
 
     let mat = LinearMatrix::from_flat(
@@ -38,11 +39,11 @@ pub fn tetrahedron_dir(tet: (Point, Point, Point, Point)) -> Orient {
 
     let val = mat.determinant();
     if val == 0.0 {
-        Orient::Line
+        Orient::Zero
     } else if val > 0.0 {
-        Orient::Right
+        Orient::Positive
     } else {
-        Orient::Left
+        Orient::Negative
     }
 }
 

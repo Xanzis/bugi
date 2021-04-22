@@ -344,9 +344,9 @@ fn arrange_element_2d(nodes: &Vec<Point>) -> (ElementType, Vec<usize>) {
         3 => {
             let (p, q, r) = (nodes[0], nodes[1], nodes[2]);
             match predicates::triangle_dir((p, q, r)) {
-                predicates::Orient::Left => (ElementType::Triangle3Node, vec![0, 1, 2]),
-                predicates::Orient::Right => (ElementType::Triangle3Node, vec![2, 1, 0]),
-                predicates::Orient::Line => panic!("degenerate element"),
+                predicates::Orient::Positive => (ElementType::Triangle3Node, vec![0, 1, 2]),
+                predicates::Orient::Negative => (ElementType::Triangle3Node, vec![2, 1, 0]),
+                predicates::Orient::Zero => panic!("degenerate element"),
             }
         }
         4 => {

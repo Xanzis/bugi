@@ -23,9 +23,9 @@ pub fn jarvis_hull(points: &Vec<Point>) -> Vec<usize> {
         for i in 0..n {
             // find the rightmost point
             match triangle_dir((points[p], points[i], points[q])) {
-                Orient::Left => q = i,
-                Orient::Right => (),
-                Orient::Line => (),
+                Orient::Positive => q = i,
+                Orient::Negative => (),
+                Orient::Zero => (),
             };
         }
 
