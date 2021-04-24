@@ -319,11 +319,17 @@ mod tests {
     fn intersections() {
         use super::predicates;
 
-        let p = (1.0, 2.0).into();
+        let p = (1.0, 1.0).into();
         let q = (4.0, 1.0).into();
         let r = (2.5, 0.2).into();
         let s = (1.5, 5.0).into();
 
-        assert!(predicates::segments_intersect((p, q), (r, s)))
+        assert!(predicates::segments_intersect((p, q), (r, s)));
+
+        let t = (3.0, 1.0).into();
+        let u = (2.5, 4.0).into();
+
+        assert!(predicates::segments_intersect((p, q), (t, u)));
+        assert!(!predicates::segments_intersect((r, s), (t, u)))
     }
 }
