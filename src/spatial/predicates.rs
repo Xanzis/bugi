@@ -4,7 +4,7 @@ use crate::matrix::{Inverse, LinearMatrix, MatrixLike};
 
 use super::Point;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Orient {
     Negative,
     Positive,
@@ -138,4 +138,37 @@ pub fn in_sphere(p: Point, tet: (Point, Point, Point, Point)) -> bool {
 
     // TODO same check as above
     mat.determinant() > 0.0
+}
+
+fn on_segment(seg: (Point, Point), q: Point) -> bool {
+    // given colinear, 2D p q and r, find if q lies on pr (seg)
+    let (p, r) = seg;
+    q[0] <= p[0].max(r[0])
+        && q[0] >= p[0].min(r[0])
+        && q[1] <= p[1].max(r[1])
+        && q[1] >= p[1].min(r[1])
+}
+
+pub fn segments_intersect(a: (Point, Point), b: (Point, Point)) -> bool {
+    // test whether line segments a and b intersect
+    let l = triangle_dir((a.0, a.1, b.0));
+    let m = triangle_dir((a.0, a.1, b.1));
+    let n = triangle_dir((b.0, b.1, a.0));
+    let o = triangle_dir((b.0, b.1, a.1));
+
+    if (l != m) && (n != o) {
+        true
+    } else {
+        if l == Orient::Zero && on_segment(a, b.0) {
+            true
+        } else if m == Orient::Zero && on_segment(a, b.1) {
+            true
+        } else if n == Orient::Zero && on_segment(b, a.0) {
+            true
+        } else if o == Orient::Zero && on_segment(b, a.1) {
+            true
+        } else {
+            false
+        }
+    }
 }

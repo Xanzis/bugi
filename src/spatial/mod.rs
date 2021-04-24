@@ -315,4 +315,15 @@ mod tests {
         assert!(!predicates::in_triangle(q, (a, b, c)));
         assert!(!predicates::in_triangle(q, (c, b, a)));
     }
+    #[test]
+    fn intersections() {
+        use super::predicates;
+
+        let p = (1.0, 2.0).into();
+        let q = (4.0, 1.0).into();
+        let r = (2.5, 0.2).into();
+        let s = (1.5, 5.0).into();
+
+        assert!(predicates::segments_intersect((p, q), (r, s)))
+    }
 }
