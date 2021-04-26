@@ -74,6 +74,16 @@ impl Point {
     pub fn norm(self) -> f64 {
         (self.data[0].powi(2) + self.data[1].powi(2) + self.data[2].powi(2)).sqrt()
     }
+
+    pub fn unit(self) -> Point {
+        let norm = self.norm();
+        let data = [
+            self.data[0] / norm,
+            self.data[1] / norm,
+            self.data[2] / norm,
+        ];
+        Point { n: self.n, data }
+    }
 }
 
 impl fmt::Display for Point {
@@ -331,5 +341,12 @@ mod tests {
 
         assert!(predicates::segments_intersect((p, q), (t, u)));
         assert!(!predicates::segments_intersect((r, s), (t, u)))
+    }
+    #[test]
+    fn unit() {
+        let p: Point = (5.0, 0.0).into();
+        assert_eq!(p.unit(), Point::new(&[1.0, 0.0]));
+        let q: Point = (3.0, 3.0).into();
+        assert!((q.unit() - Point::new(&[0.7071, 0.7071])).norm() < 1e-2);
     }
 }
