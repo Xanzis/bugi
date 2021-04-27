@@ -182,7 +182,7 @@ impl PlaneTriangulation {
 
         // end immediately for doubly-ghost edge cases
         if tri.ghost_count() > 1 {
-            return false
+            return false;
         }
 
         // first, if tri is a ghost triangle, only check if x is to the left of the non-ghost segment
@@ -199,14 +199,18 @@ impl PlaneTriangulation {
 
         // a ghost vertex is never inside a real triangle
         if x.is_ghost() {
-            return false
+            return false;
         }
 
         // if tri is a proper triangle, use the in_circle spatial predicate
         // sanity check: tri should be correctly oriented (TODO remove this check)
         assert_eq!(self.triangle_dir(tri), Some(Orient::Positive));
 
-        println!("checking in_circle for {:?}, {:?}", self.get(x).unwrap(), self.get_triangle_points(tri).unwrap());
+        println!(
+            "checking in_circle for {:?}, {:?}",
+            self.get(x).unwrap(),
+            self.get_triangle_points(tri).unwrap()
+        );
 
         predicates::in_circle(
             self.get(x).expect("nonexistent vidx").into(),
@@ -424,9 +428,6 @@ impl PlaneTriangulation {
                 }
             }
         }
-
-        let mut vis = self.visualize();
-        vis.draw(format!("test_generated/eek.png").as_str(), ());
     }
 
     pub fn visualize(&self) -> Visualizer {
