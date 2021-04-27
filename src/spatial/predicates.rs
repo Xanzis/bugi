@@ -195,3 +195,54 @@ pub fn circumradius(tri: (Point, Point, Point)) -> f64 {
 
     (a * b * c) / ((a + b + c) * (b + c - a) * (c + a - b) * (a + b - c)).sqrt()
 }
+
+// a line, represented as ax + by = c
+#[derive(Clone, Copy, Debug)]
+struct Line {
+    a: f64,
+    b: f64,
+    c: f64,
+}
+
+impl Line {
+    fn from_segment(p: Point, q: Point) -> Self {
+        let a = q[1] - p[1];
+        let b = p[0] - q[0];
+        let c = a * p[0] + b * p[1];
+        Line {a, b, c}
+    }
+
+    fn perp_bisect(p: Point, q: Point) -> Self {
+        // contruct a perpendicular bisector of pq
+        let along = Self::from_segment(p, q);
+        
+        let mid = p.mid(q);
+
+        let c = -1.0 * along.b * mid[0] + along.a * mid[1];
+        let a = -1.0 * along.b;
+        let b = along.a;
+        Line {a, b, c}
+    }
+
+    fn intersect(&self, other: Line) -> Option<Point> {
+        // find the intersection of two lines
+        let det = self.a * other.b - other.a * self.b;
+        if det == 0.0 {
+            None
+        } else {
+            let x = (other.b * self.c - self.b * other.c) / det;
+            let y = (self.a * other.c - other.a * self.c) / det;
+            Some((x, y).into())
+        }
+    }
+}
+
+pub fn circumcenter(tri: (Point, Point, Point)) -> Option<Point> {
+    // returns None if triangle is degenerate
+
+    let (p, q, r) = tri;
+    let leg_a = Line::perp_bisect(p, q);
+    let leg_b = Line::perp_bisect(q, r);
+
+    leg_a.intersect(leg_b)
+}
