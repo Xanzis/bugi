@@ -22,6 +22,7 @@ pub use buffer::{LinearMatrix, LowerTriangular, UpperTriangular};
 #[derive(Debug, Clone)]
 pub enum MatrixError {
     SolveError(String),
+    Pivot,
 }
 
 impl MatrixError {
@@ -34,6 +35,7 @@ impl fmt::Display for MatrixError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MatrixError::SolveError(s) => write!(f, "SolveError: {}", s),
+            MatrixError::Pivot => write!(f, "Pivot failed, matrix may be singular")
         }
     }
 }

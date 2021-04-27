@@ -1,5 +1,7 @@
 use super::{LowerTriangular, MatrixError, MatrixLike, UpperTriangular};
 
+const SMALL_NUM: f64 = 1e-100;
+
 pub trait Inverse<T>
 where
     T: MatrixLike,
@@ -7,7 +9,8 @@ where
     fn solve_gausselim(&mut self, b: T) -> Result<T, MatrixError>;
     fn lu_decompose(&self) -> (LowerTriangular, UpperTriangular);
     fn det_lu(&self) -> f64; // find the determinant by lu decomposition
-    fn determinant(&self) -> f64;
+    fn det_lu_pivot(&self) -> Result<f64, MatrixError>;
+    fn determinant(&self) -> Result<f64, MatrixError>;
     fn inv_lu(&self) -> T;
     fn inverse(&self) -> T;
 }
@@ -107,12 +110,55 @@ where
         u.diag().product()
     }
 
-    fn determinant(&self) -> f64 {
+    fn det_lu_pivot(&self) -> Result<f64, MatrixError> {
+        // find the determinant via the lu method with pivoting
+        let mut a = self.clone();
+        let shape = a.shape();
+        if shape.0 != shape.1 {
+            return Err(MatrixError::solve("non-square matrix"))
+        }
+        let n = shape.0;
+
+        // p stores matrix permutation information
+        let mut p: Vec<usize> = (0..n).collect();
+        let mut swap_count = 0;
+
+        for i in 0..n {
+            let mut max_a = 0.0;
+            let mut max_i = i;
+
+            let (max_i, max_a) = (i..n).map(|k| (k, a[(k, i)].abs()) ).max_by(|&x, &y| x.1.partial_cmp(&y.1).unwrap()).ok_or(MatrixError::Pivot)?;
+            if max_a < SMALL_NUM {
+                return Err(MatrixError::Pivot)
+            }
+
+            // pivot
+            if max_i != i {
+                p.swap(i, max_i);
+                a.swap_rows(i, max_i);
+                swap_count += 1;
+            }
+            
+            for j in (i + 1)..n {
+                a[(j, i)] /= a[(i, i)];
+                for k in (i + 1)..n {
+                    a[(j, k)] -= a[(j, i)] * a[(i, k)];
+                }
+            }
+        }
+
+        // decomposition done (A = L - I + U), find the determinant
+        Ok(a.diag().product::<f64>() * if swap_count & 1 == 0 { 1.0 } else { -1.0 })
+    }
+
+    fn determinant(&self) -> Result<f64, MatrixError> {
+        // TODO handle close-to-0 determinants
+
         // use the cheaper algorithm if possible
         if self.shape() == (2, 2) {
-            self[(0, 0)] * self[(1, 1)] - self[(1, 0)] * self[(0, 1)]
+            Ok(self[(0, 0)] * self[(1, 1)] - self[(1, 0)] * self[(0, 1)])
         } else {
-            self.det_lu()
+            self.det_lu_pivot()
         }
     }
 
@@ -131,7 +177,7 @@ where
         }
 
         if self.shape() == (2, 2) {
-            let det = self.determinant();
+            let det = self.determinant().expect("unreachable - 2x2 matrix determinants do not fail");
 
             let a = self[(0, 0)] / det;
             let b = self[(0, 1)] / det;

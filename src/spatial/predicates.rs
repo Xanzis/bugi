@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use crate::matrix::{Inverse, LinearMatrix, MatrixLike};
+use crate::matrix::{Inverse, LinearMatrix, MatrixLike, MatrixError};
 
 use super::Point;
 
@@ -37,14 +37,23 @@ pub fn tetrahedron_dir(tet: (Point, Point, Point, Point)) -> Orient {
         ],
     );
 
-    let val = mat.determinant();
-    if val == 0.0 {
-        Orient::Zero
-    } else if val > 0.0 {
-        Orient::Positive
-    } else {
-        Orient::Negative
+    match mat.determinant() {
+        Ok(val) => {
+            if val == 0.0 {
+                Orient::Zero
+            } else if val > 0.0 {
+                Orient::Positive
+            } else {
+                Orient::Negative
+            }
+        },
+        Err(_) => {
+            // error in determinant() implies det = 0
+            // TODO handle various error types
+            Orient::Zero
+        }
     }
+    
 }
 
 pub fn bary_coor(p: Point, tri: (Point, Point, Point)) -> (f64, f64, f64) {
@@ -96,8 +105,11 @@ pub fn in_circle(p: Point, tri: (Point, Point, Point)) -> bool {
         ],
     );
 
-    // TODO make sure determinant returns 0.0 when mat is singular
-    mat.determinant() > 0.0
+    if let Ok(val) = mat.determinant() {
+        val > 0.0
+    } else {
+        false
+    }
 }
 
 pub fn in_sphere(p: Point, tet: (Point, Point, Point, Point)) -> bool {
@@ -136,8 +148,11 @@ pub fn in_sphere(p: Point, tet: (Point, Point, Point, Point)) -> bool {
         ],
     );
 
-    // TODO same check as above
-    mat.determinant() > 0.0
+    if let Ok(val) = mat.determinant() {
+        val > 0.0
+    } else {
+        false
+    }
 }
 
 fn on_segment(seg: (Point, Point), q: Point) -> bool {

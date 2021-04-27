@@ -326,6 +326,18 @@ mod tests {
         assert!(!predicates::in_triangle(q, (c, b, a)));
     }
     #[test]
+    fn in_circle() {
+        use super::predicates;
+
+        let p = (0.0, 0.0).into();
+        let q = (2.0, 0.3).into();
+        let r = (2.0, 1.475).into();
+
+        let x = (1.0, 0.15).into();
+
+        assert!(predicates::in_circle(x, (p, q, r)))
+    }
+    #[test]
     fn intersections() {
         use super::predicates;
 
