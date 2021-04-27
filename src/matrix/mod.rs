@@ -35,7 +35,7 @@ impl fmt::Display for MatrixError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MatrixError::SolveError(s) => write!(f, "SolveError: {}", s),
-            MatrixError::Pivot => write!(f, "Pivot failed, matrix may be singular")
+            MatrixError::Pivot => write!(f, "Pivot failed, matrix may be singular"),
         }
     }
 }

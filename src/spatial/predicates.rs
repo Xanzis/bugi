@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use crate::matrix::{Inverse, LinearMatrix, MatrixLike, MatrixError};
+use crate::matrix::{Inverse, LinearMatrix, MatrixError, MatrixLike};
 
 use super::Point;
 
@@ -46,14 +46,13 @@ pub fn tetrahedron_dir(tet: (Point, Point, Point, Point)) -> Orient {
             } else {
                 Orient::Negative
             }
-        },
+        }
         Err(_) => {
             // error in determinant() implies det = 0
             // TODO handle various error types
             Orient::Zero
         }
     }
-    
 }
 
 pub fn bary_coor(p: Point, tri: (Point, Point, Point)) -> (f64, f64, f64) {

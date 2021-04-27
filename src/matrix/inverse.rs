@@ -115,7 +115,7 @@ where
         let mut a = self.clone();
         let shape = a.shape();
         if shape.0 != shape.1 {
-            return Err(MatrixError::solve("non-square matrix"))
+            return Err(MatrixError::solve("non-square matrix"));
         }
         let n = shape.0;
 
@@ -127,9 +127,12 @@ where
             let mut max_a = 0.0;
             let mut max_i = i;
 
-            let (max_i, max_a) = (i..n).map(|k| (k, a[(k, i)].abs()) ).max_by(|&x, &y| x.1.partial_cmp(&y.1).unwrap()).ok_or(MatrixError::Pivot)?;
+            let (max_i, max_a) = (i..n)
+                .map(|k| (k, a[(k, i)].abs()))
+                .max_by(|&x, &y| x.1.partial_cmp(&y.1).unwrap())
+                .ok_or(MatrixError::Pivot)?;
             if max_a < SMALL_NUM {
-                return Err(MatrixError::Pivot)
+                return Err(MatrixError::Pivot);
             }
 
             // pivot
@@ -138,7 +141,7 @@ where
                 a.swap_rows(i, max_i);
                 swap_count += 1;
             }
-            
+
             for j in (i + 1)..n {
                 a[(j, i)] /= a[(i, i)];
                 for k in (i + 1)..n {
@@ -177,7 +180,9 @@ where
         }
 
         if self.shape() == (2, 2) {
-            let det = self.determinant().expect("unreachable - 2x2 matrix determinants do not fail");
+            let det = self
+                .determinant()
+                .expect("unreachable - 2x2 matrix determinants do not fail");
 
             let a = self[(0, 0)] / det;
             let b = self[(0, 1)] / det;
