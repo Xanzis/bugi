@@ -217,7 +217,7 @@ impl IsoparElement {
 
         // invert J to find the gradient interpolation for the global coordinate system
         let j_inv = j.inverse();
-        let det_j = j.determinant();
+        let det_j = j.determinant().expect("unreachable - element determinants should be nonzero");
 
         // construct the strain interpolation matrix
         let mut b = LinearMatrix::zeros((strain_rule.vec_len(), dim * n));
