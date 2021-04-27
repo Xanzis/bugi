@@ -361,4 +361,11 @@ mod tests {
         let q: Point = (3.0, 3.0).into();
         assert!((q.unit() - Point::new(&[0.7071, 0.7071])).norm() < 1e-2);
     }
+    #[test]
+    fn circumradius() {
+        use super::predicates;
+
+        let tri = ((0.0, 0.0).into(), (3.0, 0.0).into(), (0.0, 4.0).into());
+        assert!((predicates::circumradius(tri) - 2.5).abs() < 1e-10)
+    }
 }

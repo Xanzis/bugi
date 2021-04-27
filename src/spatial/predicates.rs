@@ -186,3 +186,12 @@ pub fn segments_intersect(a: (Point, Point), b: (Point, Point)) -> bool {
         }
     }
 }
+
+pub fn circumradius(tri: (Point, Point, Point)) -> f64 {
+    // compute a triangle circumradius
+    let a = tri.0.dist(tri.1);
+    let b = tri.1.dist(tri.2);
+    let c = tri.2.dist(tri.0);
+
+    (a * b * c) / ((a + b + c) * (b + c - a) * (c + a - b) * (a + b - c)).sqrt()
+}
