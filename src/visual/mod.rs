@@ -15,14 +15,14 @@ const DOT_SIZE: u32 = 1;
 
 pub struct VisOptions {
     color_map: Option<Box<dyn Fn(f64) -> Rgb<u8>>>,
-    im_size: u32,
+    im_size: Option<u32>,
 }
 
 impl VisOptions {
     pub fn new() -> Self {
         Self {
             color_map: Some(color::hot_map_boxed()),
-            im_size: DEFAULT_IMG_SIZE,
+            im_size: None,
         }
     }
 
@@ -51,21 +51,19 @@ impl<T: ToString> From<Vec<T>> for VisOptions {
             if let Some(value) = words.next() {
                 // entry was formatted correctly, pick out recognisable settings
                 match attribute {
-                    "color_map" => {
-                        match value {
-                            "rgb_map" => res.color_map = Some(color::rgb_map_boxed()),
-                            "hot_map" => res.color_map = Some(color::hot_map_boxed()),
-                            _ => eprintln!("WARNING: unrecognized visualizer color map option")
-                        }
+                    "color_map" => match value {
+                        "rgb_map" => res.color_map = Some(color::rgb_map_boxed()),
+                        "hot_map" => res.color_map = Some(color::hot_map_boxed()),
+                        _ => eprintln!("WARNING: unrecognized visualizer color map option"),
                     },
                     "im_size" => {
                         if let Ok(val) = value.parse::<u32>() {
-                            res.im_size = val;
+                            res.im_size = Some(val);
                         } else {
                             eprintln!("WARNING: unreadable visualizer im_size, ignoring")
                         }
                     }
-                    _ => eprintln!("WARNING: unrecognized visualizer option name")
+                    _ => eprintln!("WARNING: unrecognized visualizer option name"),
                 }
             }
         }
@@ -199,6 +197,11 @@ impl Visualizer {
         T: Into<VisOptions>,
     {
         let options = options.into();
+
+        if let Some(x) = options.im_size {
+            self.im_size = x;
+        }
+
         let pix_points = self.enpixel();
         let mut img = RgbImage::new(self.im_size, self.im_size);
 
