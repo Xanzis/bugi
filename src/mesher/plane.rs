@@ -1,5 +1,7 @@
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::convert::{From, Into, TryInto};
+use std::hash::{Hash, Hasher};
 use std::iter;
 
 use crate::spatial::predicates::{self, Orient};
@@ -149,6 +151,17 @@ impl PlaneTriangulation {
         }
     }
 
+    fn get_perturbed(&self, v: VIdx) -> Option<(f64, f64)> {
+        // retrieve a vertex, perturbing it slightly using a hash of the VIdx
+        // TODO confirm this is sound
+        const MAX_PERTURB: f64 = 1e-9;
+        let mut hasher = DefaultHasher::new();
+        v.hash(&mut hasher);
+        let perturb = (hasher.finish() as f64 / u64::MAX as f64) * MAX_PERTURB;
+
+        self.get(v).map(|(x, y)| (x + perturb, y + perturb))
+    }
+
     fn all_vidx(&self) -> impl Iterator<Item = VIdx> {
         // return an iterator over all valid VIdxs
         (0..self.vertices.len())
@@ -175,8 +188,21 @@ impl PlaneTriangulation {
         ))
     }
 
-    fn in_circle<T: Into<Triangle>>(&self, tri: T, x: VIdx) -> bool {
+    fn get_triangle_points_perturbed(&self, tri: Triangle) -> Option<(Point, Point, Point)> {
+        if tri.is_ghost() {
+            return None;
+        }
+        let Triangle(u, v, w) = tri;
+        Some((
+            self.get_perturbed(u).unwrap().into(),
+            self.get_perturbed(v).unwrap().into(),
+            self.get_perturbed(w).unwrap().into(),
+        ))
+    }
+
+    fn in_circle<T: Into<Triangle>>(&self, tri: T, x: VIdx, perturb: bool) -> bool {
         // determine whether x lies in the oriented triangle tri's circumcircle
+        // perturb determines whether or not to perturb the inputs (which helps avoid chew edge cases)
         let tri = tri.into();
 
         // end immediately for doubly-ghost edge cases
@@ -202,11 +228,17 @@ impl PlaneTriangulation {
         }
 
         // don't check tri for positivity, important that negative triangles return inverse results
-
-        predicates::in_circle(
-            self.get(x).expect("nonexistent vidx").into(),
-            self.get_triangle_points(tri).unwrap(),
-        )
+        if perturb {
+            predicates::in_circle(
+                self.get_perturbed(x).expect("nonexistent vidx").into(),
+                self.get_triangle_points_perturbed(tri).unwrap(),
+            )
+        } else {
+            predicates::in_circle(
+                self.get(x).expect("nonexistent vidx").into(),
+                self.get_triangle_points(tri).unwrap(),
+            )
+        }
     }
 
     fn triangle_dir<T: Into<Triangle>>(&self, tri: T) -> Option<Orient> {
@@ -341,6 +373,41 @@ impl PlaneTriangulation {
         None
     }
 
+    fn midpoint_visible<E: Into<Edge>>(&self, e: E, v: VIdx) -> bool {
+        // determine whether the midpoint of e is visible from v
+        let e = e.into();
+        if let (Some(p), Some(q), Some(x)) = (self.get(e.0), self.get(e.1), self.get(v)) {
+            let p: Point = p.into();
+            let m = p.mid(q.into()); // midpoint
+            let x: Point = x.into();
+
+            // check if any wall obstructs mx
+            for wall in self.bound.all_walls().into_iter() {
+                let (a_id, b_id) = (VIdx::Bound(wall.0), VIdx::Bound(wall.1));
+                if a_id == e.0
+                    || a_id == e.1
+                    || a_id == v
+                    || b_id == e.0
+                    || b_id == e.1
+                    || b_id == v
+                {
+                    // don't check walls which touch the query points (they are always in contact)
+                    continue;
+                }
+
+                if let Some((a, b)) = self.bound.get_segment_points(wall) {
+                    if predicates::segments_intersect((a, b), (m, x)) {
+                        return false;
+                    }
+                }
+            }
+            true
+        } else {
+            // default false, TODO make sure this makes sense
+            false
+        }
+    }
+
     fn circumradius<T: Into<Triangle>>(&self, tri: T) -> Option<f64> {
         // determine the circumradius of the given triangle
         // if triangle is a ghost etc. returns None
@@ -365,7 +432,8 @@ impl PlaneTriangulation {
         // if wv or vw is a segment, do not cross it; add uvw
         if let (VIdx::Bound(a), VIdx::Bound(b)) = (w, v) {
             if self.bound.is_segment((a, b)) || self.bound.is_segment((b, a)) {
-                self.add_triangle((u, v, w));
+                self.add_triangle((u, v, w))
+                    .expect("could not add triangle");
                 return;
             }
         }
@@ -374,14 +442,16 @@ impl PlaneTriangulation {
         if let Some(x) = self.adjacent((w, v)) {
             if self.triangle_dir((u, v, w)) == Some(Orient::Negative) {
                 // if u is past vw, uvw isn't delaunay - dig further
-                self.delete_triangle((w, v, x));
+                self.delete_triangle((w, v, x))
+                    .expect("unreachable - adjacent always returns valid triangles");
                 self.bowyer_watson_dig(u, v, x);
                 self.bowyer_watson_dig(u, x, w);
                 return;
             }
 
-            if self.in_circle((u, v, w), x) {
-                self.delete_triangle((w, v, x));
+            if self.in_circle((u, v, w), x, false) {
+                self.delete_triangle((w, v, x))
+                    .expect("unreachable - adjacent always returns valid triangles");
                 self.bowyer_watson_dig(u, v, x);
                 self.bowyer_watson_dig(u, x, w);
             } else {
@@ -409,8 +479,6 @@ impl PlaneTriangulation {
         // finish a triangle from a directed edge
         // return the triangle and the two new directed edges
 
-        // TODO include visibility algorithms for the constrained triangulation
-
         let mut tri: Option<Triangle> = None;
         for v in self.all_vidx() {
             // do not construct doubly-ghost triangles
@@ -418,9 +486,10 @@ impl PlaneTriangulation {
                 continue;
             }
             // proceed if v is in front of e and tri is either None or encircling
-            if self.to_left(e, v) && tri.map_or(true, |t| self.in_circle(t, v)) {
-                // TODO add constrained visibility check here
-                tri = Some((e.0, e.1, v).into());
+            if self.to_left(e, v) && tri.map_or(true, |t| self.in_circle(t, v, true)) {
+                if self.midpoint_visible(e, v) {
+                    tri = Some((e.0, e.1, v).into());
+                }
             }
         }
 
@@ -445,7 +514,14 @@ impl PlaneTriangulation {
             to_finish.remove(&e);
 
             if let Some((tri, a, b)) = self.gift_wrap_finish(e) {
-                self.add_triangle(tri).expect("could not add triangle");
+                if let Err(e) = self.add_triangle(tri) {
+                    let mut vis = self.visualize();
+                    if let Some(tp) = self.get_triangle_points(tri) {
+                        vis.add_points(vec![tp.0, tp.1, tp.2], 1);
+                    }
+                    vis.draw(format!("err_state.png").as_str(), ());
+                    panic!("error gift-wrapping boundary");
+                }
                 if !to_finish.remove(&a) {
                     // if a was not in set, add its reverse
                     to_finish.insert(a.rev());

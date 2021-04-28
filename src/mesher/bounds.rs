@@ -102,7 +102,7 @@ impl PlaneBoundary {
         (0..self.vertices.len()).map(|x| VIdx::Real(x))
     }
 
-    fn get_segment_points(&self, seg: Segment) -> Option<(Point, Point)> {
+    pub fn get_segment_points(&self, seg: Segment) -> Option<(Point, Point)> {
         let Segment(u, v) = seg;
         Some((self.get(u)?.into(), self.get(v)?.into()))
     }
