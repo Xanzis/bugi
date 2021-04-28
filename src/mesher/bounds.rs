@@ -72,6 +72,11 @@ impl PlaneBoundary {
         self.seg_set.insert(s);
     }
 
+    pub fn is_segment<S: Into<Segment>>(&self, s: S) -> bool {
+        let s = s.into();
+        self.seg_set.contains(&s)
+    }
+
     fn remove_segment<S: Into<Segment>>(&mut self, s: S) {
         let s = s.into();
 

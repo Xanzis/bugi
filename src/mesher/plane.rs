@@ -100,6 +100,7 @@ impl From<Segment> for Edge {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct PlaneTriangulation {
     // mesh bounds structure
     bound: PlaneBoundary,
@@ -109,11 +110,6 @@ pub struct PlaneTriangulation {
 
     // map with three entries per triangle for fast lookup
     tris: HashMap<Edge, VIdx>,
-
-    // structures for readout / random selection
-    // TODO maybe combine tri_idxs with tris for space efficiency
-    tri_idxs: HashMap<Edge, usize>,
-    tri_list: Vec<Triangle>,
 
     // record of coappearing vertices in recently added triangles
     recents: HashMap<VIdx, VIdx>,
@@ -126,8 +122,6 @@ impl PlaneTriangulation {
             bound,
             vertices: Vec::new(),
             tris: HashMap::new(),
-            tri_idxs: HashMap::new(),
-            tri_list: Vec::new(),
             recents: HashMap::new(),
         }
     }
@@ -161,6 +155,11 @@ impl PlaneTriangulation {
             .map(|x| VIdx::Real(x))
             .chain(self.bound.all_vidx().map(|x| VIdx::Bound(x)))
             .chain(iter::once(VIdx::Ghost))
+    }
+
+    fn all_triangles<'a>(&'a self) -> impl Iterator<Item = Triangle> + 'a {
+        // in current implementation, this visits each triangle three times
+        self.tris.iter().map(|(&e, &v)| (e.0, e.1, v).into())
     }
 
     fn get_triangle_points(&self, tri: Triangle) -> Option<(Point, Point, Point)> {
@@ -202,15 +201,7 @@ impl PlaneTriangulation {
             return false;
         }
 
-        // if tri is a proper triangle, use the in_circle spatial predicate
-        // sanity check: tri should be correctly oriented (TODO remove this check)
-        assert_eq!(self.triangle_dir(tri), Some(Orient::Positive));
-
-        println!(
-            "checking in_circle for {:?}, {:?}",
-            self.get(x).unwrap(),
-            self.get_triangle_points(tri).unwrap()
-        );
+        // don't check tri for positivity, important that negative triangles return inverse results
 
         predicates::in_circle(
             self.get(x).expect("nonexistent vidx").into(),
@@ -263,12 +254,6 @@ impl PlaneTriangulation {
         self.tris.insert(edges[1], tri.0);
         self.tris.insert(edges[2], tri.1);
 
-        let idx = self.tri_list.len();
-        for e in edges.iter().cloned() {
-            self.tri_idxs.insert(e, idx);
-        }
-        self.tri_list.push(tri);
-
         // add to the recent co-appearing points map for later adjacent_one use
         // seems reasonable to not insert any ghost pairs for adjacent_one, right?
         for e in edges.iter().cloned() {
@@ -287,25 +272,31 @@ impl PlaneTriangulation {
         let edges = tri.edges();
         if self.tris.get(&edges[0]) == Some(&tri.2) {
             // store the idnex of the removed triangle and remove entries
-            let idx = self.tri_idxs.get(&edges[0]).unwrap().clone();
             for e in edges.iter() {
                 self.tris.remove(e);
-                self.tri_idxs.remove(e);
-            }
-
-            // do a swap to avoid O(n) removal
-            // TODO address edge case where the last triangle is removed
-            let to_move = self.tri_list.pop().unwrap();
-            self.tri_list[idx] = to_move;
-
-            // update the index of the moved triangle
-            for e in to_move.edges().iter().cloned() {
-                self.tri_idxs.insert(e, idx);
             }
             Ok(())
         } else {
             Err(MeshError::triangle("triangle to be deleted does not exist"))
         }
+    }
+
+    fn disp_vertex(&self, v: VIdx) -> String {
+        if let Some(p) = self.get(v) {
+            format!("({:1.4}, {:1.4})", p.0, p.1)
+        } else {
+            "None".to_string()
+        }
+    }
+
+    fn disp_triangle<T: Into<Triangle>>(&self, tri: T) -> String {
+        let tri = tri.into();
+        format!(
+            "Tri {}, {}, {}",
+            self.disp_vertex(tri.0),
+            self.disp_vertex(tri.1),
+            self.disp_vertex(tri.2)
+        )
     }
 
     fn adjacent<E: Into<Edge>>(&self, e: E) -> Option<VIdx> {
@@ -350,10 +341,45 @@ impl PlaneTriangulation {
         None
     }
 
+    fn circumradius<T: Into<Triangle>>(&self, tri: T) -> Option<f64> {
+        // determine the circumradius of the given triangle
+        // if triangle is a ghost etc. returns None
+        let tri = tri.into();
+        self.get_triangle_points(tri).map(predicates::circumradius)
+    }
+
+    fn circumcenter<T: Into<Triangle>>(&self, tri: T) -> Option<Point> {
+        // find the circumcenter of a given triangle
+        // if the triangle is a ghost or degenerate, returns None
+        let tri = tri.into();
+        if let Some(tri_points) = self.get_triangle_points(tri) {
+            predicates::circumcenter(tri_points)
+        } else {
+            None
+        }
+    }
+
     fn bowyer_watson_dig(&mut self, u: VIdx, v: VIdx, w: VIdx) {
         // u is a new vertex
-        // check if uvw is delaunay
+
+        // if wv or vw is a segment, do not cross it; add uvw
+        if let (VIdx::Bound(a), VIdx::Bound(b)) = (w, v) {
+            if self.bound.is_segment((a, b)) || self.bound.is_segment((b, a)) {
+                self.add_triangle((u, v, w));
+                return;
+            }
+        }
+
+        // check if uvw is constrained delaunay
         if let Some(x) = self.adjacent((w, v)) {
+            if self.triangle_dir((u, v, w)) == Some(Orient::Negative) {
+                // if u is past vw, uvw isn't delaunay - dig further
+                self.delete_triangle((w, v, x));
+                self.bowyer_watson_dig(u, v, x);
+                self.bowyer_watson_dig(u, x, w);
+                return;
+            }
+
             if self.in_circle((u, v, w), x) {
                 self.delete_triangle((w, v, x));
                 self.bowyer_watson_dig(u, v, x);
@@ -362,6 +388,9 @@ impl PlaneTriangulation {
                 self.add_triangle((u, v, w))
                     .expect("could not add triangle");
             }
+        } else {
+            self.add_triangle((u, v, w))
+                .expect("could not add triangle");
         }
     }
 
@@ -402,8 +431,6 @@ impl PlaneTriangulation {
     pub fn gift_wrap(&mut self) {
         // gift-wrap the triangulation from scratch
         self.tris.clear();
-        self.tri_idxs.clear();
-        self.tri_list.clear();
         self.recents.clear();
 
         let mut to_finish: HashSet<Edge> = HashSet::new();
@@ -427,6 +454,38 @@ impl PlaneTriangulation {
                     to_finish.insert(b.rev());
                 }
             }
+        }
+    }
+
+    fn large_triangle(&self, h: f64) -> Option<Triangle> {
+        // find a triangle with circumradius larger than h if one exists
+        self.all_triangles().find(|&t| {
+            if let Some(rad) = self.circumradius(t) {
+                rad > h
+            } else {
+                false
+            }
+        })
+    }
+
+    pub fn chew_mesh(&mut self, h: f64) {
+        // starting from a rough boundary
+        // refine first boundary then interior via chew's 1st method
+
+        // refine the boundary and construct initial triangulation
+        self.bound.divide_all_segments(h);
+        self.gift_wrap();
+
+        //while let Some(tri) = self.all_triangles().find(|&t| if let Some(rad) = self.circumradius(t) { rad > h } else { false }) {
+        while let Some(tri) = self.large_triangle(h) {
+            // tri is a triangle with a too-high circumradius
+            // insert its circumcenter
+            let center = self
+                .circumcenter(tri)
+                .expect("unreachable - tri with circumradius always has circumcenter");
+            let center_id = self.store_vertex(center);
+
+            self.bowyer_watson_insert(center_id, tri);
         }
     }
 

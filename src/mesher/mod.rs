@@ -34,11 +34,27 @@ mod tests {
         let mut b = bounds::PlaneBoundary::new();
         b.store_polygon(vec![(0.0, 0.0), (2.0, 0.3), (2.0, 5.0), (-1.0, 3.5)]);
 
-        b.divide_all_segments(1.0);
+        b.divide_all_segments(0.3);
 
         let mut vis = b.visualize();
 
         vis.draw("test_generated/chew_bound.png", ());
+    }
+
+    #[test]
+    fn chew_mesh_init() {
+        use super::bounds;
+        use super::plane;
+
+        let mut b = bounds::PlaneBoundary::new();
+        b.store_polygon(vec![(0.0, 0.0), (2.0, 0.3), (2.0, 5.0), (-1.0, 3.5)]);
+        b.divide_all_segments(0.3);
+
+        let mut mesh = plane::PlaneTriangulation::new(b);
+        mesh.gift_wrap();
+
+        let mut vis = mesh.visualize();
+        vis.draw("test_generated/chew_mesh_init.png", ());
     }
 
     #[test]
@@ -48,10 +64,9 @@ mod tests {
 
         let mut b = bounds::PlaneBoundary::new();
         b.store_polygon(vec![(0.0, 0.0), (2.0, 0.3), (2.0, 5.0), (-1.0, 3.5)]);
-        b.divide_all_segments(1.0);
 
         let mut mesh = plane::PlaneTriangulation::new(b);
-        mesh.gift_wrap();
+        mesh.chew_mesh(0.3);
 
         let mut vis = mesh.visualize();
         vis.draw("test_generated/chew_mesh.png", ());
