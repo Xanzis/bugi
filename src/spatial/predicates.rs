@@ -209,19 +209,19 @@ impl Line {
         let a = q[1] - p[1];
         let b = p[0] - q[0];
         let c = a * p[0] + b * p[1];
-        Line {a, b, c}
+        Line { a, b, c }
     }
 
     fn perp_bisect(p: Point, q: Point) -> Self {
         // contruct a perpendicular bisector of pq
         let along = Self::from_segment(p, q);
-        
+
         let mid = p.mid(q);
 
         let c = -1.0 * along.b * mid[0] + along.a * mid[1];
         let a = -1.0 * along.b;
         let b = along.a;
-        Line {a, b, c}
+        Line { a, b, c }
     }
 
     fn intersect(&self, other: Line) -> Option<Point> {

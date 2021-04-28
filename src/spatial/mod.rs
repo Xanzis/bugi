@@ -373,6 +373,11 @@ mod tests {
         use super::predicates;
 
         let tri = ((0.0, 0.0).into(), (3.0, 0.0).into(), (0.0, 4.0).into());
-        assert!(predicates::circumcenter(tri).unwrap().dist((1.5, 2.0).into()) < 1e-10)
+        assert!(
+            predicates::circumcenter(tri)
+                .unwrap()
+                .dist((1.5, 2.0).into())
+                < 1e-10
+        )
     }
 }
