@@ -10,32 +10,74 @@ mod fill;
 #[cfg(test)]
 mod tests;
 
-const IMG_SIZE: u32 = 256;
+const DEFAULT_IMG_SIZE: u32 = 256;
 const DOT_SIZE: u32 = 1;
 
 pub struct VisOptions {
     color_map: Option<Box<dyn Fn(f64) -> Rgb<u8>>>,
+    im_size: u32,
 }
 
 impl VisOptions {
-    pub fn with_color_map(map: Box<dyn Fn(f64) -> Rgb<u8>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            color_map: Some(map),
+            color_map: Some(color::hot_map_boxed()),
+            im_size: DEFAULT_IMG_SIZE,
         }
+    }
+
+    pub fn with_color_map(map: Box<dyn Fn(f64) -> Rgb<u8>>) -> Self {
+        let mut res = Self::new();
+        res.color_map = Some(map);
+        res
     }
 }
 
 impl From<()> for VisOptions {
     fn from(_x: ()) -> Self {
-        Self {
-            color_map: Some(color::hot_map_boxed()),
+        Self::new()
+    }
+}
+
+impl<T: ToString> From<Vec<T>> for VisOptions {
+    fn from(x: Vec<T>) -> Self {
+        // parse a list of visualization settings as key=value pairs
+        // improper options don't panic but do print warnings
+        let mut res = Self::new();
+
+        for s in x.into_iter().map(|a| a.to_string()) {
+            let mut words = s.as_str().split('=');
+            let attribute = words.next().expect("unreachable");
+            if let Some(value) = words.next() {
+                // entry was formatted correctly, pick out recognisable settings
+                match attribute {
+                    "color_map" => {
+                        match value {
+                            "rgb_map" => res.color_map = Some(color::rgb_map_boxed()),
+                            "hot_map" => res.color_map = Some(color::hot_map_boxed()),
+                            _ => eprintln!("WARNING: unrecognized visualizer color map option")
+                        }
+                    },
+                    "im_size" => {
+                        if let Ok(val) = value.parse::<u32>() {
+                            res.im_size = val;
+                        } else {
+                            eprintln!("WARNING: unreadable visualizer im_size, ignoring")
+                        }
+                    }
+                    _ => eprintln!("WARNING: unrecognized visualizer option name")
+                }
+            }
         }
+
+        res
     }
 }
 
 // big ol' struct with all the stuff we're gonna need
 pub struct Visualizer {
     dim: usize,
+    im_size: u32,
     points: Vec<Point>,
     colors: Vec<usize>,
     edges: Option<Vec<(usize, usize)>>,
@@ -135,7 +177,7 @@ impl Visualizer {
         let max_range = if x_range > y_range { x_range } else { y_range };
 
         // want to bring the range down to 80% of the image width
-        let target_range = 0.8 * (IMG_SIZE as f64);
+        let target_range = 0.8 * (self.im_size as f64);
         let scaling = target_range / max_range;
 
         let middle_x = (x_max + x_min) / 2.0;
@@ -143,9 +185,9 @@ impl Visualizer {
 
         let mut pix_points = Vec::new();
         for (x, y) in xs.iter().zip(ys.iter()) {
-            let x_new = ((x - middle_x) * scaling + (IMG_SIZE as f64) / 2.0).round();
+            let x_new = ((x - middle_x) * scaling + (self.im_size as f64) / 2.0).round();
             // flip y so the image appears in the familiar x/y orientation
-            let y_new = (-1.0 * (y - middle_y) * scaling + (IMG_SIZE as f64) / 2.0).round();
+            let y_new = (-1.0 * (y - middle_y) * scaling + (self.im_size as f64) / 2.0).round();
             pix_points.push((x_new as u32, y_new as u32));
         }
 
@@ -158,7 +200,7 @@ impl Visualizer {
     {
         let options = options.into();
         let pix_points = self.enpixel();
-        let mut img = RgbImage::new(IMG_SIZE, IMG_SIZE);
+        let mut img = RgbImage::new(self.im_size, self.im_size);
 
         // draw triangles if present
         if let (Some(triangles), Some(node_vals)) = (self.triangles.clone(), self.node_vals.clone())
@@ -214,6 +256,7 @@ impl From<Vec<Point>> for Visualizer {
         }
         Visualizer {
             dim,
+            im_size: DEFAULT_IMG_SIZE,
             points,
             colors: vec![0; n],
             edges: None,
