@@ -4,6 +4,9 @@ use std::convert::TryInto;
 use crate::spatial::{predicates, Point};
 use crate::visual::Visualizer;
 
+use crate::element::material::Material;
+use crate::element::loading::Constraint;
+
 // a bounds vertex id
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum VIdx {
@@ -36,6 +39,12 @@ pub struct PlaneBoundary {
     wall_starts: Vec<VIdx>,
     seg_map: HashMap<VIdx, VIdx>,
     seg_set: HashSet<Segment>,
+//
+//   // also store some BC / material information
+//    thickness: Option<f64>,
+//    material: Option<Material>,
+//    constraints: HashMap<VIdx, Constraint>,
+//    distributed_forces: Vec<Point>,
 }
 
 impl PlaneBoundary {
