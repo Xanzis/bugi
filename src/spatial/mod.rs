@@ -84,6 +84,14 @@ impl Point {
         ];
         Point { n: self.n, data }
     }
+
+    pub fn to_vec(self) -> Vec<f64> {
+        let mut res = Vec::with_capacity(self.dim());
+        for i in 0..self.dim() {
+            res.push(self[i]);
+        }
+        res
+    }
 }
 
 impl fmt::Display for Point {
