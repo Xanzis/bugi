@@ -28,6 +28,7 @@ pub struct ElementAssemblage {
     elements: Vec<IsoparElement>,
     constraints: HashMap<usize, Constraint>,
     concentrated_forces: HashMap<usize, Point>,
+    line_forces: HashMap<(usize, usize), Point>,
     dof_lookup: Option<Vec<[Option<usize>; 3]>>,
     dofs: usize,
     area: Option<f64>,
@@ -44,6 +45,7 @@ impl ElementAssemblage {
             elements: Vec::new(),
             constraints: HashMap::new(),
             concentrated_forces: HashMap::new(),
+            line_forces: HashMap::new(),
             dof_lookup: None,
             dofs: 0,
             area: None,
@@ -121,6 +123,10 @@ impl ElementAssemblage {
 
     pub fn add_conc_force(&mut self, n: usize, force: Point) {
         self.concentrated_forces.insert(n, force);
+    }
+
+    pub fn add_dist_line_force(&mut self, n: usize, m: usize, force: Point) {
+        self.line_forces.insert((n, m), force);
     }
 
     pub fn add_constraint(&mut self, n: usize, constraint: Constraint) {
@@ -240,21 +246,41 @@ impl ElementAssemblage {
         let mut assemblage_k = self.find_k();
 
         let mut con_force = LinearMatrix::zeros((self.dofs, 1));
-        // for each node, check if a concentrated force is applied
-        for n in 0..self.node_count() {
-            if let Some(f) = self.concentrated_forces.get(&n) {
-                // check if each node dof still exists and if so apply that part of force
-                for d in 0..self.dim {
-                    if let Some(dof) = self.find_dof(n, d) {
-                        con_force[(dof, 0)] = f[d];
+        for (&n, &f) in self.concentrated_forces.iter() {
+            // check if each node dof still exists and if so apply that part of force
+            for d in 0..self.dim() {
+                if let Some(dof) = self.find_dof(n, d) {
+                    con_force[(dof, 0)] = f[d];
+                }
+            }
+        }
+
+        let mut dist_line_force = LinearMatrix::zeros((self.dofs, 1));
+        for (&(n, m), &f) in self.line_forces.iter() {
+            // convert force f to a column vector
+            let f = LinearMatrix::col_vec(f.to_vec());
+            for el in self.elements.iter() {
+                // TODO this is a bad way of locating affected elements - very slow, lots of loops
+                if el.nodes_connect(n, m) {
+                    let f_l = el.find_f_l(n, m, &f);
+
+                    for i in 0..el.dofs() {
+                        // for each value in the interpolated / integrated force vector,
+                        // find the corresponding degree of freedom
+                        let (node_idx, node_dof) = el.i_to_dof(i);
+                        // check if the degree of freedom still exists, and if so add the force
+                        if let Some(dof) = self.find_dof(node_idx, node_dof) {
+                            dist_line_force[(dof, 0)] = f_l[(i, 0)];
+                        }
                     }
                 }
             }
         }
 
         // assemble r, the overall load vector
-        // for now this is just concentrated loads, but will eventually include body forces etc.
-        let r = con_force;
+        // TODO add area distributed forces / body forces / initial loads
+        let mut r = con_force;
+        r.add_ass(&dist_line_force);
 
         let raw_displacements = assemblage_k
             .solve_gausselim(r)

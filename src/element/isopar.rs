@@ -1,4 +1,4 @@
-use super::integrate::NdGaussSamples;
+use super::integrate::{self, NdGaussSamples};
 use super::material::{Material, ProblemType};
 use super::strain::StrainRule;
 use super::stress::StressState;
@@ -93,7 +93,7 @@ impl IsoparElement {
         self.node_points[i]
     }
 
-    pub fn node_natural(&self, i: usize) -> Point {
+    fn node_natural(&self, i: usize) -> Point {
         // returns the node's natural coordinates
         match self.el_type {
             ElementType::Bar2Node => match i {
@@ -122,6 +122,12 @@ impl IsoparElement {
         }
     }
 
+    pub fn nodes_connect(&self, i: usize, j: usize) -> bool {
+        // tests if two nodes are connected by an edge
+        // TODO this is a slow naive implentation
+        self.edges().unwrap().into_iter().any(|x| x == (i, j) || x == (j, i))
+    }
+
     pub fn node_idxs(&self) -> Vec<usize> {
         // the node indices in the global list
         self.node_idxs.clone()
@@ -133,6 +139,12 @@ impl IsoparElement {
 
     pub fn node_count(&self) -> usize {
         self.node_idxs.len()
+    }
+
+    fn global_to_own_idx(&self, i: usize) -> Option<usize> {
+        // convert a node index in the global list to an index in the local one
+        // TODO this is slow
+        self.node_idxs.iter().position(|&x| x == i)
     }
 
     pub fn integration_order(&self) -> usize {
@@ -298,6 +310,33 @@ impl IsoparElement {
         mats.b.transpose();
 
         inter.mul(&mats.b)
+    }
+
+    pub fn find_f_l(&self, a_idx: usize, b_idx: usize, f: &LinearMatrix) -> LinearMatrix {
+        // integrate the interpolation of a distributed force over an element edge
+        // a_idx and b_idx are node indices of the edge ends in the global node array
+
+        if !self.nodes_connect(a_idx, b_idx) {
+            panic!("invalid edge");
+        }
+
+        if f.shape() != (self.dim(), 1) {
+            panic!("dsitributed force must have dimensions ({}, 1)", self.dim());
+        }
+
+        // find the node points, first converting to the local point indices
+        let a = self.node_natural(self.global_to_own_idx(a_idx).expect("element does not contain node"));
+        let b = self.node_natural(self.global_to_own_idx(b_idx).expect("element does not contain node"));
+
+        // MISTAKE: find_mats takes natural coordinates
+        let integrand = |p: Point| {
+            let mats = self.find_mats(p);
+            let mut h = mats.h.unwrap();
+            h.transpose();
+            h.mul(f)
+        };
+
+        integrate::gauss_segment_mat(integrand, a, b, self.integration_order())
     }
 
     pub fn node_stress(&self, node_idx: usize, u: Vec<f64>) -> StressState {

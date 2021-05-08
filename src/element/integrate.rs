@@ -168,3 +168,33 @@ where
 
     sum
 }
+
+// compute a line integral on the segment between the given points
+pub fn gauss_segment_mat<T>(func: T, a: Point, b: Point, order: usize) -> LinearMatrix
+where
+    T: Fn(Point) -> LinearMatrix,
+{
+    let dist = a.dist(b);
+    let mid = a.mid(b);
+
+    let r_func = |t| { mid + (b * t * 0.5) - (a * t * 0.5)}; // [-1, 1] -> [a, b]
+
+    let norm_r_prime = dist / 2.0;
+
+    let mut samples = GAUSS_POINTS[order].iter().cloned().zip(GAUSS_WEIGHTS[order].iter().cloned());
+
+    let (first_p, first_w) = samples.next().expect("empty integration sampler");
+    let mut first_term = func(r_func(first_p)); // parameterized input to func
+    first_term *= first_w;
+
+    let mut sum: LinearMatrix = first_term;
+
+    while let Some((p, w)) = samples.next() {
+        let mut term = func(r_func(p));
+        term *= w;
+        sum.add_ass(&term);
+    }
+
+    sum *= norm_r_prime;
+    sum
+}

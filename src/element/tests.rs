@@ -1,4 +1,4 @@
-use super::integrate::{nd_gauss_single, newton_single};
+use super::integrate::{nd_gauss_single, newton_single, gauss_segment_mat};
 use super::isopar::IsoparElement;
 use super::loading::Constraint;
 use super::material::{AL6061, TEST};
@@ -15,6 +15,7 @@ fn basic_bar_f() {
     let target = LinearMatrix::from_flat((2, 2), vec![0.5, -0.5, -0.5, 0.5]);
     assert_eq!(el.find_k_integrand(Point::new(&[2.3])), target);
 }
+
 #[test]
 fn rectangle_jacobians() {
     let a = Point::new(&[4.0, 1.0]);
@@ -28,6 +29,7 @@ fn rectangle_jacobians() {
 
     assert_eq!(mats.det_j(), 6.0);
 }
+
 #[test]
 fn simple_integrals() {
     // single integral of (2^x - x) with Newton samples
@@ -46,6 +48,18 @@ fn simple_integrals() {
     let val = nd_gauss_single(|x| x[0].powi(2) * x[1].powi(2) * x[2].powi(4), 3, 4);
     assert!((val - (8.0 / 45.0)).abs() < 1.0e-6);
 }
+
+#[test]
+fn line_integrals() {
+    // segment integral, answer verified by hand
+    let integrand = |p: Point| {
+        LinearMatrix::from_flat(1, vec![3.0 * p[0].powi(2) - 2.0 * p[1]])
+    };
+
+    let val = gauss_segment_mat(integrand, (3.0, 6.0).into(), (1.0, -1.0).into(), 2);
+    assert!((val[(0, 0)] - (8.0 * 53.0_f64.sqrt())).abs() < 1.0e-6);
+}
+
 #[test]
 fn assemblage() {
     let mut elas = ElementAssemblage::new(2, AL6061);
@@ -64,6 +78,7 @@ fn assemblage() {
     vis.set_vals(elas.displacement_norms().unwrap());
     vis.draw("test_generated/disp_square.png", ());
 }
+
 #[test]
 fn multi_element() {
     let mut elas = ElementAssemblage::new(2, AL6061);
@@ -97,6 +112,7 @@ fn multi_element() {
     vis.set_vals(elas.displacement_norms().unwrap());
     vis.draw("test_generated/disp_tower.png", ());
 }
+
 #[test]
 fn triangles() {
     let mut elas = ElementAssemblage::new(2, AL6061);
@@ -124,4 +140,35 @@ fn triangles() {
     vis.set_vals(elas.displacement_norms().unwrap());
 
     vis.draw("test_generated/triangles.png", ());
+}
+
+#[test]
+fn dist_line() {
+    let mut elas = ElementAssemblage::new(2, AL6061);
+    elas.set_thickness(0.2);
+
+    elas.add_nodes(vec![
+        (0.0, 0.0),
+        (2.0, 0.0),
+        (4.0, 0.0),
+        (1.0, 1.0),
+        (3.0, 1.0),
+    ]);
+
+    elas.add_element(vec![0, 1, 3]);
+    elas.add_element(vec![4, 3, 1]);
+    elas.add_element(vec![1, 2, 4]);
+
+    elas.add_constraint(0, Constraint::PlainDof(false, true, false));
+    elas.add_constraint(1, Constraint::PlainDof(true, true, false));
+    elas.add_constraint(2, Constraint::PlainDof(false, true, false));
+
+    elas.add_dist_line_force(3, 4, Point::new(&[2.0e3 , -1.0e3]));
+
+    elas.calc_displacements();
+
+    let mut vis = elas.visualize(100.0);
+    vis.set_vals(elas.displacement_norms().unwrap());
+
+    vis.draw("test_generated/dist_line.png", ());
 }
