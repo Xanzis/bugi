@@ -156,16 +156,22 @@ mod tests {
         bound.divide_all_segments(0.49);
 
         // check that the point (0.5, 0.0) has been created and has an associated constraint
-        let has_con = bound.all_constraints().into_iter()
+        let has_con = bound
+            .all_constraints()
+            .into_iter()
             .map(|(vid, con)| bound.get(vid).unwrap())
             .any(|x| x == (0.5, 0.0));
         assert!(has_con);
 
         // check that a new segment from c to a point at (0.5, 1.0) exists and has a force
-        let fwd = bound.all_distributed_forces().into_iter()
+        let fwd = bound
+            .all_distributed_forces()
+            .into_iter()
             .map(|(s, f)| (s.0, bound.get(s.1).unwrap()))
             .any(|(sa, sb_val)| sa == c && sb_val == (0.5, 1.0));
-        let rev = bound.all_distributed_forces().into_iter()
+        let rev = bound
+            .all_distributed_forces()
+            .into_iter()
             .map(|(s, f)| (s.1, bound.get(s.0).unwrap()))
             .any(|(sa, sb_val)| sa == c && sb_val == (0.5, 1.0));
         assert!(fwd || rev);

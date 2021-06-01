@@ -4,8 +4,8 @@ use std::convert::TryInto;
 use crate::spatial::{predicates, Point};
 use crate::visual::Visualizer;
 
-use crate::element::material::Material;
 use crate::element::loading::Constraint;
+use crate::element::material::Material;
 
 // a bounds vertex id
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -40,12 +40,12 @@ pub struct PlaneBoundary {
     seg_map: HashMap<VIdx, VIdx>,
     seg_set: HashSet<Segment>,
 
-   // also store some BC / material information
-   thickness: Option<f64>,
-   material: Option<Material>,
-   constraints: HashMap<VIdx, Constraint>,
-   distributed_forces: HashMap<Segment, Point>,
-   distributed_constraints: HashMap<Segment, Constraint>
+    // also store some BC / material information
+    thickness: Option<f64>,
+    material: Option<Material>,
+    constraints: HashMap<VIdx, Constraint>,
+    distributed_forces: HashMap<Segment, Point>,
+    distributed_constraints: HashMap<Segment, Constraint>,
 }
 
 impl PlaneBoundary {
@@ -205,10 +205,14 @@ impl PlaneBoundary {
         let leg = (b - a).unit() * segment_length;
 
         // find whether there are distributed forces or constraints on the segment
-        let dist_f = self.distributed_forces.remove(&s)
+        let dist_f = self
+            .distributed_forces
+            .remove(&s)
             .or_else(|| self.distributed_forces.remove(&s.rev()));
 
-        let dist_c = self.distributed_constraints.remove(&s)
+        let dist_c = self
+            .distributed_constraints
+            .remove(&s)
             .or_else(|| self.distributed_constraints.remove(&s.rev()));
 
         self.remove_segment(s);
@@ -224,11 +228,13 @@ impl PlaneBoundary {
 
             // if there are distributed attributes, insert them
             if let Some(f) = dist_f {
-                self.distributed_forces.insert((cur, new_point_idx).into(), f);
+                self.distributed_forces
+                    .insert((cur, new_point_idx).into(), f);
             }
 
             if let Some(c) = dist_c {
-                self.distributed_constraints.insert((cur, new_point_idx).into(), c);
+                self.distributed_constraints
+                    .insert((cur, new_point_idx).into(), c);
 
                 // distributed constraints are just bookkeeping
                 // they mark segments where new points should have cosntraints
@@ -275,7 +281,10 @@ impl PlaneBoundary {
     }
 
     pub fn all_distributed_forces(&self) -> Vec<(Segment, Point)> {
-        self.distributed_forces.iter().map(|(&s, &f)| (s, f)).collect()
+        self.distributed_forces
+            .iter()
+            .map(|(&s, &f)| (s, f))
+            .collect()
     }
 
     pub fn all_constraints(&self) -> Vec<(VIdx, Constraint)> {
