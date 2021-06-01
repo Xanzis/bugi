@@ -123,9 +123,51 @@ mod tests {
         b.store_polygon(poly.iter().map(|p| p.clone()).collect::<Vec<_>>());
 
         let mut mesh = plane::PlaneTriangulation::new(b);
-        mesh.chew_mesh(0.3);
+        mesh.chew_mesh(0.5);
 
         let mut vis = mesh.visualize();
         vis.draw("test_generated/chew_big_mesh.png", vec!["im_size=1024"]);
+    }
+
+    #[test]
+    fn distributed() {
+        use super::bounds;
+        use crate::element::loading::Constraint;
+        use crate::spatial::Point;
+
+        let mut bound = bounds::PlaneBoundary::new();
+
+        // store vertices, get vertex ids, store segments
+        let a = bound.store_vertex((0.0, 0.0));
+        let b = bound.store_vertex((1.0, 0.0));
+        let c = bound.store_vertex((1.0, 1.0));
+        let d = bound.store_vertex((0.0, 1.0));
+
+        bound.store_segment((a, b));
+        bound.store_segment((b, c));
+        bound.store_segment((c, d));
+        bound.store_segment((d, a));
+
+        // store a distributed constraint and a distributed force
+        bound.store_distributed_constraint(a, b, Constraint::PlainDof(true, false, false));
+        bound.store_distributed_force(c, d, (1.0, 2.0).into());
+
+        // get the boundary to subdivide every edge
+        bound.divide_all_segments(0.49);
+
+        // check that the point (0.5, 0.0) has been created and has an associated constraint
+        let has_con = bound.all_constraints().into_iter()
+            .map(|(vid, con)| bound.get(vid).unwrap())
+            .any(|x| x == (0.5, 0.0));
+        assert!(has_con);
+
+        // check that a new segment from c to a point at (0.5, 1.0) exists and has a force
+        let fwd = bound.all_distributed_forces().into_iter()
+            .map(|(s, f)| (s.0, bound.get(s.1).unwrap()))
+            .any(|(sa, sb_val)| sa == c && sb_val == (0.5, 1.0));
+        let rev = bound.all_distributed_forces().into_iter()
+            .map(|(s, f)| (s.1, bound.get(s.0).unwrap()))
+            .any(|(sa, sb_val)| sa == c && sb_val == (0.5, 1.0));
+        assert!(fwd || rev);
     }
 }

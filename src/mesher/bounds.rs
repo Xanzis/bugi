@@ -39,12 +39,13 @@ pub struct PlaneBoundary {
     wall_starts: Vec<VIdx>,
     seg_map: HashMap<VIdx, VIdx>,
     seg_set: HashSet<Segment>,
-//
-//   // also store some BC / material information
-//    thickness: Option<f64>,
-//    material: Option<Material>,
-//    constraints: HashMap<VIdx, Constraint>,
-//    distributed_forces: Vec<Point>,
+
+   // also store some BC / material information
+   thickness: Option<f64>,
+   material: Option<Material>,
+   constraints: HashMap<VIdx, Constraint>,
+   distributed_forces: HashMap<Segment, Point>,
+   distributed_constraints: HashMap<Segment, Constraint>
 }
 
 impl PlaneBoundary {
@@ -54,10 +55,16 @@ impl PlaneBoundary {
             wall_starts: Vec::new(),
             seg_map: HashMap::new(),
             seg_set: HashSet::new(),
+
+            thickness: None,
+            material: None,
+            constraints: HashMap::new(),
+            distributed_forces: HashMap::new(),
+            distributed_constraints: HashMap::new(),
         }
     }
 
-    fn store_vertex<T: TryInto<(f64, f64)>>(&mut self, p: T) -> VIdx {
+    pub fn store_vertex<T: TryInto<(f64, f64)>>(&mut self, p: T) -> VIdx {
         if let Ok((x, y)) = p.try_into() {
             self.vertices.push((x, y));
             VIdx::Real(self.vertices.len() - 1)
@@ -66,7 +73,7 @@ impl PlaneBoundary {
         }
     }
 
-    fn store_segment<S: Into<Segment>>(&mut self, s: S) {
+    pub fn store_segment<S: Into<Segment>>(&mut self, s: S) {
         let s = s.into();
 
         let a = self.get(s.0).expect("bad index");
@@ -79,6 +86,26 @@ impl PlaneBoundary {
 
         self.seg_map.insert(s.0, s.1);
         self.seg_set.insert(s);
+    }
+
+    pub fn set_thickness(&mut self, t: f64) {
+        self.thickness = Some(t);
+    }
+
+    pub fn set_material(&mut self, m: Material) {
+        self.material = Some(m);
+    }
+
+    pub fn store_constraint(&mut self, v: VIdx, c: Constraint) {
+        self.constraints.insert(v, c);
+    }
+
+    pub fn store_distributed_force(&mut self, v: VIdx, w: VIdx, f: Point) {
+        self.distributed_forces.insert((v, w).into(), f);
+    }
+
+    pub fn store_distributed_constraint(&mut self, v: VIdx, w: VIdx, c: Constraint) {
+        self.distributed_constraints.insert((v, w).into(), c);
     }
 
     pub fn is_segment<S: Into<Segment>>(&self, s: S) -> bool {
@@ -177,6 +204,13 @@ impl PlaneBoundary {
         let segment_length = dist / num;
         let leg = (b - a).unit() * segment_length;
 
+        // find whether there are distributed forces or constraints on the segment
+        let dist_f = self.distributed_forces.remove(&s)
+            .or_else(|| self.distributed_forces.remove(&s.rev()));
+
+        let dist_c = self.distributed_constraints.remove(&s)
+            .or_else(|| self.distributed_constraints.remove(&s.rev()));
+
         self.remove_segment(s);
         let start = s.0;
         let end = s.1;
@@ -187,6 +221,19 @@ impl PlaneBoundary {
         for _ in 0..((num as i64) - 1) {
             let new_point_idx = self.store_vertex(new_point);
             self.store_segment_unchecked((cur, new_point_idx));
+
+            // if there are distributed attributes, insert them
+            if let Some(f) = dist_f {
+                self.distributed_forces.insert((cur, new_point_idx).into(), f);
+            }
+
+            if let Some(c) = dist_c {
+                self.distributed_constraints.insert((cur, new_point_idx).into(), c);
+
+                // distributed constraints are just bookkeeping
+                // they mark segments where new points should have cosntraints
+                self.constraints.insert(new_point_idx, c);
+            }
 
             cur = new_point_idx;
             new_point = new_point + leg;
@@ -225,6 +272,14 @@ impl PlaneBoundary {
             .iter()
             .flat_map(|p| self.wall(*p).into_iter())
             .collect()
+    }
+
+    pub fn all_distributed_forces(&self) -> Vec<(Segment, Point)> {
+        self.distributed_forces.iter().map(|(&s, &f)| (s, f)).collect()
+    }
+
+    pub fn all_constraints(&self) -> Vec<(VIdx, Constraint)> {
+        self.constraints.iter().map(|(&v, &c)| (v, c)).collect()
     }
 
     pub fn visualize(&self) -> Visualizer {
