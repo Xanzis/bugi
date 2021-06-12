@@ -5,8 +5,8 @@ use std::fmt;
 use std::fs;
 use std::path::Path;
 
-mod bmsh;
 mod bbnd;
+mod bmsh;
 
 pub fn read_to_elas<P: AsRef<Path>>(path: P) -> Result<ElementAssemblage, FileError> {
     let ext = path
@@ -26,7 +26,10 @@ pub fn read_to_elas<P: AsRef<Path>>(path: P) -> Result<ElementAssemblage, FileEr
 }
 
 pub fn read_to_bound<P: AsRef<Path>>(path: P) -> Result<PlaneBoundary, FileError> {
-    let ext = path.as_ref().extension().map_or(Err(FileError::NoExt), |e| Ok(e))?;
+    let ext = path
+        .as_ref()
+        .extension()
+        .map_or(Err(FileError::NoExt), |e| Ok(e))?;
     let ext = ext.to_str().ok_or(FileError::NonUniPath)?.to_string();
 
     let file = fs::read_to_string(path).or(Err(FileError::NoOpen))?;

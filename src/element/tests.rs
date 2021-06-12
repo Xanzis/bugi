@@ -1,4 +1,4 @@
-use super::integrate::{nd_gauss_single, newton_single, gauss_segment_mat};
+use super::integrate::{gauss_segment_mat, nd_gauss_single, newton_single};
 use super::isopar::IsoparElement;
 use super::loading::Constraint;
 use super::material::{AL6061, TEST};
@@ -52,9 +52,7 @@ fn simple_integrals() {
 #[test]
 fn line_integrals() {
     // segment integral, answer verified by hand
-    let integrand = |p: Point| {
-        LinearMatrix::from_flat(1, vec![3.0 * p[0].powi(2) - 2.0 * p[1]])
-    };
+    let integrand = |p: Point| LinearMatrix::from_flat(1, vec![3.0 * p[0].powi(2) - 2.0 * p[1]]);
 
     let val = gauss_segment_mat(integrand, (3.0, 6.0).into(), (1.0, -1.0).into(), 2);
     assert!((val[(0, 0)] - (8.0 * 53.0_f64.sqrt())).abs() < 1.0e-6);
@@ -163,7 +161,7 @@ fn dist_line() {
     elas.add_constraint(1, Constraint::PlainDof(true, true, false));
     elas.add_constraint(2, Constraint::PlainDof(false, true, false));
 
-    elas.add_dist_line_force(3, 4, Point::new(&[2.0e3 , -1.0e3]));
+    elas.add_dist_line_force(3, 4, Point::new(&[2.0e3, -1.0e3]));
 
     elas.calc_displacements();
 

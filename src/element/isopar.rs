@@ -125,7 +125,10 @@ impl IsoparElement {
     pub fn nodes_connect(&self, i: usize, j: usize) -> bool {
         // tests if two nodes are connected by an edge
         // TODO this is a slow naive implentation
-        self.edges().unwrap().into_iter().any(|x| x == (i, j) || x == (j, i))
+        self.edges()
+            .unwrap()
+            .into_iter()
+            .any(|x| x == (i, j) || x == (j, i))
     }
 
     pub fn node_idxs(&self) -> Vec<usize> {
@@ -325,8 +328,14 @@ impl IsoparElement {
         }
 
         // find the node points, first converting to the local point indices
-        let a = self.node_natural(self.global_to_own_idx(a_idx).expect("element does not contain node"));
-        let b = self.node_natural(self.global_to_own_idx(b_idx).expect("element does not contain node"));
+        let a = self.node_natural(
+            self.global_to_own_idx(a_idx)
+                .expect("element does not contain node"),
+        );
+        let b = self.node_natural(
+            self.global_to_own_idx(b_idx)
+                .expect("element does not contain node"),
+        );
 
         // MISTAKE: find_mats takes natural coordinates
         let integrand = |p: Point| {

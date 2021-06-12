@@ -177,11 +177,14 @@ where
     let dist = a.dist(b);
     let mid = a.mid(b);
 
-    let r_func = |t| { mid + (b * t * 0.5) - (a * t * 0.5)}; // [-1, 1] -> [a, b]
+    let r_func = |t| mid + (b * t * 0.5) - (a * t * 0.5); // [-1, 1] -> [a, b]
 
     let norm_r_prime = dist / 2.0;
 
-    let mut samples = GAUSS_POINTS[order].iter().cloned().zip(GAUSS_WEIGHTS[order].iter().cloned());
+    let mut samples = GAUSS_POINTS[order]
+        .iter()
+        .cloned()
+        .zip(GAUSS_WEIGHTS[order].iter().cloned());
 
     let (first_p, first_w) = samples.next().expect("empty integration sampler");
     let mut first_term = func(r_func(first_p)); // parameterized input to func
