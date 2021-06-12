@@ -162,24 +162,28 @@ impl PlaneBoundary {
         false
     }
 
-    pub fn store_polygon<T: IntoIterator<Item = (f64, f64)>>(&mut self, poly: T) {
+    pub fn store_polygon<T: IntoIterator<Item = (f64, f64)>>(&mut self, poly: T) -> Vec<VIdx> {
         // store an ordered set of points as a polygon
         // the polygon should be oriented so positive triangles off the edges are inside the body
         // TODO enforce this
         let mut poly = poly.into_iter();
+        let mut ids = Vec::new();
         let start = poly.next().unwrap();
         let start_idx = self.store_vertex(start);
+        ids.push(start_idx);
         self.wall_starts.push(start_idx);
 
         let mut prev_idx = start_idx;
         for p in poly {
             let p_idx = self.store_vertex(p);
+            ids.push(p_idx);
             self.store_segment((prev_idx, p_idx));
 
             prev_idx = p_idx;
         }
 
         self.store_segment((prev_idx, start_idx));
+        ids
     }
 
     pub fn divide_segment(&mut self, s: Segment, h: f64) {

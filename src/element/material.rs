@@ -1,4 +1,5 @@
 use crate::matrix::{LinearMatrix, MatrixLike};
+use std::str::FromStr;
 
 pub enum ProblemType {
     // strain vector e.T in comments
@@ -122,5 +123,18 @@ impl Material {
                 }
             }
         }
+    }
+}
+
+impl FromStr for Material {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mat = match s {
+            "AL6061" => AL6061,
+            "TEST" => TEST,
+            _ => return Err(()),
+        };
+        Ok(mat)
     }
 }

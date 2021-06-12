@@ -1,10 +1,12 @@
 use crate::element::ElementAssemblage;
+use crate::mesher::bounds::PlaneBoundary;
 use std::error;
 use std::fmt;
 use std::fs;
 use std::path::Path;
 
 mod bmsh;
+mod bbnd;
 
 pub fn read_to_elas<P: AsRef<Path>>(path: P) -> Result<ElementAssemblage, FileError> {
     let ext = path
@@ -19,7 +21,20 @@ pub fn read_to_elas<P: AsRef<Path>>(path: P) -> Result<ElementAssemblage, FileEr
 
     match ext.as_str() {
         "bmsh" => bmsh::lines_to_elas(lines),
-        _ => Err(FileError::BadType(ext.to_string())),
+        _ => Err(FileError::BadType(ext)),
+    }
+}
+
+pub fn read_to_bound<P: AsRef<Path>>(path: P) -> Result<PlaneBoundary, FileError> {
+    let ext = path.as_ref().extension().map_or(Err(FileError::NoExt), |e| Ok(e))?;
+    let ext = ext.to_str().ok_or(FileError::NonUniPath)?.to_string();
+
+    let file = fs::read_to_string(path).or(Err(FileError::NoOpen))?;
+    let lines = file.split("\n");
+
+    match ext.as_str() {
+        "bbnd" => bbnd::lines_to_bounds(lines),
+        _ => Err(FileError::BadType(ext)),
     }
 }
 
@@ -54,6 +69,12 @@ impl fmt::Display for FileError {
                 write!(f, "bad parse: {}", s)
             }
         }
+    }
+}
+
+impl FileError {
+    pub fn parse<T: ToString>(msg: T) -> Self {
+        Self::BadParse(msg.to_string())
     }
 }
 
