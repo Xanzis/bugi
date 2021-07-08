@@ -4,6 +4,7 @@ use std::convert::{From, Into, TryInto};
 use std::hash::{Hash, Hasher};
 use std::iter;
 
+use crate::element::ElementAssemblage;
 use crate::spatial::predicates::{self, Orient};
 use crate::spatial::Point;
 use crate::visual::Visualizer;
@@ -40,6 +41,12 @@ impl VIdx {
     }
 }
 
+impl From<bounds::VIdx> for VIdx {
+    fn from(id: bounds::VIdx) -> Self {
+        VIdx::Bound(id)
+    }
+}
+
 // structs for ordered pairs / triplets of vertex indices
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct Triangle(VIdx, VIdx, VIdx);
@@ -72,6 +79,26 @@ impl Triangle {
         }
         res
     }
+
+    fn rot(self) -> Self {
+        Triangle(self.1, self.2, self.0)
+    }
+
+    fn rev(self) -> Self {
+        Triangle(self.2, self.1, self.0)
+    }
+
+    fn all(self) -> impl Iterator<Item = Self> {
+        vec![
+            self,
+            self.rot(),
+            self.rot().rot(),
+            self.rev(),
+            self.rev().rot(),
+            self.rev().rot().rot(),
+        ]
+        .into_iter()
+    }
 }
 
 impl From<(VIdx, VIdx, VIdx)> for Triangle {
@@ -98,20 +125,21 @@ impl From<(VIdx, VIdx)> for Edge {
 
 impl From<Segment> for Edge {
     fn from(s: Segment) -> Edge {
-        Edge(VIdx::Bound(s.0), VIdx::Bound(s.1))
+        Edge(s.0.into(), s.1.into())
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct PlaneTriangulation {
     // mesh bounds structure
-    bound: PlaneBoundary,
+    pub bound: PlaneBoundary,
 
     // vector of vertex locations
     vertices: Vec<(f64, f64)>,
 
     // map with three entries per triangle for fast lookup
     tris: HashMap<Edge, VIdx>,
+    full_tris: HashSet<Triangle>,
 
     // record of coappearing vertices in recently added triangles
     recents: HashMap<VIdx, VIdx>,
@@ -124,6 +152,7 @@ impl PlaneTriangulation {
             bound,
             vertices: Vec::new(),
             tris: HashMap::new(),
+            full_tris: HashSet::new(),
             recents: HashMap::new(),
         }
     }
@@ -171,8 +200,7 @@ impl PlaneTriangulation {
     }
 
     fn all_triangles<'a>(&'a self) -> impl Iterator<Item = Triangle> + 'a {
-        // in current implementation, this visits each triangle three times
-        self.tris.iter().map(|(&e, &v)| (e.0, e.1, v).into())
+        self.full_tris.iter().cloned()
     }
 
     fn get_triangle_points(&self, tri: Triangle) -> Option<(Point, Point, Point)> {
@@ -286,6 +314,8 @@ impl PlaneTriangulation {
         self.tris.insert(edges[1], tri.0);
         self.tris.insert(edges[2], tri.1);
 
+        self.full_tris.insert(tri);
+
         // add to the recent co-appearing points map for later adjacent_one use
         // seems reasonable to not insert any ghost pairs for adjacent_one, right?
         for e in edges.iter().cloned() {
@@ -303,10 +333,18 @@ impl PlaneTriangulation {
         let tri = tri.into();
         let edges = tri.edges();
         if self.tris.get(&edges[0]) == Some(&tri.2) {
-            // store the idnex of the removed triangle and remove entries
+            // remove the triangle from both storage structs
             for e in edges.iter() {
                 self.tris.remove(e);
             }
+
+            for t in tri.all() {
+                if self.full_tris.remove(&t) {
+                    // only try removing until the triangle was successfully removed
+                    break;
+                }
+            }
+
             Ok(())
         } else {
             Err(MeshError::triangle("triangle to be deleted does not exist"))
@@ -598,5 +636,61 @@ impl PlaneTriangulation {
         let mut vis: Visualizer = nodes.into();
         vis.set_edges(edges);
         vis
+    }
+
+    pub fn assemble(self) -> Result<ElementAssemblage, &'static str> {
+        let mat = self.bound.material().ok_or("missing material definition")?;
+
+        // TODO add logic when 1D/3D is implemented
+        let mut res = ElementAssemblage::new(2, mat);
+
+        if let Some(t) = self.bound.thickness() {
+            res.set_thickness(t);
+        }
+
+        let mut vertex_list: Vec<(f64, f64)> = Vec::new();
+        let mut vertex_lookup: HashMap<VIdx, usize> = HashMap::new();
+
+        // translate vertex ids to indices in a now-frozen vertex list
+
+        for id in self.all_vidx() {
+            vertex_lookup.insert(id, vertex_list.len());
+            vertex_list.push(self.get(id).unwrap());
+        }
+
+        res.add_nodes(vertex_list);
+
+        // add all the triangles
+
+        for tri in self.full_tris.into_iter() {
+            // TODO avoid these heap allocations by using elas' triangle insertion method
+            let tri_def = vec![
+                *vertex_lookup.get(&tri.0).unwrap(),
+                *vertex_lookup.get(&tri.1).unwrap(),
+                *vertex_lookup.get(&tri.2).unwrap(),
+            ];
+
+            res.add_element(tri_def);
+        }
+
+        // pull the various boundary conditions through from bound
+
+        for (id, con) in self.bound.all_constraints() {
+            // upgrade the bounds::VIdx to a VIdx
+            let id: VIdx = id.into();
+            res.add_constraint(*vertex_lookup.get(&id).unwrap(), con);
+        }
+
+        for (seg, force) in self.bound.all_distributed_forces() {
+            let edg: Edge = seg.into();
+
+            // break out the two end point indices
+            let a = *vertex_lookup.get(&edg.0).unwrap();
+            let b = *vertex_lookup.get(&edg.1).unwrap();
+
+            res.add_dist_line_force(a, b, force);
+        }
+
+        Ok(res)
     }
 }

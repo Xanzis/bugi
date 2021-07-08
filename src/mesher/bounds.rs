@@ -92,8 +92,16 @@ impl PlaneBoundary {
         self.thickness = Some(t);
     }
 
+    pub fn thickness(&self) -> Option<f64> {
+        self.thickness
+    }
+
     pub fn set_material(&mut self, m: Material) {
         self.material = Some(m);
+    }
+
+    pub fn material(&self) -> Option<Material> {
+        self.material
     }
 
     pub fn store_constraint(&mut self, v: VIdx, c: Constraint) {
