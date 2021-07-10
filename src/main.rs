@@ -3,7 +3,6 @@ use std::convert::From;
 use std::env;
 use std::error::Error;
 use std::fmt;
-use std::fs;
 use std::path;
 
 use bugi::element;
@@ -113,7 +112,7 @@ fn mesh(args: Args) -> Result<(), BugiError> {
         .ok_or(BugiError::arg_error("missing path argument"))?;
     let file_path = path::Path::new(file_path.as_str());
 
-    let mut bnd = file::read_to_bound(file_path)?;
+    let bnd = file::read_to_bound(file_path)?;
 
     // TODO will need to add 3d options when available
     let mut msh = plane::PlaneTriangulation::new(bnd);

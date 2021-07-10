@@ -468,10 +468,6 @@ where
         }
     }
 
-    pub fn avg(&self) -> Option<T> {
-        self.avg.clone()
-    }
-
     pub fn consume(self) -> Option<T> {
         self.avg
     }

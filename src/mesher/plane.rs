@@ -2,7 +2,6 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::convert::{From, Into, TryInto};
 use std::hash::{Hash, Hasher};
-use std::iter;
 
 use crate::element::ElementAssemblage;
 use crate::spatial::predicates::{self, Orient};
@@ -24,18 +23,6 @@ impl VIdx {
     fn is_ghost(&self) -> bool {
         match self {
             VIdx::Ghost => true,
-            _ => false,
-        }
-    }
-    fn is_real(&self) -> bool {
-        match self {
-            VIdx::Real(_) => true,
-            _ => false,
-        }
-    }
-    fn is_bound(&self) -> bool {
-        match self {
-            VIdx::Bound(_) => true,
             _ => false,
         }
     }
@@ -351,29 +338,12 @@ impl PlaneTriangulation {
         }
     }
 
-    fn disp_vertex(&self, v: VIdx) -> String {
-        if let Some(p) = self.get(v) {
-            format!("({:1.4}, {:1.4})", p.0, p.1)
-        } else {
-            "None".to_string()
-        }
-    }
-
-    fn disp_triangle<T: Into<Triangle>>(&self, tri: T) -> String {
-        let tri = tri.into();
-        format!(
-            "Tri {}, {}, {}",
-            self.disp_vertex(tri.0),
-            self.disp_vertex(tri.1),
-            self.disp_vertex(tri.2)
-        )
-    }
-
     fn adjacent<E: Into<Edge>>(&self, e: E) -> Option<VIdx> {
         // return Some(w) if the positively oriented uvw exists
         self.tris.get(&e.into()).cloned()
     }
 
+    #[allow(dead_code)]
     fn adjacent_one(&self, u: VIdx) -> Option<Edge> {
         // return an arbitrary triangle including u, if one exists
         // if u has been part of a recent triangle, return it
@@ -557,8 +527,8 @@ impl PlaneTriangulation {
                     if let Some(tp) = self.get_triangle_points(tri) {
                         vis.add_points(vec![tp.0, tp.1, tp.2], 1);
                     }
-                    vis.draw(format!("err_state.png").as_str(), ());
-                    panic!("error gift-wrapping boundary");
+                    vis.draw("err_state.png", ());
+                    panic!("error gift-wrapping boundary: {}", e);
                 }
                 if !to_finish.remove(&a) {
                     // if a was not in set, add its reverse

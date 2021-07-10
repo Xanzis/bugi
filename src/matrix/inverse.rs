@@ -124,9 +124,6 @@ where
         let mut swap_count = 0;
 
         for i in 0..n {
-            let mut max_a = 0.0;
-            let mut max_i = i;
-
             let (max_i, max_a) = (i..n)
                 .map(|k| (k, a[(k, i)].abs()))
                 .max_by(|&x, &y| x.1.partial_cmp(&y.1).unwrap())

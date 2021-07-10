@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use crate::matrix::{Inverse, LinearMatrix, MatrixError, MatrixLike};
+use crate::matrix::{Inverse, LinearMatrix, MatrixLike};
 
 use super::Point;
 
@@ -25,6 +25,7 @@ pub fn triangle_dir(tri: (Point, Point, Point)) -> Orient {
     }
 }
 
+#[allow(dead_code)]
 pub fn tetrahedron_dir(tet: (Point, Point, Point, Point)) -> Orient {
     // return the orientation of a tetrahedron
     let (a, b, c, d) = tet;
@@ -111,6 +112,7 @@ pub fn in_circle(p: Point, tri: (Point, Point, Point)) -> bool {
     }
 }
 
+#[allow(dead_code)]
 pub fn in_sphere(p: Point, tet: (Point, Point, Point, Point)) -> bool {
     // determine whether p lies within tet's circumsphere
     let (a, b, c, d) = tet;

@@ -8,11 +8,6 @@ use super::FileError;
 
 // parser for a simple boundary definition file
 
-fn parse_error(line_no: usize, text: &'static str) -> FileError {
-    let s = format!("line {}: {}", line_no, text);
-    FileError::BadParse(s)
-}
-
 pub fn lines_to_bounds<'a, T>(mut lines: T) -> Result<PlaneBoundary, FileError>
 where
     T: Iterator<Item = &'a str>,
@@ -27,7 +22,7 @@ where
             continue;
         }
 
-        let mut words: Vec<&str> = line.split(" ").collect();
+        let words: Vec<&str> = line.split(" ").collect();
 
         match words[0] {
             "polygon" => {
@@ -46,7 +41,7 @@ where
                         ended = true;
                         break;
                     }
-                    let mut wds: Vec<&str> = ln.split(" ").collect();
+                    let wds: Vec<&str> = ln.split(" ").collect();
                     if wds.len() == 2 || wds.len() == 3 {
                         if let (Ok(a), Ok(b)) = (wds[0].parse::<f64>(), wds[1].parse::<f64>()) {
                             poly.push((a, b));
