@@ -3,12 +3,13 @@ use std::convert::From;
 use std::env;
 use std::error::Error;
 use std::fmt;
+use std::fs;
 use std::path;
 
-use bugi::file;
-use bugi::visual::{color, VisOptions};
-use bugi::mesher::plane;
 use bugi::element;
+use bugi::file;
+use bugi::mesher::plane;
+use bugi::visual::{color, VisOptions};
 
 const VERSION: &str = "0.1.0";
 
@@ -52,6 +53,7 @@ fn main() -> Result<(), BugiError> {
 
     match args.command.as_str() {
         "linear" => linear(args),
+        "mesh" => mesh(args),
         "" => {
             help();
             Err(BugiError::arg_error("no command supplied"))
@@ -85,8 +87,8 @@ fn linear(args: Args) -> Result<(), BugiError> {
     vis.set_vals(node_vals);
 
     let out_path = match args.arg_val("out") {
-        Some(s) => path::Path::new(&format!("{}.png", s)),
-        None => path::Path::new("out.png"),
+        Some(s) => format!("{}.png", s),
+        None => "out.png".to_string(),
     };
 
     let vis_options: VisOptions = match args.arg_val("colormap") {
@@ -96,13 +98,9 @@ fn linear(args: Args) -> Result<(), BugiError> {
         _ => return Err(BugiError::arg_error("unimplemented colormap name")),
     };
 
-    // TODO following problem can be fixed if draw accepts AsRef<Path>
-    match out_path.to_str() {
-        Some(s) => {
-            vis.draw(s, vis_options);
-        }
-        None => return Err(BugiError::arg_error("out path is not valid unicode")),
-    }
+    // TODO incorporate rust's PATH logic and check path validities
+
+    vis.draw(out_path.as_str(), vis_options);
 
     Ok(())
 }
@@ -110,7 +108,9 @@ fn linear(args: Args) -> Result<(), BugiError> {
 fn mesh(args: Args) -> Result<(), BugiError> {
     // compute a mesh from a boundary definition
     // save a mesh definition file and a mesh visualization
-    let file_path = args.cmd_arg(0).ok_or(BugiError::arg_error("missing path argument"))?;
+    let file_path = args
+        .cmd_arg(0)
+        .ok_or(BugiError::arg_error("missing path argument"))?;
     let file_path = path::Path::new(file_path.as_str());
 
     let mut bnd = file::read_to_bound(file_path)?;
@@ -120,24 +120,33 @@ fn mesh(args: Args) -> Result<(), BugiError> {
 
     let size = match args.arg_val("elementsize") {
         None => Err(BugiError::arg_error("element size not specified")),
-        Some(x) => x.parse::<f64>().or(Err(BugiError::arg_error("could not parse element size"))),
+        Some(x) => x
+            .parse::<f64>()
+            .or(Err(BugiError::arg_error("could not parse element size"))),
     }?;
 
     match args.arg_val("mesher") {
         None | Some("chew") => msh.chew_mesh(size),
-        _ => return Err(BugiError::arg_error("unrecognised mesh algorithm specified")),
+        _ => {
+            return Err(BugiError::arg_error(
+                "unrecognised mesh algorithm specified",
+            ))
+        }
     }
 
     let (vis_out_path, mesh_out_path) = match args.arg_val("out") {
-        Some(s) => (path::Path::new(&format!("{}.png", s)), path::Path::new(&format!("{}.bmsh", s))),
-        None => (path::Path::new("out.png"), path::Path::new("out.bmsh")),
+        Some(s) => (format!("{}.png", s), format!("{}.bmsh", s)),
+        None => ("out.png".to_string(), "out.bmsh".to_string()),
     };
 
+    // TODO add rust Path logic to the save process
+
     let mut vis = msh.visualize();
-    vis.draw(vis_out_path.to_str().ok_or(BugiError::arg_error("bad out path"))?, vec!["im_size=1024"]);
+    vis.draw(vis_out_path.as_str(), vec!["im_size=1024"]);
 
     let elas: element::ElementAssemblage = msh.assemble().map_err(|e| BugiError::run_error(e))?;
-    elas.save(mesh_out_path);
+
+    file::save_elas(mesh_out_path.as_str(), elas);
 
     Ok(())
 }

@@ -192,11 +192,11 @@ impl PlaneTriangulation {
     }
 
     fn all_vidx(&self) -> impl Iterator<Item = VIdx> {
-        // return an iterator over all valid VIdxs
+        // return an iterator over all nonghost VIdxs
         (0..self.vertices.len())
             .map(|x| VIdx::Real(x))
             .chain(self.bound.all_vidx().map(|x| VIdx::Bound(x)))
-            .chain(iter::once(VIdx::Ghost))
+        //    .chain(iter::once(VIdx::Ghost))
     }
 
     fn all_triangles<'a>(&'a self) -> impl Iterator<Item = Triangle> + 'a {

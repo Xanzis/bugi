@@ -46,7 +46,7 @@ where
                         ended = true;
                         break;
                     }
-                    let mut wds: Vec<&str> = line.split(" ").collect();
+                    let mut wds: Vec<&str> = ln.split(" ").collect();
                     if wds.len() == 2 || wds.len() == 3 {
                         if let (Ok(a), Ok(b)) = (wds[0].parse::<f64>(), wds[1].parse::<f64>()) {
                             poly.push((a, b));
@@ -60,9 +60,10 @@ where
                             return Err(FileError::parse("could not parse point values"));
                         }
                     } else {
-                        return Err(FileError::parse(
-                            "expected two or three words on polygon line",
-                        ));
+                        return Err(FileError::parse(format!(
+                            "expected two or three words on polygon line (line {})",
+                            no
+                        )));
                     }
                 }
 

@@ -9,6 +9,7 @@ use crate::matrix::{Average, Inverse, LinearMatrix, MatrixLike};
 use crate::spatial::Point;
 use crate::visual::Visualizer;
 
+use isopar::ElementType;
 use isopar::IsoparElement;
 use loading::Constraint;
 use material::Material;
@@ -97,6 +98,14 @@ impl ElementAssemblage {
         }
     }
 
+    pub fn element_node_idxs(&self) -> Vec<Vec<usize>> {
+        self.elements.iter().map(|e| e.node_idxs()).collect()
+    }
+
+    pub fn element_types(&self) -> Vec<ElementType> {
+        self.elements.iter().map(|e| e.el_type()).collect()
+    }
+
     pub fn add_element(&mut self, node_idxs: Vec<usize>) {
         // el should be an El::blank(), it'll get overwritten
         let el = IsoparElement::new(&self.nodes, node_idxs, self.material());
@@ -121,12 +130,33 @@ impl ElementAssemblage {
     // also allow specification of element subtypes (eg triangular/rectangular)
     // for when it is difficult to infer (six-node triangle or 6-node rectangle?)
 
+    pub fn conc_forces(&self) -> Vec<(usize, Point)> {
+        self.concentrated_forces
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+
     pub fn add_conc_force(&mut self, n: usize, force: Point) {
         self.concentrated_forces.insert(n, force);
     }
 
+    pub fn dist_forces(&self) -> Vec<((usize, usize), Point)> {
+        self.line_forces
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+
     pub fn add_dist_line_force(&mut self, n: usize, m: usize, force: Point) {
         self.line_forces.insert((n, m), force);
+    }
+
+    pub fn constraints(&self) -> Vec<(usize, Constraint)> {
+        self.constraints
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
     }
 
     pub fn add_constraint(&mut self, n: usize, constraint: Constraint) {

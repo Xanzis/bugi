@@ -41,6 +41,12 @@ pub fn read_to_bound<P: AsRef<Path>>(path: P) -> Result<PlaneBoundary, FileError
     }
 }
 
+pub fn save_elas<P: AsRef<Path>>(path: P, elas: ElementAssemblage) {
+    let serialized = bmsh::elas_to_bmsh(elas);
+
+    fs::write(path, serialized).expect("could not write to file");
+}
+
 #[derive(Debug, Clone)]
 pub enum FileError {
     NoExt,

@@ -1,5 +1,6 @@
 use std::convert::TryInto;
 
+use crate::element::isopar::ElementType;
 use crate::element::loading::Constraint;
 use crate::element::material::{Material, AL6061};
 use crate::element::ElementAssemblage;
@@ -19,6 +20,8 @@ enum ReadState {
     Constraints { in_body: bool },
     ForceStart,
     Forces { in_body: bool },
+    DistForceStart,
+    DistForces { in_body: bool },
     End,
 }
 
@@ -45,6 +48,8 @@ pub fn lines_to_elas<'a, T: Iterator<Item = &'a str>>(
     let mut constraints: Vec<(usize, Constraint)> = Vec::new();
     let mut force_count = 0;
     let mut forces: Vec<(usize, Point)> = Vec::new();
+    let mut dist_force_count = 0;
+    let mut dist_forces: Vec<(usize, usize, Point)> = Vec::new();
 
     let mut state = ReadState::Start;
 
@@ -217,7 +222,7 @@ pub fn lines_to_elas<'a, T: Iterator<Item = &'a str>>(
                         if forces.len() != force_count {
                             return Err(parse_error(no, "did not read specified force count"));
                         }
-                        ReadState::End
+                        ReadState::DistForceStart
                     } else {
                         let (id, p) = id_and_point(no, line)?;
                         if id >= nodes.len() {
@@ -228,6 +233,43 @@ pub fn lines_to_elas<'a, T: Iterator<Item = &'a str>>(
                         }
                         forces.push((id, p));
                         ReadState::Forces { in_body: true }
+                    }
+                }
+            },
+            ReadState::DistForceStart => {
+                if line != "$DistForces" {
+                    return Err(parse_error(no, "expected $DistForces"));
+                }
+                ReadState::DistForces { in_body: false }
+            }
+            ReadState::DistForces { in_body } => match in_body {
+                false => {
+                    let (n, v) = name_and_num(no, line)?;
+                    if n != "count" {
+                        return Err(parse_error(no, "expected count"));
+                    }
+                    dist_force_count = v;
+                    ReadState::DistForces { in_body: true }
+                }
+                true => {
+                    if line == "$EndDistForces" {
+                        if dist_forces.len() != dist_force_count {
+                            return Err(parse_error(
+                                no,
+                                "did not read specified distributed force count",
+                            ));
+                        }
+                        ReadState::End
+                    } else {
+                        let (ida, idb, p) = id_id_and_point(no, line)?;
+                        if ida >= nodes.len() || idb >= nodes.len() {
+                            return Err(parse_error(
+                                no,
+                                "force refers to out-of-bounds node index",
+                            ));
+                        }
+                        dist_forces.push((ida, idb, p));
+                        ReadState::DistForces { in_body: true }
                     }
                 }
             },
@@ -265,7 +307,97 @@ pub fn lines_to_elas<'a, T: Iterator<Item = &'a str>>(
         elas.add_conc_force(n, frc);
     }
 
+    for (na, nb, frc) in dist_forces.into_iter() {
+        elas.add_dist_line_force(na, nb, frc);
+    }
+
     Ok(elas)
+}
+
+pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
+    // construct a bmsh representation of the elas for dumping to file
+    // assumes elas is properly constructed and panics otherwise
+
+    let dim = elas.dim();
+
+    let mut res = "$Header\nversion 1".to_string();
+    res += &format!("\ndim {}", dim);
+    res += &format!("\nmaterial {}", elas.material().to_string());
+    if let Some(t) = elas.thickness() {
+        res += &format!("\nthickness {}", t);
+    }
+    if let Some(a) = elas.area() {
+        res += &format!("\narea {}", a);
+    }
+    res += "\n$EndHeader\n\n$Nodes";
+
+    let nodes = elas.nodes();
+    res += &format!("\ncount {}", nodes.len());
+    for (i, n) in nodes.into_iter().enumerate() {
+        match dim {
+            1 => res += &format!("\n{} {:.6}", i, n[0]),
+            2 => res += &format!("\n{} {:.6}/{:.6}", i, n[0], n[1]),
+            3 => res += &format!("\n{} {:.6}/{:.6}/{:.6}", i, n[0], n[1], n[2]),
+            _ => unreachable!(),
+        }
+    }
+    res += "\n$EndNodes\n\n$Elements";
+
+    let e_node_idxs = elas.element_node_idxs();
+    let e_types = elas.element_types();
+    res += &format!("\ncount {}", e_types.len());
+    for (i, (en, et)) in e_node_idxs.into_iter().zip(e_types.into_iter()).enumerate() {
+        res += &format!("\n{} ", i);
+
+        let type_id = match et {
+            ElementType::Bar2Node => 1,
+            ElementType::Triangle3Node => 2,
+            _ => panic!("unsupported element type for bmsh output"),
+        };
+
+        res += &format!("{} {}", type_id, en.get(0).expect("no 0 node elements"));
+        for n in en.into_iter().skip(1) {
+            res += &format!("/{}", n);
+        }
+    }
+    res += "\n$EndElements\n\n$Constraints";
+
+    let cons = elas.constraints();
+    res += &format!("\ncount {}", cons.len());
+    for (n, con) in cons {
+        // TODO update the '0' when more constraint types are available
+        res += &format!("\n{} 0 {}", n, if con.plain_dim_struck(0) { 1 } else { 0 });
+
+        // TODO fix constraint reader to accept 2 and 1-dim assemblage constraints
+        for i in 1..3 {
+            res += if con.plain_dim_struck(i) { "/1" } else { "/0" };
+        }
+    }
+    res += "\n$EndConstraints\n\n$Forces";
+
+    let forces = elas.conc_forces();
+    res += &format!("\ncount {}", forces.len());
+    for (n, frc) in forces {
+        res += &format!("\n{} {:.3}", n, frc[0]);
+
+        for i in (0..dim).skip(1) {
+            res += &format!("/{:.3}", frc[i]);
+        }
+    }
+    res.push_str("\n$EndForces\n\n$DistForces");
+
+    let dist_forces = elas.dist_forces();
+    res += &format!("\ncount {}", dist_forces.len());
+    for ((na, nb), frc) in dist_forces {
+        res += &format!("\n{} {} {:.3}", na, nb, frc[0]);
+
+        for i in (0..dim).skip(1) {
+            res += &format!("/{:.3}", frc[i]);
+        }
+    }
+    res += "\n$EndDistForces";
+
+    res
 }
 
 fn name_and_num<'a>(no: usize, line: &'a str) -> Result<(&'a str, usize), FileError> {
@@ -330,6 +462,40 @@ fn id_and_point(no: usize, line: &str) -> Result<(usize, Point), FileError> {
         .or(Err(parse_error(no, "couldn't assemble Point")))?;
 
     Ok((id, p))
+}
+
+fn id_id_and_point(no: usize, line: &str) -> Result<(usize, usize, Point), FileError> {
+    // convert <id x/y/z> to (id, Point)
+    let mut l_split = line.split(" ");
+    let ida = l_split
+        .next()
+        .ok_or(parse_error(no, "expected id"))?
+        .parse::<usize>()
+        .or(Err(parse_error(no, "bad uint")))?;
+
+    let idb = l_split
+        .next()
+        .ok_or(parse_error(no, "expected id"))?
+        .parse::<usize>()
+        .or(Err(parse_error(no, "bad uint")))?;
+
+    let vals_str = l_split
+        .next()
+        .ok_or(parse_error(no, "expected float series"))?;
+    let mut vals: Vec<f64> = Vec::new();
+    for val_str in vals_str.split("/") {
+        vals.push(
+            val_str
+                .parse::<f64>()
+                .or(Err(parse_error(no, "bad float")))?,
+        );
+    }
+
+    let p: Point = vals
+        .try_into()
+        .or(Err(parse_error(no, "couldn't assemble Point")))?;
+
+    Ok((ida, idb, p))
 }
 
 fn id_type_and_list(no: usize, line: &str) -> Result<(usize, u8, Vec<usize>), FileError> {
@@ -423,7 +589,11 @@ fn make_material(no: usize, mat: &str) -> Result<Material, FileError> {
 // <node id> <ASCII float x val>/<y val if applicable>/<z val if applicable>
 // ...
 // $EndForces
-//
+// $DistForces
+// count <ASCII uint, number of forces>
+// <node id a> <node id b> <ASCII float x val>/<y val if applicable>/<z val if applicable>
+// ...
+// $EndDistForces
 // ~~file end~~
 //
 // Element types: (only showing those so far implemented)

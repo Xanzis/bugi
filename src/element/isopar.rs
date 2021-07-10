@@ -144,6 +144,10 @@ impl IsoparElement {
         self.node_idxs.len()
     }
 
+    pub fn el_type(&self) -> ElementType {
+        self.el_type.clone()
+    }
+
     fn global_to_own_idx(&self, i: usize) -> Option<usize> {
         // convert a node index in the global list to an index in the local one
         // TODO this is slow

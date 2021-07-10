@@ -14,15 +14,18 @@ pub enum ProblemType {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Material {
+    name: &'static str,
     youngs: f64,
     poisson: f64,
 }
 
 pub const AL6061: Material = Material {
+    name: "AL6061",
     youngs: 6.89e10,
     poisson: 0.33,
 };
 pub const TEST: Material = Material {
+    name: "TEST",
     youngs: 1.0,
     poisson: 0.0,
 };
@@ -136,5 +139,11 @@ impl FromStr for Material {
             _ => return Err(()),
         };
         Ok(mat)
+    }
+}
+
+impl ToString for Material {
+    fn to_string(&self) -> String {
+        self.name.to_string()
     }
 }
