@@ -1,0 +1,16 @@
+polygon
+0 0 a
+5 0
+5.5 -1 c
+6.5 -1 d
+7 0
+15 0
+15 1 f
+10 1 e
+0 1 b
+end
+thickness 0.2
+material AL6061
+distributed_constraint a b xy
+distributed_constraint c d y
+distributed_force e f 0 -10000
