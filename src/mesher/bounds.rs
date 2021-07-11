@@ -235,26 +235,31 @@ impl PlaneBoundary {
 
         // move along, adding new points and segments
         for _ in 0..((num as i64) - 1) {
-            let new_point_idx = self.store_vertex(new_point);
-            self.store_segment_unchecked((cur, new_point_idx));
+            let new_point_id = self.store_vertex(new_point);
+            self.store_segment_unchecked((cur, new_point_id));
 
             // if there are distributed attributes, insert them
             if let Some(f) = dist_f {
                 self.distributed_forces
-                    .insert((cur, new_point_idx).into(), f);
+                    .insert((cur, new_point_id).into(), f);
             }
 
             if let Some(c) = dist_c {
                 self.distributed_constraints
-                    .insert((cur, new_point_idx).into(), c);
+                    .insert((cur, new_point_id).into(), c);
 
                 // distributed constraints are just bookkeeping
                 // they mark segments where new points should have cosntraints
-                self.constraints.insert(new_point_idx, c);
+                self.constraints.insert(new_point_id, c);
             }
 
-            cur = new_point_idx;
+            cur = new_point_id;
             new_point = new_point + leg;
+        }
+
+        if let Some(c) = dist_c {
+            self.constraints.insert(start, c);
+            self.constraints.insert(end, c);
         }
 
         self.store_segment_unchecked((cur, end));
