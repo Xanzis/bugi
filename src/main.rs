@@ -97,6 +97,9 @@ fn linear(args: Args) -> Result<(), BugiError> {
         _ => return Err(BugiError::arg_error("unimplemented colormap name")),
     };
 
+    // TODO allow manual specification of image size
+    let vis_options = vis_options.with(vec!["im_size=2048"]);
+
     // TODO incorporate rust's PATH logic and check path validities
 
     vis.draw(out_path.as_str(), vis_options);

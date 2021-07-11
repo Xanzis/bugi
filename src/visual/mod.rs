@@ -31,6 +31,21 @@ impl VisOptions {
         res.color_map = Some(map);
         res
     }
+
+    pub fn with<T: Into<VisOptions>>(self, other: T) -> Self {
+        // overwrite any specified options
+        let other = other.into();
+
+        let mut res = self;
+        if let Some(cm) = other.color_map {
+            res.color_map = Some(cm);
+        }
+        if let Some(is) = other.im_size {
+            res.im_size = Some(is);
+        }
+
+        res
+    }
 }
 
 impl From<()> for VisOptions {
