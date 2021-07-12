@@ -1,0 +1,61 @@
+name: bugi
+version: "0.1.0"
+author: Xander H.
+about: a finite element solver
+subcommands:
+    - mesh:
+        about: generate a mesh from a body boundary definition
+        args:
+            - INPUT:
+                help: body boundary specification, must currently be .bbnd file
+                required: true
+                index: 1
+            - mesher:
+                short: m
+                long: mesher
+                value_name: NAME
+                help: select the mesher algorithm, default is chew
+                takes_value: true
+            - elementsize:
+                short: s
+                long: elementsize
+                value_name: FLOAT
+                help: specify the global element size criterion
+                takes_value: true
+                required: true
+            - imageout:
+                short: I
+                long: imageout
+                value_name: FILE
+                help: path to save the mesh image
+                takes_value: true
+            - meshout:
+                short: M
+                long: meshout
+                value_name: FILE
+                help: path to save the mesh file
+                takes_value: true
+    - linear:
+        about: compute a linear elastic response for the given body mesh file
+        args:
+            - INPUT:
+                help: body mesh specification, must currently be .bmsh file
+                required: true
+                index: 1
+            - colormap:
+                short: c
+                long: colormap
+                value_name: NAME
+                help: set the color map for graphic outputs; options are hot, rgb
+                takes_value: true
+            - nodevalue:
+                short: n
+                long: nodevalue
+                value_name: NAME
+                help: select the node value type to visualize; options are displacement, vonmises
+                takes_value: true
+            - out:
+                short: o
+                long: out
+                value_name: FILE
+                help: select the result image path
