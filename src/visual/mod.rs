@@ -21,7 +21,7 @@ pub struct VisOptions {
 impl VisOptions {
     pub fn new() -> Self {
         Self {
-            color_map: Some(color::hot_map_boxed()),
+            color_map: None,
             im_size: None,
         }
     }

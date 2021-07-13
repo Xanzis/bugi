@@ -35,6 +35,12 @@ subcommands:
                 value_name: FILE
                 help: path to save the mesh file
                 takes_value: true
+            - imsize:
+                short: i
+                long: imsize
+                value_name: INT
+                help: specify the size of the output image in pixels
+                takes_value: true
     - linear:
         about: compute a linear elastic response for the given body mesh file
         args:
@@ -59,3 +65,16 @@ subcommands:
                 long: out
                 value_name: FILE
                 help: select the result image path
+                takes_value: true
+            - scale:
+                short: s
+                long: scale
+                value_name: FLOAT
+                help: specify the displacement exaggeration factor in the output image
+                takes_value: true
+            - imsize:
+                short: i
+                long: imsize
+                value_name: INT
+                help: specify the size of the output image in pixels
+                takes_value: true

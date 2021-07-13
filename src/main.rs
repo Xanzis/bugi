@@ -38,7 +38,10 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
     elas.calc_displacements();
 
-    let mut vis = elas.visualize(50.0);
+    let scale = args.value_of("imsize")
+        .unwrap_or("50.0").parse::<f64>()
+        .map_err(|_| BugiError::arg_error("could not parse displacement scale argument"))?;
+    let mut vis = elas.visualize(scale);
 
     let node_vals = match args.value_of("nodevalue") {
         None | Some("displacement") => elas.displacement_norms().unwrap(),
@@ -58,7 +61,10 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     };
 
     // TODO allow manual specification of image size
-    let vis_options = vis_options.with(vec!["im_size=2048"]);
+    let im_size = args.value_of("imsize")
+        .unwrap_or("1024").parse::<usize>()
+        .map_err(|_| BugiError::arg_error("could not parse image size argument"))?;
+    let vis_options = vis_options.with(vec![format!("im_size={}", im_size)]);
 
     // TODO incorporate rust's PATH logic and check path validities
 
@@ -99,7 +105,12 @@ fn mesh<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     // TODO add rust Path logic to the save process
 
     let mut vis = msh.visualize();
-    vis.draw(vis_out_path.as_str(), vec!["im_size=1024"]);
+
+    let im_size = args.value_of("imsize")
+        .unwrap_or("1024").parse::<usize>()
+        .map_err(|_| BugiError::arg_error("could not parse image size argument"))?;
+
+    vis.draw(vis_out_path.as_str(), vec![format!("im_size={}", im_size)]);
 
     let elas: element::ElementAssemblage = msh.assemble().map_err(|e| BugiError::run_error(e))?;
 
