@@ -1,6 +1,6 @@
 use super::inverse::Inverse;
 use super::norm::Norm;
-use super::{LinearMatrix, LowerTriangular, MatrixLike, UpperTriangular};
+use super::{LinearMatrix, LowerTriangular, MatrixLike, UpperTriangular, CompressedRow};
 
 #[test]
 fn linear_constructors() {
@@ -22,6 +22,7 @@ fn linear_constructors() {
     x[(2, 1)] = 0.0;
     assert_eq!(x[(2, 1)], 0.0);
 }
+
 #[test]
 fn linear_ops() {
     // check the standard matrix operations for linear matrices
@@ -47,6 +48,7 @@ fn linear_ops() {
     let target = LinearMatrix::from_flat((2, 2), vec![6.0, 8.0, 10.0, 12.0]);
     assert_eq!(a, target);
 }
+
 #[test]
 fn linear_disp() {
     let target = "rows: 1 cols: 2\n1.00000 2.00000 \n";
@@ -54,6 +56,7 @@ fn linear_disp() {
     println!("{}", mat);
     assert_eq!(format!("{}", mat), target)
 }
+
 #[test]
 fn linear_transpose() {
     let mut a = LinearMatrix::from_flat((2, 3), vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
@@ -61,6 +64,7 @@ fn linear_transpose() {
     let b = LinearMatrix::from_flat((3, 2), vec![1.0, 4.0, 2.0, 5.0, 3.0, 6.0]);
     assert_eq!(a, b);
 }
+
 #[test]
 fn linear_swaps() {
     let mut a = LinearMatrix::from_flat((2, 2), vec![1.0, 2.0, 3.0, 4.0]);
@@ -71,6 +75,7 @@ fn linear_swaps() {
     a.swap_cols(0, 1);
     assert_eq!(a, target_b);
 }
+
 #[test]
 fn iterators() {
     let a = LinearMatrix::from_flat((2, 2), vec![1.0, 2.0, 3.0, 4.0]);
@@ -81,6 +86,7 @@ fn iterators() {
         vec![1.0, 2.0, 3.0, 4.0]
     );
 }
+
 #[test]
 fn dots() {
     let a = LinearMatrix::from_flat(2, vec![1.0, 2.0, 3.0, 4.0]);
@@ -104,6 +110,7 @@ fn solve_gauss() {
     let target_x = LinearMatrix::from_flat((2, 1), vec![-4.0, 4.5]);
     assert!((&x - &target_x).frobenius() < 1e-10);
 }
+
 #[test]
 fn lu_decompose() {
     let a = LinearMatrix::from_flat((2, 2), vec![4.0, 3.0, 6.0, 3.0]);
@@ -115,11 +122,13 @@ fn lu_decompose() {
     let regen: LinearMatrix = l.mul(&u);
     assert!((&a - &regen).frobenius() < 1e-10);
 }
+
 #[test]
 fn determinant() {
     let a = LinearMatrix::from_flat((2, 2), vec![3.0, 8.0, 4.0, 6.0]);
     assert!((a.det_lu() + 14.0).abs() < 1e-10);
 }
+
 #[test]
 fn triangulars() {
     let mut a = LowerTriangular::zeros(3);
@@ -134,18 +143,21 @@ fn triangulars() {
     b[(1, 2)] = 3.0;
     assert_eq!(b[(1, 2)], 3.0);
 }
+
 #[test]
 #[should_panic]
 fn triangular_l_oob() {
     let mut a = LowerTriangular::zeros(2);
     a[(0, 1)] = 2.0;
 }
+
 #[test]
 #[should_panic]
 fn triangular_u_oob() {
     let mut a = UpperTriangular::zeros(2);
     a[(1, 0)] = 2.0;
 }
+
 #[test]
 fn triangular_l_sub() {
     let mut a = LowerTriangular::eye(4);
@@ -158,6 +170,7 @@ fn triangular_l_sub() {
     let target = LinearMatrix::from_flat((4, 1), vec![1.0, 0.0, 2.0, -33.0]);
     assert!((&x - &target).frobenius() < 1.0e-10);
 }
+
 #[test]
 fn triangular_u_sub() {
     let mut a = UpperTriangular::zeros(3);
@@ -171,6 +184,7 @@ fn triangular_u_sub() {
     let target = LinearMatrix::from_flat((3, 1), vec![1.0, 2.0, 3.0]);
     assert!((&x - &target).frobenius() < 1.0e-10);
 }
+
 #[test]
 fn lu_inverses() {
     let mut a = LowerTriangular::eye(3);
@@ -190,6 +204,7 @@ fn lu_inverses() {
     let target = LinearMatrix::eye(3);
     assert!((&i - &target).frobenius() < 1.0e-10);
 }
+
 #[test]
 fn inverses() {
     let a = LinearMatrix::from_flat((1, 1), vec![2.0]);
@@ -209,4 +224,15 @@ fn inverses() {
     let i: LinearMatrix = a.mul(&a_inv);
     let eye = LinearMatrix::eye(3);
     assert!((&i - &eye).frobenius() < 1.0e-10);
+}
+
+#[test]
+fn sparse_cr() {
+    let a = CompressedRow::from_flat((2, 3), vec![2.0, 0.0, 1.0, 0.0, 3.0, 0.0]);
+    let b = CompressedRow::from_flat((3, 1), vec![1.0, 2.0, 0.0]);
+
+    let target = CompressedRow::from_flat((2, 1), vec![2.0, 6.0]);
+
+    let prod: CompressedRow = a.mul(&b);
+    assert_eq!(target, prod);
 }
