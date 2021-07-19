@@ -7,6 +7,7 @@ use std::ops::{Add, Div, Index, IndexMut, Mul};
 pub mod buffer;
 pub mod inverse;
 pub mod norm;
+pub mod sparse;
 pub use inverse::Inverse;
 pub use norm::Norm;
 
@@ -14,6 +15,7 @@ pub use norm::Norm;
 mod tests;
 
 pub use buffer::{LinearMatrix, LowerTriangular, UpperTriangular};
+pub use sparse::CompressedRow;
 //type Matrix = LinearMatrix; // default implementation
 
 // rolling my own (pretty limited) matrix math
