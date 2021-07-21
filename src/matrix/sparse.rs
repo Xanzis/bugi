@@ -45,7 +45,8 @@ impl CompressedRow {
 		return Entry::Zero
 	}
 
-	fn non_zero_count(&self) -> usize {
+	#[allow(dead_code)]
+	pub fn non_zero_count(&self) -> usize {
 		// number of nonzero entries, also len of data and col_indices
 		self.nz_count
 	}
@@ -119,6 +120,40 @@ impl MatrixLike for CompressedRow {
             col_indices,
             row_starts,
         }
+    }
+
+    // specialized mul, taking advantage of sparsity
+
+    fn mul<T: MatrixLike, U: MatrixLike>(&self, other: &T) -> U {
+        let a_shape = self.shape();
+        let b_shape = other.shape();
+
+        if a_shape.1 != b_shape.0 {
+            panic!(
+                "improper shapes for matrix multiplication: {:?} and {:?}",
+                a_shape, b_shape
+            )
+        }
+
+        let res_shape = (a_shape.0, b_shape.1);
+        let mut res_vals = Vec::with_capacity(res_shape.0 * res_shape.1);
+
+        for r in 0..res_shape.0 {
+            for c in 0..res_shape.1 {
+            	let row_begin = self.row_starts[r];
+            	let row_end = self.row_starts.get(r + 1)
+            		.cloned()
+            		.unwrap_or(self.data.len());
+
+            	let dot = (row_begin..row_end)
+            		.map(|i| self.data[i] * other[(self.col_indices[i], c)])
+            		.sum();
+
+                res_vals.push(dot);
+            }
+        }
+
+        U::from_flat(res_shape, res_vals)
     }
 }
 
