@@ -38,8 +38,10 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
     elas.calc_displacements();
 
-    let scale = args.value_of("imsize")
-        .unwrap_or("50.0").parse::<f64>()
+    let scale = args
+        .value_of("imsize")
+        .unwrap_or("50.0")
+        .parse::<f64>()
         .map_err(|_| BugiError::arg_error("could not parse displacement scale argument"))?;
     let mut vis = elas.visualize(scale);
 
@@ -61,8 +63,10 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     };
 
     // TODO allow manual specification of image size
-    let im_size = args.value_of("imsize")
-        .unwrap_or("1024").parse::<usize>()
+    let im_size = args
+        .value_of("imsize")
+        .unwrap_or("1024")
+        .parse::<usize>()
         .map_err(|_| BugiError::arg_error("could not parse image size argument"))?;
     let vis_options = vis_options.with(vec![format!("im_size={}", im_size)]);
 
@@ -106,8 +110,10 @@ fn mesh<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
     let mut vis = msh.visualize();
 
-    let im_size = args.value_of("imsize")
-        .unwrap_or("1024").parse::<usize>()
+    let im_size = args
+        .value_of("imsize")
+        .unwrap_or("1024")
+        .parse::<usize>()
         .map_err(|_| BugiError::arg_error("could not parse image size argument"))?;
 
     vis.draw(vis_out_path.as_str(), vec![format!("im_size={}", im_size)]);
