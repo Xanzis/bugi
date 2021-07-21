@@ -215,13 +215,13 @@ impl<'a> Iterator for Row<'a> {
     type Item = (usize, f64);
 
     fn next(&mut self) -> Option<(usize, f64)> {
+        if self.cur >= self.end {
+            return None
+        }
+
         let val = self.source.data[self.cur];
         let col = self.source.col_indices[self.cur];
-        if self.cur >= self.end {
-            None
-        } else {
-            self.cur += 1;
-            Some((col, val))
-        }
+        self.cur += 1;
+        Some((col, val))
     }
 }
