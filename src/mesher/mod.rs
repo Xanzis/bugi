@@ -133,7 +133,6 @@ mod tests {
     fn distributed() {
         use super::bounds;
         use crate::element::loading::Constraint;
-        use crate::spatial::Point;
 
         let mut bound = bounds::PlaneBoundary::new();
 
@@ -159,7 +158,7 @@ mod tests {
         let has_con = bound
             .all_constraints()
             .into_iter()
-            .map(|(vid, con)| bound.get(vid).unwrap())
+            .map(|(vid, _)| bound.get(vid).unwrap())
             .any(|x| x == (0.5, 0.0));
         assert!(has_con);
 
@@ -167,12 +166,12 @@ mod tests {
         let fwd = bound
             .all_distributed_forces()
             .into_iter()
-            .map(|(s, f)| (s.0, bound.get(s.1).unwrap()))
+            .map(|(s, _)| (s.0, bound.get(s.1).unwrap()))
             .any(|(sa, sb_val)| sa == c && sb_val == (0.5, 1.0));
         let rev = bound
             .all_distributed_forces()
             .into_iter()
-            .map(|(s, f)| (s.1, bound.get(s.0).unwrap()))
+            .map(|(s, _)| (s.1, bound.get(s.0).unwrap()))
             .any(|(sa, sb_val)| sa == c && sb_val == (0.5, 1.0));
         assert!(fwd || rev);
     }
