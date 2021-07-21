@@ -216,7 +216,7 @@ impl<'a> Iterator for Row<'a> {
 
     fn next(&mut self) -> Option<(usize, f64)> {
         if self.cur >= self.end {
-            return None
+            return None;
         }
 
         let val = self.source.data[self.cur];

@@ -1,6 +1,6 @@
 use super::inverse::Inverse;
 use super::norm::Norm;
-use super::{LinearMatrix, LowerTriangular, MatrixLike, UpperTriangular, CompressedRow};
+use super::{CompressedRow, LinearMatrix, LowerTriangular, MatrixLike, UpperTriangular};
 
 #[test]
 fn linear_constructors() {
