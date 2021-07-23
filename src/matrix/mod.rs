@@ -9,6 +9,7 @@ pub mod inverse;
 pub mod norm;
 pub mod solve;
 pub mod sparse;
+pub mod graph;
 pub use inverse::Inverse;
 pub use norm::Norm;
 

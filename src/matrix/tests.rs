@@ -1,5 +1,6 @@
 use super::inverse::Inverse;
 use super::norm::Norm;
+use super::graph::Graph;
 use super::{CompressedRow, LinearMatrix, LowerTriangular, MatrixLike, UpperTriangular};
 
 #[test]
@@ -235,4 +236,12 @@ fn sparse_cr() {
 
     let prod: CompressedRow = a.mul(&b);
     assert_eq!(target, prod);
+}
+
+#[test]
+fn graph_peripheral() {
+    let mut g = Graph::from_lol(vec![vec![1], vec![0, 2, 5], vec![1, 3, 5], vec![2, 4, 7], vec![3, 7], vec![1, 2, 6], vec![5, 7], vec![3, 4, 6]]);
+
+    assert_eq!(g.far_node(2), (0, 2));
+    assert_eq!(g.pseudo_peripheral(), 0);
 }
