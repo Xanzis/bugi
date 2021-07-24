@@ -11,6 +11,10 @@ enum Entry<T: Debug> {
     Data(T),
 }
 
+// sparse matrix struct definitions
+
+// compressed row matrix storage
+// rows are contiguous pairs of values and column indices
 #[derive(Debug, Clone, PartialEq)]
 pub struct CompressedRow {
     shape: (usize, usize),
@@ -19,6 +23,18 @@ pub struct CompressedRow {
     col_indices: Vec<usize>,
     row_starts: Vec<usize>,
 }
+
+// lower triangular row enelope matrix storage
+// stores the shortest possible row segments left of the diagonal
+#[derive(Debug, Clone, PartialEq)]
+pub struct LowerRowEnvelope {
+    n: usize,
+    data: Vec<f64>,
+    row_nnz: Vec<usize>,
+    row_starts: Vec<usize>,
+}
+
+// specific implementations
 
 impl CompressedRow {
     fn pos(&self, loc: (usize, usize)) -> Entry<usize> {
@@ -52,7 +68,7 @@ impl CompressedRow {
         self.nz_count
     }
 
-    pub fn row_nzs(&self, row: usize) -> Row {
+    pub fn row_nzs(&self, row: usize) -> CompressedRowRow {
         let rstart = self.row_starts[row];
         // rend is one after last row entry
         let rend = self
@@ -61,13 +77,77 @@ impl CompressedRow {
             .cloned()
             .unwrap_or(self.nz_count);
 
-        Row {
+        CompressedRowRow {
             source: &self,
             cur: rstart,
             end: rend,
         }
     }
 }
+
+impl LowerRowEnvelope {
+    fn pos(&self, loc: (usize, usize)) -> Entry<usize> {
+        let (row, col) = loc;
+
+        // TODO add methods for lookup that use fewer comparisons
+        // or take advantage of structure with method for cheap slices
+
+        if row >= self.n || col >= self.n {
+            return Entry::Oob;
+        }
+
+        if col > row {
+            return Entry::Zero;
+        }
+
+        if self.row_nnz[row] == 0 {
+            return Entry::Zero;
+        }
+
+        let nnz_offset = self.row_nnz[row] - 1;
+        // column of the first element of this row's contiguous values
+        let start_col = row - nnz_offset;
+
+        if col < start_col {
+            return Entry::Zero;
+        }
+
+        let offset = col - start_col;
+        Entry::Data(self.row_starts[row] + offset)
+    }
+
+    pub fn from_envelope(env: Vec<usize>) -> Self {
+        let n = env.len();
+
+        if env.iter().enumerate().any(|(r, &x)| x > r + 1) {
+            panic!("envelope row oversized for lower triangular matrix")
+        }
+
+        let data = vec![0.0; env.iter().cloned().sum()];
+
+        let mut row_starts = vec![0];
+        for x in env.iter().cloned() {
+            row_starts.push(row_starts.last().unwrap() + x);
+        }
+
+        row_starts.pop();
+
+        LowerRowEnvelope {
+            n,
+            data,
+            row_nnz: env,
+            row_starts,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn non_zero_count(&self) -> usize {
+        // includes zeros within the envelope
+        self.data.len()
+    }
+}
+
+// matrixlike implementations
 
 impl MatrixLike for CompressedRow {
     fn shape(&self) -> (usize, usize) {
@@ -178,6 +258,105 @@ impl MatrixLike for CompressedRow {
     }
 }
 
+impl MatrixLike for LowerRowEnvelope {
+    fn shape(&self) -> (usize, usize) {
+        (self.n, self.n)
+    }
+
+    fn get(&self, loc: (usize, usize)) -> Option<&f64> {
+        match self.pos(loc) {
+            Entry::Data(i) => unsafe { Some(self.data.get_unchecked(i)) },
+            Entry::Zero => Some(&0.0),
+            Entry::Oob => None,
+        }
+    }
+
+    fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64> {
+        if let Entry::Data(i) = self.pos(loc) {
+            unsafe { Some(self.data.get_unchecked_mut(i)) }
+        } else {
+            None
+        }
+    }
+
+    fn transpose(&mut self) {
+        unimplemented!()
+    }
+
+    fn zeros<T: Into<MatrixShape>>(_shape: T) -> Self {
+        // will never want this, always want to initialize with envelope
+        unimplemented!()
+    }
+
+    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, vals: U) -> Self {
+        // this implementation is expensive and shouldn't be used at scale
+
+        let shape: MatrixShape = shape.into();
+        if shape.nrow != shape.ncol {
+            panic!("non-square triangular matrix requested");
+        }
+        let n = shape.ncol;
+
+        let mut vals = vals.into_iter();
+
+        let mut envelope: Vec<usize> = Vec::new();
+        let mut to_set: Vec<((usize, usize), f64)> = Vec::new();
+
+        for row in 0..n {
+            let mut in_env = false;
+            let mut row_nnz = 0;
+
+            for col in 0..n {
+                let val = vals
+                    .next()
+                    .expect("supplied iterator contains too few elements");
+
+                // woo logic
+                if in_env {
+                    if col > row {
+                        if val != 0.0 {
+                            panic!("nonzero in upper triangle")
+                        }
+
+                        in_env = false;
+                    } else {
+                        row_nnz += 1;
+                        to_set.push(((row, col), val));
+                    }
+                } else {
+                    if col > row {
+                        if val != 0.0 {
+                            panic!("nonzero in upper triangle")
+                        }
+                    } else {
+                        if val != 0.0 {
+                            row_nnz += 1;
+                            to_set.push(((row, col), val));
+                            in_env = true;
+                        }
+                    }
+                }
+            }
+
+            envelope.push(row_nnz);
+        }
+
+        println!("{:?}", envelope);
+
+        let mut res = LowerRowEnvelope::from_envelope(envelope);
+
+        println!("{:?}", to_set);
+
+        for (loc, val) in to_set {
+            res[loc] = val;
+        }
+
+        res
+    }
+}
+
+// trait implementations to satisfy matrixlike bounds
+
 impl fmt::Display for CompressedRow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.disp())
@@ -205,13 +384,40 @@ impl IndexMut<(usize, usize)> for CompressedRow {
     }
 }
 
-pub struct Row<'a> {
+impl fmt::Display for LowerRowEnvelope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.disp())
+    }
+}
+
+impl Index<(usize, usize)> for LowerRowEnvelope {
+    type Output = f64;
+    fn index(&self, loc: (usize, usize)) -> &Self::Output {
+        match self.pos(loc) {
+            Entry::Data(i) => unsafe { self.data.get_unchecked(i) },
+            Entry::Zero => &0.0,
+            Entry::Oob => panic!("matrix index out of bounds"),
+        }
+    }
+}
+
+impl IndexMut<(usize, usize)> for LowerRowEnvelope {
+    fn index_mut(&mut self, loc: (usize, usize)) -> &mut Self::Output {
+        match self.pos(loc) {
+            Entry::Data(i) => unsafe { self.data.get_unchecked_mut(i) },
+            Entry::Zero => panic!("indexmut value insertion is unimplemented for LowerRowEnvelope"),
+            Entry::Oob => panic!("matrix index out of bounds"),
+        }
+    }
+}
+
+pub struct CompressedRowRow<'a> {
     source: &'a CompressedRow,
     cur: usize,
     end: usize,
 }
 
-impl<'a> Iterator for Row<'a> {
+impl<'a> Iterator for CompressedRowRow<'a> {
     type Item = (usize, f64);
 
     fn next(&mut self) -> Option<(usize, f64)> {

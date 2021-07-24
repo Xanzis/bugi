@@ -1,7 +1,9 @@
 use super::graph::Graph;
 use super::inverse::Inverse;
 use super::norm::Norm;
-use super::{CompressedRow, LinearMatrix, LowerTriangular, MatrixLike, UpperTriangular};
+use super::{
+    CompressedRow, LinearMatrix, LowerRowEnvelope, LowerTriangular, MatrixLike, UpperTriangular,
+};
 
 #[test]
 fn linear_constructors() {
@@ -269,4 +271,27 @@ fn graph_rcm() {
     ]);
 
     assert_eq!(g.reverse_cuthill_mckee(), vec![7, 4, 6, 3, 5, 2, 1, 0]);
+}
+
+#[test]
+fn envelope() {
+    let envelope = vec![1, 1, 3, 2];
+    let mut a = LowerRowEnvelope::from_envelope(envelope);
+
+    a[(0, 0)] = 3.0;
+    a[(1, 1)] = 4.0;
+    a[(2, 0)] = 5.0;
+    a[(2, 1)] = 6.0;
+    a[(2, 2)] = 7.0;
+    a[(3, 2)] = 8.0;
+    a[(3, 3)] = 9.0;
+
+    let target = LowerRowEnvelope::from_flat(
+        4,
+        vec![
+            3.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 5.0, 6.0, 7.0, 0.0, 0.0, 0.0, 8.0, 9.0,
+        ],
+    );
+
+    assert_eq!(a, target)
 }
