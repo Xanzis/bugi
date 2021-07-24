@@ -1,143 +1,181 @@
 #[derive(Debug, Clone)]
 pub struct Graph {
-	adjacent: Vec<usize>,
-	indices: Vec<usize>,
-	temp: Vec<usize>,
+    adjacent: Vec<usize>,
+    indices: Vec<usize>,
+    temp: Vec<usize>,
 }
 
 impl Graph {
-	pub fn from_lol<T, U>(adjs: T) -> Self
-		where
-			T: IntoIterator<Item = U>,
-			U: IntoIterator<Item = usize>,
-	{
-		// create an ordered graph from a list of lists,
-		// where adj[i][_] = j means {i, j} is an element of E
-		let mut res = Self { adjacent: Vec::new(), indices: Vec::new(), temp: Vec::new()};
+    pub fn from_lol<T, U>(adjs: T) -> Self
+    where
+        T: IntoIterator<Item = U>,
+        U: IntoIterator<Item = usize>,
+    {
+        // create an ordered graph from a list of lists,
+        // where adj[i][_] = j means {i, j} is an element of E
+        let mut res = Self {
+            adjacent: Vec::new(),
+            indices: Vec::new(),
+            temp: Vec::new(),
+        };
 
-		for (i, adj) in adjs.into_iter().enumerate() {
-			res.indices.push(res.adjacent.len());
-			for a in adj.into_iter() {
-				res.adjacent.push(a);
-			}
-		}
+        for adj in adjs.into_iter() {
+            res.indices.push(res.adjacent.len());
+            for a in adj.into_iter() {
+                res.adjacent.push(a);
+            }
+        }
 
-		res
-	}
+        res
+    }
 
-	pub fn vertex_count(&self) -> usize {
-		self.indices.len()
-	}
+    pub fn vertex_count(&self) -> usize {
+        self.indices.len()
+    }
 
-	fn adj_idxs(&self, v: usize) -> (usize, usize) {
-		// helper function to locate adjacencies in data
-		let start = self.indices[v];
-		let end = self.indices.get(v + 1).cloned().unwrap_or(self.adjacent.len());
-		(start, end)
-	} 
+    fn adj_idxs(&self, v: usize) -> (usize, usize) {
+        // helper function to locate adjacencies in data
+        let start = self.indices[v];
+        let end = self
+            .indices
+            .get(v + 1)
+            .cloned()
+            .unwrap_or(self.adjacent.len());
+        (start, end)
+    }
 
-	pub fn adjacent(&self, v: usize) -> &[usize] {
-		if v >= self.vertex_count() {
-			panic!("vertex index out of bounds")
-		}
+    pub fn adjacent(&self, v: usize) -> &[usize] {
+        if v >= self.vertex_count() {
+            panic!("vertex index out of bounds")
+        }
 
-		let (start, end) = self.adj_idxs(v);
-		&self.adjacent[start..end]
-	}
+        let (start, end) = self.adj_idxs(v);
+        &self.adjacent[start..end]
+    }
 
-	pub fn adjacent_masked<'a>(&'a mut self, i: usize, mask: &Vec<bool>) -> &'a [usize] {
-		if mask.len() != self.vertex_count() {
-			panic!("mask does not match vertex count");
-		}
+    pub fn adjacent_masked<'a>(&'a mut self, i: usize, mask: &Vec<bool>) -> &'a [usize] {
+        if i >= self.vertex_count() {
+            panic!("vertex index out of bounds")
+        }
 
-		if i >= self.vertex_count() {
-			panic!("vertex index out of bounds")
-		}
+        let (start, end) = self.adj_idxs(i);
 
-		let (start, end) = self.adj_idxs(i);
+        self.temp.clear();
+        for x in start..end {
+            let v = self.adjacent[x];
+            if mask[v] {
+                self.temp.push(v);
+            }
+        }
 
-		self.temp.clear();
-		for x in start..end {
-			let v = self.adjacent[x];
-			if mask[v] {
-				self.temp.push(v);
-			}
-		}
+        self.temp.as_slice()
+    }
 
-		self.temp.as_slice()
-	}
+    pub fn degree(&self, v: usize) -> usize {
+        // degree of node n
 
-	pub fn degree(&self, v: usize) -> usize {
-		// degree of node n
+        let (start, end) = self.adj_idxs(v);
+        end - start
+    }
 
-		let (start, end) = self.adj_idxs(v);
-		end - start
-	}
+    pub fn degree_masked(&self, v: usize, mask: &Vec<bool>) -> usize {
+        let (start, end) = self.adj_idxs(v);
 
-	pub fn far_node(&mut self, root: usize) -> (usize, usize) {
-		// find the node furthest from root on the graph and the distance to it
-		// returns (node, length)
-		// ties are broken by smaller degree
+        (start..end)
+            .map(|i| if mask[self.adjacent[i]] { 1 } else { 0 })
+            .sum()
+    }
 
-		if root >= self.vertex_count() {
-			panic!("root label out of bounds");
-		}
+    pub fn far_node(&mut self, root: usize) -> (usize, usize) {
+        // find the node furthest from root on the graph and the distance to it
+        // returns (node, length)
+        // ties are broken by smaller degree
 
-		let mut cur_level = vec![root];
-		let mut next_level = Vec::new();
-		let mut mask = vec![true; self.vertex_count()];
-		let mut length = 0;
+        if root >= self.vertex_count() {
+            panic!("root label out of bounds");
+        }
 
-		mask[root] = false;
+        let mut cur_level = vec![root];
+        let mut next_level = Vec::new();
+        let mut mask = vec![true; self.vertex_count()];
+        let mut length = 0;
 
-		loop {
-			next_level.clear();
+        mask[root] = false;
 
-			// explore the unvisited nodes adjacent to every node on the current level
-			for v in cur_level.iter().cloned() {
-				mask[v] = false;
-				let adj = self.adjacent_masked(v, &mask);
-				for a in adj.iter().cloned() {
-					mask[a] = false;
-					next_level.push(a);
-				}
-			}
+        loop {
+            next_level.clear();
 
-			if next_level.is_empty() {
-				break
-			} else {
-				// next level becomes the current level
-				// (this way of swapping should prevent reallocations)
-				length += 1;
-				std::mem::swap(&mut cur_level, &mut next_level);
-			}
-		}
+            // explore the unvisited nodes adjacent to every node on the current level
+            for v in cur_level.iter().cloned() {
+                mask[v] = false;
+                let adj = self.adjacent_masked(v, &mask);
+                for a in adj.iter().cloned() {
+                    mask[a] = false;
+                    next_level.push(a);
+                }
+            }
 
-		// cur_level contains the last level to be explored
-		// select the element with the smallest degree
+            if next_level.is_empty() {
+                break;
+            } else {
+                // next level becomes the current level
+                // (this way of swapping should prevent reallocations)
+                length += 1;
+                std::mem::swap(&mut cur_level, &mut next_level);
+            }
+        }
 
-		let res_node = cur_level.into_iter().min_by(|&v, &w| self.degree(v).cmp(&self.degree(w))).unwrap();
-		(res_node, length)
-	}
+        // cur_level contains the last level to be explored
+        // select the element with the smallest degree
 
-	pub fn pseudo_peripheral(&mut self) -> usize {
-		// identify a pseudoperipheral node of the graph by George and Liu's method
+        let res_node = cur_level
+            .into_iter()
+            .min_by(|&v, &w| self.degree(v).cmp(&self.degree(w)))
+            .unwrap();
+        (res_node, length)
+    }
 
-		// choose an arbitrary starting node
-		let mut x = 0;
-		let mut longest = 0;
+    pub fn pseudo_peripheral(&mut self) -> usize {
+        // identify a pseudoperipheral node of the graph by George and Liu's method
 
-		loop {
-			let (new_x, length) = self.far_node(x);
-			x = new_x;
+        // choose an arbitrary starting node
+        let mut x = 0;
+        let mut longest = 0;
 
-			if length > longest {
-				longest = length;
-			} else {
-				break
-			}
-		}
+        loop {
+            let (new_x, length) = self.far_node(x);
+            x = new_x;
 
-		x
-	}
+            if length > longest {
+                longest = length;
+            } else {
+                break;
+            }
+        }
+
+        x
+    }
+
+    pub fn reverse_cuthill_mckee(&mut self) -> Vec<usize> {
+        // find the reverse cuthill mckee labelling of the graph's nodes
+
+        let mut ordering = Vec::new();
+        ordering.push(self.pseudo_peripheral());
+
+        let mut mask = vec![true; self.vertex_count()];
+        mask[ordering[0]] = false;
+
+        for i in 0..self.vertex_count() {
+            let adj = self.adjacent_masked(ordering[i], &mask);
+
+            for a in adj {
+                mask[*a] = false;
+                ordering.push(*a);
+            }
+        }
+
+        assert_eq!(ordering.len(), self.vertex_count());
+        ordering.reverse();
+        ordering
+    }
 }

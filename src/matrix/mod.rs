@@ -5,11 +5,11 @@ use std::fmt;
 use std::ops::{Add, Div, Index, IndexMut, Mul};
 
 pub mod buffer;
+pub mod graph;
 pub mod inverse;
 pub mod norm;
 pub mod solve;
 pub mod sparse;
-pub mod graph;
 pub use inverse::Inverse;
 pub use norm::Norm;
 

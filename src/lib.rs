@@ -1,6 +1,6 @@
 pub mod element;
 pub mod file;
-mod matrix;
+pub mod matrix;
 pub mod mesher;
 mod spatial;
 pub mod visual;
