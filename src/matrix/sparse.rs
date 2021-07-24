@@ -26,6 +26,7 @@ pub struct CompressedRow {
 
 // lower triangular row enelope matrix storage
 // stores the shortest possible row segments left of the diagonal
+// each row is required to store at least one value (which may be a numerical zero)
 #[derive(Debug, Clone, PartialEq)]
 pub struct LowerRowEnvelope {
     n: usize,
@@ -100,13 +101,8 @@ impl LowerRowEnvelope {
             return Entry::Zero;
         }
 
-        if self.row_nnz[row] == 0 {
-            return Entry::Zero;
-        }
-
-        let nnz_offset = self.row_nnz[row] - 1;
         // column of the first element of this row's contiguous values
-        let start_col = row - nnz_offset;
+        let start_col = (row + 1) - self.row_nnz[row];
 
         if col < start_col {
             return Entry::Zero;
@@ -127,6 +123,9 @@ impl LowerRowEnvelope {
 
         let mut row_starts = vec![0];
         for x in env.iter().cloned() {
+            if x == 0 {
+                panic!("LowerRowEnvelope buffer requires nonzero envelopes for every row");
+            }
             row_starts.push(row_starts.last().unwrap() + x);
         }
 
@@ -138,6 +137,31 @@ impl LowerRowEnvelope {
             row_nnz: env,
             row_starts,
         }
+    }
+
+    pub fn solve(&self, b: &[f64]) -> Vec<f64> {
+        // solves Lx = b by forward substitution
+
+        if b.len() != self.n {
+            panic!("shapes do not agree")
+        }
+
+        let mut x = vec![0.0; self.n];
+
+        for i in 0..self.n {
+            let row_start = self.row_starts[i];
+            let diag_idx = row_start + self.row_nnz[i] - 1;
+            let start_col = (i + 1) - self.row_nnz[i];
+
+            let dot: f64 = (row_start..diag_idx)
+                .zip(start_col..)
+                .map(|(i, col)| self.data[i] * x[col])
+                .sum();
+
+            x[i] = (b[i] - dot) / self.data[diag_idx];
+        }
+
+        x
     }
 
     #[allow(dead_code)]
@@ -341,11 +365,7 @@ impl MatrixLike for LowerRowEnvelope {
             envelope.push(row_nnz);
         }
 
-        println!("{:?}", envelope);
-
         let mut res = LowerRowEnvelope::from_envelope(envelope);
-
-        println!("{:?}", to_set);
 
         for (loc, val) in to_set {
             res[loc] = val;

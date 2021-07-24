@@ -295,3 +295,16 @@ fn envelope() {
 
     assert_eq!(a, target)
 }
+
+#[test]
+fn envelope_l_solve() {
+    let mut a = LowerRowEnvelope::from_flat(
+        4,
+        vec![
+            1.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.5, 1.0, 0.0, 6.0, 1.0, 14.0, 1.0,
+        ],
+    );
+    let x = LinearMatrix::from_flat((4, 1), a.solve(&[1.0, -1.0, 2.0, 1.0]));
+    let target = LinearMatrix::from_flat((4, 1), vec![1.0, 0.0, 2.0, -33.0]);
+    assert!((&x - &target).frobenius() < 1.0e-10);
+}
