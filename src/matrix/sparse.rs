@@ -139,14 +139,11 @@ impl LowerRowEnvelope {
         }
     }
 
-    pub fn solve(&self, b: &[f64]) -> Vec<f64> {
+    pub fn solve(&self, b: &[f64], x: &mut [f64]) {
         // solves Lx = b by forward substitution
 
-        if b.len() != self.n {
-            panic!("shapes do not agree")
-        }
-
-        let mut x = vec![0.0; self.n];
+        assert_eq!(self.n, b.len(), "shapes do not agree");
+        assert_eq!(self.n, x.len(), "shapes do not agree");
 
         for i in 0..self.n {
             let row_start = self.row_starts[i];
@@ -160,18 +157,46 @@ impl LowerRowEnvelope {
 
             x[i] = (b[i] - dot) / self.data[diag_idx];
         }
-
-        x
     }
 
-    pub fn solve_transposed(&self, y: &[f64]) -> Vec<f64> {
-        // solves L'x = y by outer product
+    pub fn solve_submatrix(&self, b: &[f64], x: &mut [f64], range: (usize, usize)) {
+        // solves L[sub_start..sub_end][sub_start..sub_end] x = b
 
-        if y.len() != self.n {
-            panic!("shapes do not agree")
+        assert_eq!(b.len(), x.len(), "shapes do not agree");
+        assert_eq!(b.len(), range.1 - range.0, "shapes do not agree");
+        if range.1 > self.n {
+            panic!("requested submatrix larger than base matrix");
         }
 
-        let mut x: Vec<f64> = y.iter().cloned().collect();
+        for (sub_i, i) in (range.0..range.1).enumerate() {
+            let mut row_start = self.row_starts[i];
+            let diag_idx = row_start + self.row_nnz[i] - 1;
+            let mut start_col = (i + 1) - self.row_nnz[i];
+
+            // TODO clean up recomputation
+            if start_col < range.0 {
+                // skip columns that precede the submatrix
+                row_start += range.0 - start_col;
+                start_col += range.0 - start_col;
+            }
+
+            let sub_start_col = start_col - range.0;
+            let dot: f64 = (row_start..diag_idx)
+                .zip(sub_start_col..)
+                .map(|(idx, col)| self.data[idx] * x[col])
+                .sum();
+
+            x[sub_i] = (b[sub_i] - dot) / self.data[diag_idx];
+        }
+    }
+
+    pub fn solve_transposed(&self, y: &[f64], x: &mut [f64]) {
+        // solves L'x = y by outer product
+
+        assert_eq!(self.n, y.len(), "shapes do not agree");
+        assert_eq!(self.n, x.len(), "shapes do not agree");
+
+        x.clone_from_slice(&y);
 
         for i in (0..self.n).rev() {
             if y[i] == 0.0 {
@@ -189,8 +214,6 @@ impl LowerRowEnvelope {
                 x[col] -= s * self.data[idx];
             }
         }
-
-        x
     }
 
     #[allow(dead_code)]

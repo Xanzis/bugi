@@ -298,23 +298,48 @@ fn envelope() {
 
 #[test]
 fn envelope_l_solve() {
-    let mut a = LowerRowEnvelope::from_flat(
+    let a = LowerRowEnvelope::from_flat(
         4,
         vec![
             1.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.5, 1.0, 0.0, 6.0, 1.0, 14.0, 1.0,
         ],
     );
-    let x = LinearMatrix::from_flat((4, 1), a.solve(&[1.0, -1.0, 2.0, 1.0]));
+
+    let mut x = vec![0.0; 4];
+    a.solve(&[1.0, -1.0, 2.0, 1.0], x.as_mut_slice());
+    let x = LinearMatrix::from_flat((4, 1), x);
     let target = LinearMatrix::from_flat((4, 1), vec![1.0, 0.0, 2.0, -33.0]);
     assert!((&x - &target).frobenius() < 1.0e-10);
 }
 
 #[test]
 fn envelope_l_solve_transposed() {
-    let mut a =
-        LowerRowEnvelope::from_flat(3, vec![-4.0, 0.0, 0.0, -2.0, 3.5, 0.0, 1.0, -1.75, 3.5]);
+    let a = LowerRowEnvelope::from_flat(3, vec![-4.0, 0.0, 0.0, -2.0, 3.5, 0.0, 1.0, -1.75, 3.5]);
 
-    let x = LinearMatrix::from_flat((3, 1), a.solve_transposed(&[-5.0, 1.75, 10.5]));
+    let mut x = vec![0.0; 3];
+    a.solve_transposed(&[-5.0, 1.75, 10.5], x.as_mut_slice());
+    let x = LinearMatrix::from_flat((3, 1), x);
     let target = LinearMatrix::from_flat((3, 1), vec![1.0, 2.0, 3.0]);
+    assert!((&x - &target).frobenius() < 1.0e-10);
+}
+
+#[test]
+fn envelope_submatrix_solve() {
+    let mut a = LowerRowEnvelope::from_envelope(vec![1, 1, 2, 3, 4, 1]);
+    for i in 0..6 {
+        a[(i, i)] = 1.0;
+    }
+    a[(2, 1)] = -1.0;
+    a[(3, 2)] = 0.5;
+    a[(4, 3)] = 14.0;
+    a[(4, 2)] = 1.0;
+    a[(4, 1)] = 6.0;
+
+    let mut x = vec![0.0; 4];
+    a.solve_submatrix(&[1.0, -1.0, 2.0, 1.0], x.as_mut_slice(), (1, 5));
+
+    let x = LinearMatrix::from_flat((4, 1), x);
+    let target = LinearMatrix::from_flat((4, 1), vec![1.0, 0.0, 2.0, -33.0]);
+
     assert!((&x - &target).frobenius() < 1.0e-10);
 }
