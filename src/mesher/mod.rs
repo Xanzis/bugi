@@ -73,7 +73,7 @@ mod tests {
 
         let mut b = bounds::PlaneBoundary::new();
 
-        let poly  = vec![
+        let poly = vec![
             (0.0, 0.0),
             (1.0, 0.0),
             (1.0, 3.0),
