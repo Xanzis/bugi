@@ -95,7 +95,7 @@ mod tests {
         mesh.chew_mesh(0.5);
 
         let mut vis = mesh.visualize();
-        vis.draw("test_generated/chew_big_mesh.png", vec!["im_size=1024"]);
+        vis.draw("test_generated/chew_big_mesh.png", vec!["im_size=512"]);
     }
 
     #[test]
