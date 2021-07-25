@@ -308,3 +308,13 @@ fn envelope_l_solve() {
     let target = LinearMatrix::from_flat((4, 1), vec![1.0, 0.0, 2.0, -33.0]);
     assert!((&x - &target).frobenius() < 1.0e-10);
 }
+
+#[test]
+fn envelope_l_solve_transposed() {
+    let mut a =
+        LowerRowEnvelope::from_flat(3, vec![-4.0, 0.0, 0.0, -2.0, 3.5, 0.0, 1.0, -1.75, 3.5]);
+
+    let x = LinearMatrix::from_flat((3, 1), a.solve_transposed(&[-5.0, 1.75, 10.5]));
+    let target = LinearMatrix::from_flat((3, 1), vec![1.0, 2.0, 3.0]);
+    assert!((&x - &target).frobenius() < 1.0e-10);
+}

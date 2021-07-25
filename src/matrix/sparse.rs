@@ -155,10 +155,39 @@ impl LowerRowEnvelope {
 
             let dot: f64 = (row_start..diag_idx)
                 .zip(start_col..)
-                .map(|(i, col)| self.data[i] * x[col])
+                .map(|(idx, col)| self.data[idx] * x[col])
                 .sum();
 
             x[i] = (b[i] - dot) / self.data[diag_idx];
+        }
+
+        x
+    }
+
+    pub fn solve_transposed(&self, y: &[f64]) -> Vec<f64> {
+        // solves L'x = y by outer product
+
+        if y.len() != self.n {
+            panic!("shapes do not agree")
+        }
+
+        let mut x: Vec<f64> = y.iter().cloned().collect();
+
+        for i in (0..self.n).rev() {
+            if y[i] == 0.0 {
+                continue;
+            }
+
+            let row_start = self.row_starts[i];
+            let diag_idx = row_start + self.row_nnz[i] - 1;
+            let start_col = (i + 1) - self.row_nnz[i];
+
+            let s = x[i] / self.data[diag_idx];
+            x[i] = s;
+
+            for (idx, col) in (row_start..diag_idx).zip(start_col..) {
+                x[col] -= s * self.data[idx];
+            }
         }
 
         x
