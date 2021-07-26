@@ -161,6 +161,11 @@ impl LowerRowEnvelope {
         (start_col, &self.data[start..=diag])
     }
 
+    pub fn row_stored_mut(&mut self, row: usize) -> (usize, &mut [f64]) {
+        let (start, diag, start_col) = self.row_pos(row);
+        (start_col, &mut self.data[start..=diag])
+    }
+
     pub fn row_stored_nodiag(&self, row: usize) -> (usize, &[f64]) {
         // return the sotred portion of the row without the diagonal element
 
