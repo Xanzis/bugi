@@ -87,6 +87,17 @@ impl CompressedRow {
 }
 
 impl LowerRowEnvelope {
+    fn row_pos(&self, row: usize) -> (usize, usize, usize) {
+        // return the start, final element index, and starting column number of the
+        // stored portion of the requested row
+
+        let start = self.row_starts[row];
+        let diag = start + self.row_nnz[row] - 1;
+        let start_col = (row + 1) - self.row_nnz[row];
+
+        (start, diag, start_col)
+    }
+
     fn pos(&self, loc: (usize, usize)) -> Entry<usize> {
         let (row, col) = loc;
 
@@ -139,6 +150,24 @@ impl LowerRowEnvelope {
         }
     }
 
+    pub fn envelope(&self) -> Vec<usize> {
+        self.row_nnz.clone()
+    }
+
+    pub fn row_stored(&self, row: usize) -> (usize, &[f64]) {
+        // return the stored portion of the row, as a (starting column, slice) tuple
+
+        let (start, diag, start_col) = self.row_pos(row);
+        (start_col, &self.data[start..=diag])
+    }
+
+    pub fn row_stored_nodiag(&self, row: usize) -> (usize, &[f64]) {
+        // return the sotred portion of the row without the diagonal element
+
+        let (start, diag, start_col) = self.row_pos(row);
+        (start_col, &self.data[start..diag])
+    }
+
     pub fn solve(&self, b: &[f64], x: &mut [f64]) {
         // solves Lx = b by forward substitution
 
@@ -146,16 +175,15 @@ impl LowerRowEnvelope {
         assert_eq!(self.n, x.len(), "shapes do not agree");
 
         for i in 0..self.n {
-            let row_start = self.row_starts[i];
-            let diag_idx = row_start + self.row_nnz[i] - 1;
-            let start_col = (i + 1) - self.row_nnz[i];
+            let (start_col, row_stored) = self.row_stored(i);
 
-            let dot: f64 = (row_start..diag_idx)
+            let dot: f64 = row_stored
+                .iter()
                 .zip(start_col..)
-                .map(|(idx, col)| self.data[idx] * x[col])
+                .map(|(val, col)| val * x[col])
                 .sum();
 
-            x[i] = (b[i] - dot) / self.data[diag_idx];
+            x[i] = (b[i] - dot) / row_stored.last().unwrap();
         }
     }
 
@@ -169,24 +197,25 @@ impl LowerRowEnvelope {
         }
 
         for (sub_i, i) in (range.0..range.1).enumerate() {
-            let mut row_start = self.row_starts[i];
-            let diag_idx = row_start + self.row_nnz[i] - 1;
-            let mut start_col = (i + 1) - self.row_nnz[i];
+            let (start_col, row_stored) = self.row_stored(i);
 
-            // TODO clean up recomputation
-            if start_col < range.0 {
-                // skip columns that precede the submatrix
-                row_start += range.0 - start_col;
-                start_col += range.0 - start_col;
-            }
+            let offset = if start_col < range.0 {
+                range.0 - start_col
+            } else {
+                0
+            };
+
+            let row_stored = &row_stored[offset..];
+            let start_col = start_col + offset;
 
             let sub_start_col = start_col - range.0;
-            let dot: f64 = (row_start..diag_idx)
+            let dot: f64 = row_stored
+                .iter()
                 .zip(sub_start_col..)
-                .map(|(idx, col)| self.data[idx] * x[col])
+                .map(|(val, col)| val * x[col])
                 .sum();
 
-            x[sub_i] = (b[sub_i] - dot) / self.data[diag_idx];
+            x[sub_i] = (b[sub_i] - dot) / row_stored.last().unwrap();
         }
     }
 
@@ -203,15 +232,15 @@ impl LowerRowEnvelope {
                 continue;
             }
 
-            let row_start = self.row_starts[i];
-            let diag_idx = row_start + self.row_nnz[i] - 1;
-            let start_col = (i + 1) - self.row_nnz[i];
+            let (start_col, row_stored) = self.row_stored(i);
 
-            let s = x[i] / self.data[diag_idx];
+            let mut row_iter = row_stored.iter();
+            let s = x[i] / row_iter.next_back().unwrap();
             x[i] = s;
 
-            for (idx, col) in (row_start..diag_idx).zip(start_col..) {
-                x[col] -= s * self.data[idx];
+            // row_iter no longer contains the diagonal
+            for (val, col) in row_iter.zip(start_col..) {
+                x[col] -= s * val;
             }
         }
     }
