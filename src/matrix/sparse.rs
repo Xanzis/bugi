@@ -84,6 +84,44 @@ impl CompressedRow {
             end: rend,
         }
     }
+
+    pub fn from_labeled_vals(shape: (usize, usize), mut vals: Vec<((usize, usize), f64)>) -> Self {
+        // contruct from ((row, col), val) tuples
+        use std::cmp::Ordering;
+
+        vals.sort_by(|x, y| match x.0 .0.cmp(&y.0 .0) {
+            Ordering::Equal => x.0 .1.cmp(&y.0 .1),
+            o => o,
+        });
+
+        // vals should now be contiguous stretches of same-row values in ascending column order
+        let nz_count = vals.len();
+
+        // TODO decide if it's worth performing a bounds check on the supplied values
+        let data: Vec<f64> = vals.iter().map(|(_, x)| *x).collect();
+        let col_indices: Vec<usize> = vals.iter().map(|((_, c), _)| *c).collect();
+
+        // label the row starts
+        let mut row_starts = vec![0];
+        let mut cur_row = 0;
+        for (i, ((r, _), _)) in vals.iter().enumerate() {
+            while cur_row < *r {
+                row_starts.push(i);
+                cur_row += 1;
+            }
+        }
+
+        // fill out any trailing empty rows
+        row_starts.resize(shape.0, data.len());
+
+        Self {
+            shape,
+            nz_count,
+            data,
+            col_indices,
+            row_starts,
+        }
+    }
 }
 
 impl LowerRowEnvelope {

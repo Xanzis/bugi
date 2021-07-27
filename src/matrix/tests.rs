@@ -232,6 +232,12 @@ fn inverses() {
 #[test]
 fn sparse_cr() {
     let a = CompressedRow::from_flat((2, 3), vec![2.0, 0.0, 1.0, 0.0, 3.0, 0.0]);
+
+    let a_from_labeled =
+        CompressedRow::from_labeled_vals((2, 3), vec![((0, 0), 2.0), ((0, 2), 1.0), ((1, 1), 3.0)]);
+
+    assert_eq!(a, a_from_labeled);
+
     let b = CompressedRow::from_flat((3, 1), vec![1.0, 2.0, 0.0]);
 
     let target = CompressedRow::from_flat((2, 1), vec![2.0, 6.0]);
