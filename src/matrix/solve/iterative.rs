@@ -1,6 +1,69 @@
+use super::Solver;
 use crate::matrix::{CompressedRow, LinearMatrix, MatrixLike, Norm};
+use std::collections::HashMap;
 
-pub fn gauss_seidel(k: CompressedRow, r: LinearMatrix, tol: f64) -> LinearMatrix {
+pub struct GaussSeidelSolver {
+    dofs: usize,
+    tolerance: f64,
+    max_iter: usize,
+    k_constructor: HashMap<(usize, usize), f64>,
+    r: LinearMatrix,
+}
+
+impl Solver for GaussSeidelSolver {
+    fn new(dofs: usize) -> Self {
+        Self {
+            dofs,
+            // TODO add interface for tol, max_iter specification
+            tolerance: 0.001,
+            max_iter: 200,
+
+            k_constructor: HashMap::new(),
+            r: LinearMatrix::zeros((dofs, 1)),
+        }
+    }
+
+    fn add_coefficient(&mut self, loc: (usize, usize), val: f64) {
+        if loc.0 >= self.dofs || loc.1 >= self.dofs {
+            panic!(
+                "index out of bounds: n is {} but the index is {:?}",
+                self.dofs, loc
+            );
+        }
+
+        let x = self.k_constructor.entry(loc).or_insert(0.0);
+        *x += val;
+    }
+
+    fn add_rhs_val(&mut self, loc: usize, val: f64) {
+        if loc >= self.dofs {
+            panic!(
+                "index out of bounds: n is {} but the index is {:?}",
+                self.dofs, loc
+            );
+        }
+
+        self.r[(loc, 0)] += val;
+    }
+
+    fn solve(self) -> Result<Vec<f64>, ()> {
+        let k_constructor = self.k_constructor.into_iter().collect();
+
+        let k = CompressedRow::from_labeled_vals((self.dofs, self.dofs), k_constructor);
+
+        let res = gauss_seidel(k, self.r, self.tolerance, self.max_iter);
+
+        // TODO pass informative errors up, remove gauss_seidel panics
+        Ok(res.flat().cloned().collect())
+    }
+}
+
+pub(super) fn gauss_seidel(
+    k: CompressedRow,
+    r: LinearMatrix,
+    tol: f64,
+    max_iter: usize,
+) -> LinearMatrix {
     // iteratively solve ku = r using the gauss seidel method
     // tol is the convergence tolerance, the upper bound on the solution residual
 
@@ -50,7 +113,7 @@ pub fn gauss_seidel(k: CompressedRow, r: LinearMatrix, tol: f64) -> LinearMatrix
             break;
         }
 
-        if round > 200 {
+        if round > max_iter {
             panic!("failed to converge");
         }
     }

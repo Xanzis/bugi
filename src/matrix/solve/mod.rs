@@ -1,10 +1,22 @@
 pub mod direct;
 pub mod iterative;
 
+pub trait Solver {
+    fn new(dofs: usize) -> Self;
+
+    // set a new coefficient if not present or add to existing one
+    fn add_coefficient(&mut self, loc: (usize, usize), val: f64);
+
+    fn add_rhs_val(&mut self, loc: usize, val: f64);
+
+    // TODO improve matrix::Error API and add to this result
+    fn solve(self) -> Result<Vec<f64>, ()>;
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
-    fn conjugate_gradient() {
+    fn gauss_seidel() {
         use crate::matrix::{CompressedRow, LinearMatrix, MatrixLike, Norm};
 
         let k = CompressedRow::from_flat(
@@ -16,7 +28,7 @@ mod tests {
         );
         let r = LinearMatrix::from_flat((4, 1), vec![0.0, 1.0, 0.0, 0.0]);
 
-        let u = super::iterative::gauss_seidel(k, r, 0.0001);
+        let u = super::iterative::gauss_seidel(k, r, 0.0001, 200);
 
         let target = LinearMatrix::from_flat((4, 1), vec![1.6, 2.6, 2.4, 1.4]);
 
