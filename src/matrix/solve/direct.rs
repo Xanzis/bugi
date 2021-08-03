@@ -1,4 +1,34 @@
-use crate::matrix::{LowerRowEnvelope, MatrixLike};
+use crate::matrix::{Inverse, LinearMatrix, LowerRowEnvelope, MatrixLike};
+
+use super::Solver;
+
+pub struct DirectGaussSolver {
+    k: LinearMatrix,
+    r: LinearMatrix,
+}
+
+impl Solver for DirectGaussSolver {
+    fn new(dofs: usize) -> Self {
+        Self {
+            k: LinearMatrix::zeros(dofs),
+            r: LinearMatrix::zeros((dofs, 1)),
+        }
+    }
+
+    fn add_coefficient(&mut self, loc: (usize, usize), val: f64) {
+        self.k[loc] += val;
+    }
+
+    fn add_rhs_val(&mut self, loc: usize, val: f64) {
+        self.r[(loc, 0)] += val;
+    }
+
+    fn solve(mut self) -> Result<Vec<f64>, ()> {
+        let res = self.k.solve_gausselim(self.r).map_err(|_| ())?;
+
+        Ok(res.flat().cloned().collect())
+    }
+}
 
 pub fn cholesky_envelope(a: &LowerRowEnvelope) -> LowerRowEnvelope {
     // find the cholesky factor L such that A = LL'
