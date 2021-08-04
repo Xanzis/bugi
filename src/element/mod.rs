@@ -5,7 +5,8 @@ pub mod material;
 pub mod strain;
 pub mod stress;
 
-use crate::matrix::{Average, Inverse, LinearMatrix, MatrixLike};
+use crate::matrix::solve::Solver;
+use crate::matrix::{Average, LinearMatrix, MatrixLike};
 use crate::spatial::Point;
 use crate::visual::Visualizer;
 
@@ -241,9 +242,7 @@ impl ElementAssemblage {
         Box::new(k_func)
     }
 
-    fn find_k(&mut self) -> LinearMatrix {
-        let mut k = LinearMatrix::zeros(self.dofs);
-
+    fn find_k<T: Solver>(&mut self, solver: &mut T) {
         for (i, el) in self.elements.iter().enumerate() {
             let int_func = self.k_integrand_func(i);
             let el_k = integrate::nd_gauss_mat(int_func, self.dim, el.integration_order());
@@ -258,34 +257,32 @@ impl ElementAssemblage {
                         let (j_node_idx, j_node_dof) = el.i_to_dof(j);
                         if let Some(j_dof) = self.find_dof(j_node_idx, j_node_dof) {
                             // wooo finally
-                            k[(i_dof, j_dof)] += el_k[(i, j)];
+                            solver.add_coefficient((i_dof, j_dof), el_k[(i, j)]);
                         }
                     }
                 }
             }
         }
-        k
     }
 
-    pub fn calc_displacements(&mut self) {
+    pub fn calc_displacements<T: Solver>(&mut self) {
         // find the displacements under load and store them in the assemblage
         if self.dof_lookup.is_none() {
             self.compile_lookup();
         }
 
-        let mut assemblage_k = self.find_k();
+        let mut solver = T::new(self.dofs);
+        self.find_k(&mut solver);
 
-        let mut con_force = LinearMatrix::zeros((self.dofs, 1));
         for (&n, &f) in self.concentrated_forces.iter() {
             // check if each node dof still exists and if so apply that part of force
             for d in 0..self.dim() {
                 if let Some(dof) = self.find_dof(n, d) {
-                    con_force[(dof, 0)] = f[d];
+                    solver.add_rhs_val(dof, f[d]);
                 }
             }
         }
 
-        let mut dist_line_force = LinearMatrix::zeros((self.dofs, 1));
         for (&(n, m), &f) in self.line_forces.iter() {
             // convert force f to a column vector
             let f = LinearMatrix::col_vec(f.to_vec());
@@ -300,28 +297,25 @@ impl ElementAssemblage {
                         let (node_idx, node_dof) = el.i_to_dof(i);
                         // check if the degree of freedom still exists, and if so add the force
                         if let Some(dof) = self.find_dof(node_idx, node_dof) {
-                            dist_line_force[(dof, 0)] = f_l[(i, 0)];
+                            // TODO have f_l be a full Matrix seems silly
+                            solver.add_rhs_val(dof, f_l[(i, 0)])
                         }
                     }
                 }
             }
         }
 
-        // assemble r, the overall load vector
-        // TODO add area distributed forces / body forces / initial loads
-        let mut r = con_force;
-        r.add_ass(&dist_line_force);
+        // TODO add area body forces / initial loads
 
-        let raw_displacements = assemblage_k
-            .solve_gausselim(r)
-            .expect("could not invert stiffness matrix");
+        // TODO properly handle solver errors
+        let raw_displacements = solver.solve().unwrap();
         let mut node_displacements = Vec::new();
 
         for n in 0..self.node_count() {
             let mut disp = Point::zero(self.dim);
             for d in 0..self.dim {
                 if let Some(i) = self.find_dof(n, d) {
-                    disp[d] = raw_displacements[(i, 0)];
+                    disp[d] = raw_displacements[i];
                 }
             }
             node_displacements.push(disp);

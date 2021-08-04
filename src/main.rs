@@ -8,6 +8,7 @@ use std::path;
 
 use bugi::element;
 use bugi::file;
+use bugi::matrix::solve::direct::DenseGaussSolver;
 use bugi::mesher::plane;
 use bugi::visual::{color, VisOptions};
 
@@ -36,7 +37,7 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
     let mut elas = file::read_to_elas(file_path)?;
 
-    elas.calc_displacements();
+    elas.calc_displacements::<DenseGaussSolver>();
 
     let scale = args
         .value_of("imsize")

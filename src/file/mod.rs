@@ -91,10 +91,12 @@ impl FileError {
 mod tests {
     #[test]
     fn load_test() {
+        use crate::matrix::solve::direct::DenseGaussSolver;
+
         let elas_out = super::read_to_elas("example_files/square.bmsh");
         assert!(elas_out.is_ok());
         let mut elas = elas_out.unwrap();
-        elas.calc_displacements();
+        elas.calc_displacements::<DenseGaussSolver>();
 
         let mut vis = elas.visualize(50.0);
         vis.set_vals(elas.displacement_norms().unwrap());

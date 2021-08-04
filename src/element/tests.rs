@@ -4,6 +4,7 @@ use super::loading::Constraint;
 use super::material::{AL6061, TEST};
 use super::ElementAssemblage;
 
+use crate::matrix::solve::direct::DenseGaussSolver;
 use crate::matrix::{LinearMatrix, MatrixLike};
 use crate::spatial::Point;
 
@@ -70,7 +71,7 @@ fn assemblage() {
     elas.add_constraint(2, Constraint::PlainDof(true, true, false));
     elas.add_constraint(3, Constraint::PlainDof(false, true, false));
 
-    elas.calc_displacements();
+    elas.calc_displacements::<DenseGaussSolver>();
 
     let mut vis = elas.visualize(50.0);
     vis.set_vals(elas.displacement_norms().unwrap());
@@ -104,7 +105,7 @@ fn multi_element() {
 
     elas.add_conc_force(9, Point::new(&[1.0e5, 0.0]));
 
-    elas.calc_displacements();
+    elas.calc_displacements::<DenseGaussSolver>();
 
     let mut vis = elas.visualize(50.0);
     vis.set_vals(elas.displacement_norms().unwrap());
@@ -132,7 +133,7 @@ fn triangles() {
     elas.add_constraint(29, Constraint::PlainDof(false, true, false));
 
     elas.add_conc_force(39, Point::new(&[0.0, -1.0e5]));
-    elas.calc_displacements();
+    elas.calc_displacements::<DenseGaussSolver>();
 
     let mut vis = elas.visualize(50.0);
     vis.set_vals(elas.displacement_norms().unwrap());
@@ -163,7 +164,7 @@ fn dist_line() {
 
     elas.add_dist_line_force(3, 4, Point::new(&[2.0e3, -1.0e3]));
 
-    elas.calc_displacements();
+    elas.calc_displacements::<DenseGaussSolver>();
 
     let mut vis = elas.visualize(100.0);
     vis.set_vals(elas.displacement_norms().unwrap());
