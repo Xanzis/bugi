@@ -2,12 +2,12 @@ use crate::matrix::{Inverse, LinearMatrix, LowerRowEnvelope, MatrixLike};
 
 use super::Solver;
 
-pub struct DirectGaussSolver {
+pub struct DenseGaussSolver {
     k: LinearMatrix,
     r: LinearMatrix,
 }
 
-impl Solver for DirectGaussSolver {
+impl Solver for DenseGaussSolver {
     fn new(dofs: usize) -> Self {
         Self {
             k: LinearMatrix::zeros(dofs),
