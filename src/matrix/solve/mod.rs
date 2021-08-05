@@ -30,7 +30,9 @@ pub trait Solver {
 
         for row in 0..dofs {
             for col in 0..dofs {
-                res.add_coefficient((row, col), k[(row, col)]);
+                if k[(row, col)] != 0.0 {
+                    res.add_coefficient((row, col), k[(row, col)]);
+                }
             }
 
             res.add_rhs_val(row, r[(row, 0)]);
@@ -67,7 +69,10 @@ mod tests {
 
     #[test]
     fn solver_impls() {
-        use super::{direct::DenseGaussSolver, iterative::GaussSeidelSolver, Solver};
+        use super::{
+            direct::CholeskyEnvelopeSolver, direct::DenseGaussSolver, iterative::GaussSeidelSolver,
+            Solver,
+        };
         use crate::matrix::{LinearMatrix, MatrixLike};
 
         let k = LinearMatrix::from_flat(
@@ -96,6 +101,17 @@ mod tests {
         let gs_res = gs.solve().unwrap();
         assert!(
             gs_res
+                .iter()
+                .zip(target.iter())
+                .map(|(&x, &y)| (x - y).powi(2))
+                .sum::<f64>()
+                <= 1.0e-2
+        );
+
+        let ch = CholeskyEnvelopeSolver::from_kr(&k, &r);
+        let ch_res = ch.solve().unwrap();
+        assert!(
+            ch_res
                 .iter()
                 .zip(target.iter())
                 .map(|(&x, &y)| (x - y).powi(2))

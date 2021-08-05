@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use std::cmp::Ordering;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 pub struct Graph {
@@ -33,8 +33,8 @@ impl Graph {
     }
 
     pub fn from_edges<T>(v_count: usize, edge_iter: T) -> Self
-    where 
-        T: IntoIterator<Item = (usize, usize)>
+    where
+        T: IntoIterator<Item = (usize, usize)>,
     {
         // construct a graph from directed edges
 
@@ -45,7 +45,9 @@ impl Graph {
                 panic!("edge vertex out of bounds");
             }
 
-            if x == y { continue }
+            if x == y {
+                continue;
+            }
 
             edges.insert((x, y));
             edges.insert((y, x));
@@ -196,7 +198,7 @@ impl Graph {
             if length > longest {
                 longest = length;
             } else {
-                break x
+                break x;
             }
         }
     }
@@ -243,11 +245,17 @@ impl Permutation {
         // where value n being in the ith place means n transforms to i
 
         let len = p.len();
-        let mut res = Self { forward: vec![0; len], back: vec![0; len], };
+        let mut res = Self {
+            forward: vec![0; len],
+            back: vec![0; len],
+        };
 
         // confirm values are unique and bounded properly
         let mut items = HashSet::new();
-        assert!(p.iter().all(move |x| items.insert(x) && *x < len), "improper permutation");
+        assert!(
+            p.iter().all(move |x| items.insert(x) && *x < len),
+            "improper permutation"
+        );
 
         for (i, x) in p.into_iter().enumerate() {
             res.forward[x] = i;
@@ -263,5 +271,12 @@ impl Permutation {
 
     pub fn unpermute(&self, x: usize) -> usize {
         self.back[x]
+    }
+
+    pub fn invert(self) -> Self {
+        Self {
+            forward: self.back,
+            back: self.forward,
+        }
     }
 }

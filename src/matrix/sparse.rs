@@ -1,4 +1,5 @@
 // sparse matrix storage schemes
+use super::graph::Permutation;
 use super::{MatrixLike, MatrixShape};
 
 use std::collections::HashMap;
@@ -104,7 +105,7 @@ impl CompressedRow {
         });
 
         // vals should now be contiguous stretches of same-row values in ascending column order
-        let nz_count = vals.len(    );
+        let nz_count = vals.len();
 
         // TODO decide if it's worth performing a bounds check on the supplied values
         let data: Vec<f64> = vals.iter().map(|(_, x)| *x).collect();
@@ -280,7 +281,7 @@ impl LowerRowEnvelope {
         x.clone_from_slice(&y);
 
         for i in (0..self.n).rev() {
-            if y[i] == 0.0 {
+            if x[i] == 0.0 {
                 continue;
             }
 
@@ -336,6 +337,25 @@ impl Dictionary {
 
         Some(self.data.entry(loc).or_insert(0.0))
     }
+
+    pub fn permute(self, p: Permutation) -> Self {
+        let mut res = Self {
+            shape: self.shape(),
+            data: HashMap::with_capacity(self.data.capacity()),
+        };
+
+        for ((r, c), v) in self.data {
+            res.data.insert((p.permute(r), p.permute(c)), v);
+        }
+
+        res
+    }
+
+    pub fn edges(&self) -> impl Iterator<Item = &(usize, usize)> {
+        // directed edges of the matrix's connection graph
+        // includes 'connections' along the diagonal
+        self.data.keys()
+    }
 }
 
 impl From<Dictionary> for LowerRowEnvelope {
@@ -346,6 +366,10 @@ impl From<Dictionary> for LowerRowEnvelope {
         let mut res = Self::from_envelope(env);
 
         for (loc, v) in dct.data.into_iter() {
+            if loc.1 > loc.0 {
+                continue;
+            }
+
             res[loc] = v;
         }
 
@@ -571,7 +595,7 @@ impl MatrixLike for Dictionary {
     fn get(&self, loc: (usize, usize)) -> Option<&f64> {
         // in the current implementation this doesn't insert zeros
         if self.in_bounds(loc) {
-            self.get_unchecked(loc)
+            self.get_unchecked(loc).or(Some(&0.0))
         } else {
             None
         }
@@ -705,7 +729,8 @@ impl IndexMut<(usize, usize)> for Dictionary {
             );
         }
 
-        self.get_unchecked_mut(loc).unwrap()
+        self.get_unchecked_mut(loc)
+            .expect("indexmut value insertion unimplemented for dictionary")
     }
 }
 

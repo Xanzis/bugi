@@ -1,4 +1,5 @@
-use crate::matrix::{Inverse, LinearMatrix, LowerRowEnvelope, MatrixLike};
+use crate::matrix::graph::Graph;
+use crate::matrix::{Dictionary, Inverse, LinearMatrix, LowerRowEnvelope, MatrixLike};
 
 use super::Solver;
 
@@ -27,6 +28,50 @@ impl Solver for DenseGaussSolver {
         let res = self.k.solve_gausselim(self.r).map_err(|_| ())?;
 
         Ok(res.flat().cloned().collect())
+    }
+}
+
+pub struct CholeskyEnvelopeSolver {
+    dofs: usize,
+    k: Dictionary,
+    r: Vec<f64>,
+}
+
+impl Solver for CholeskyEnvelopeSolver {
+    fn new(dofs: usize) -> Self {
+        Self {
+            dofs,
+            k: Dictionary::zeros(dofs),
+            r: vec![0.0; dofs],
+        }
+    }
+
+    fn add_coefficient(&mut self, loc: (usize, usize), val: f64) {
+        self.k[loc] += val;
+    }
+
+    fn add_rhs_val(&mut self, loc: usize, val: f64) {
+        self.r[loc] += val;
+    }
+
+    fn solve(self) -> Result<Vec<f64>, ()> {
+        //let graph = Graph::from_edges(self.dofs, self.k.edges().cloned());
+
+        //let perm = graph.reverse_cuthill_mckee();
+        //let k = self.k.permute(perm);
+
+        let k: LowerRowEnvelope = self.k.into();
+
+        let chol = cholesky_envelope(&k);
+
+        // solve the system L L' x = b as L y = b, L' x = y
+        let mut y = vec![0.0; self.dofs];
+        chol.solve(self.r.as_slice(), y.as_mut_slice());
+
+        let mut x = vec![0.0; self.dofs];
+        chol.solve_transposed(y.as_slice(), x.as_mut_slice());
+
+        Ok(x)
     }
 }
 
