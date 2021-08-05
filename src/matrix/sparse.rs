@@ -338,7 +338,7 @@ impl Dictionary {
         Some(self.data.entry(loc).or_insert(0.0))
     }
 
-    pub fn permute(self, p: Permutation) -> Self {
+    pub fn permute(self, p: &Permutation) -> Self {
         let mut res = Self {
             shape: self.shape(),
             data: HashMap::with_capacity(self.data.capacity()),
@@ -351,10 +351,10 @@ impl Dictionary {
         res
     }
 
-    pub fn edges(&self) -> impl Iterator<Item = &(usize, usize)> {
+    pub fn edges(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
         // directed edges of the matrix's connection graph
         // includes 'connections' along the diagonal
-        self.data.keys()
+        self.data.keys().cloned()
     }
 }
 

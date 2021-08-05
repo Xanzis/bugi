@@ -55,21 +55,29 @@ impl Solver for CholeskyEnvelopeSolver {
     }
 
     fn solve(self) -> Result<Vec<f64>, ()> {
-        //let graph = Graph::from_edges(self.dofs, self.k.edges().cloned());
+        let dofs = self.dofs;
 
-        //let perm = graph.reverse_cuthill_mckee();
-        //let k = self.k.permute(perm);
+        let mut graph = Graph::from_edges(dofs, self.k.edges());
+        let perm = graph.reverse_cuthill_mckee();
 
-        let k: LowerRowEnvelope = self.k.into();
+        let k = self.k.permute(&perm);
+        let mut r = self.r;
+        perm.permute_slice(r.as_mut_slice());
+
+        let k: LowerRowEnvelope = k.into();
 
         let chol = cholesky_envelope(&k);
 
         // solve the system L L' x = b as L y = b, L' x = y
-        let mut y = vec![0.0; self.dofs];
-        chol.solve(self.r.as_slice(), y.as_mut_slice());
+        let mut y = vec![0.0; dofs];
+        chol.solve(r.as_slice(), y.as_mut_slice());
 
-        let mut x = vec![0.0; self.dofs];
+        let mut x = vec![0.0; dofs];
         chol.solve_transposed(y.as_slice(), x.as_mut_slice());
+
+        // invert the permutation
+        let perm = perm.invert();
+        perm.permute_slice(x.as_mut_slice());
 
         Ok(x)
     }

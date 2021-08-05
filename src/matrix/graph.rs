@@ -269,6 +269,16 @@ impl Permutation {
         self.forward[x]
     }
 
+    pub fn permute_slice<T: Clone>(&self, vals: &mut [T]) {
+        assert_eq!(vals.len(), self.forward.len(), "lengths mismatched");
+
+        let old: Vec<T> = vals.iter().cloned().collect();
+
+        for (i, x) in old.into_iter().enumerate() {
+            vals[self.permute(i)] = x;
+        }
+    }
+
     pub fn unpermute(&self, x: usize) -> usize {
         self.back[x]
     }
