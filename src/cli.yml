@@ -67,7 +67,7 @@ subcommands:
                 help: select the result image path
                 takes_value: true
             - scale:
-                short: s
+                short: x
                 long: scale
                 value_name: FLOAT
                 help: specify the displacement exaggeration factor in the output image
@@ -77,4 +77,10 @@ subcommands:
                 long: imsize
                 value_name: INT
                 help: specify the size of the output image in pixels
+                takes_value: true
+            - solver:
+                short: s
+                long: solver
+                value_name: NAME
+                help: specify the solution algorithm; options are gaussseidel, cholesky, densegauss
                 takes_value: true

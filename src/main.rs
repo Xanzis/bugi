@@ -8,7 +8,8 @@ use std::path;
 
 use bugi::element;
 use bugi::file;
-use bugi::matrix::solve::direct::DenseGaussSolver;
+use bugi::matrix::solve::direct::{CholeskyEnvelopeSolver, DenseGaussSolver};
+use bugi::matrix::solve::iterative::GaussSeidelSolver;
 use bugi::mesher::plane;
 use bugi::visual::{color, VisOptions};
 
@@ -37,7 +38,13 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
     let mut elas = file::read_to_elas(file_path)?;
 
-    elas.calc_displacements::<DenseGaussSolver>();
+    match args.value_of("solver") {
+        None => elas.calc_displacements::<DenseGaussSolver>(),
+        Some("densegauss") => elas.calc_displacements::<DenseGaussSolver>(),
+        Some("cholesky") => elas.calc_displacements::<CholeskyEnvelopeSolver>(),
+        Some("gaussseidel") => elas.calc_displacements::<GaussSeidelSolver>(),
+        _ => return Err(BugiError::arg_error("unimplemented solver name")),
+    };
 
     let scale = args
         .value_of("imsize")
