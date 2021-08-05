@@ -285,7 +285,10 @@ fn graph_rcm() {
         vec![3, 4, 6],
     ]);
 
-    assert_eq!(g.reverse_cuthill_mckee(), Permutation::from_placement(vec![7, 4, 6, 3, 5, 2, 1, 0]));
+    assert_eq!(
+        g.reverse_cuthill_mckee(),
+        Permutation::from_placement(vec![7, 4, 6, 3, 5, 2, 1, 0])
+    );
 }
 
 #[test]
