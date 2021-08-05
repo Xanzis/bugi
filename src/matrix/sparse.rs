@@ -1,6 +1,7 @@
 // sparse matrix storage schemes
 use super::{MatrixLike, MatrixShape};
 
+use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::ops::{Index, IndexMut};
 
@@ -33,6 +34,14 @@ pub struct LowerRowEnvelope {
     data: Vec<f64>,
     row_nnz: Vec<usize>,
     row_starts: Vec<usize>,
+}
+
+// dictionary matrix storage
+// stores non-zero values in a hashmap keyed by (row, col) tuples
+#[derive(Debug, Clone, PartialEq)]
+pub struct Dictionary {
+    shape: (usize, usize),
+    data: HashMap<(usize, usize), f64>,
 }
 
 // specific implementations
@@ -295,6 +304,40 @@ impl LowerRowEnvelope {
     }
 }
 
+impl Dictionary {
+    pub fn envelope(&self) -> Vec<usize> {
+        // find the by-row, below-diagonal envelope of the matrix
+
+        let mut env = vec![0; self.shape().0];
+
+        for &(r, c) in self.data.keys() {
+            if c > r {
+                continue;
+            }
+
+            env[r] = env[r].max((r - c) + 1);
+        }
+
+        env
+    }
+
+    fn in_bounds(&self, loc: (usize, usize)) -> bool {
+        loc.0 < self.shape().0 && loc.1 < self.shape().1
+    }
+
+    fn get_unchecked(&self, loc: (usize, usize)) -> Option<&f64> {
+        // in the current implementation this doesn't insert zeros
+
+        self.data.get(&loc)
+    }
+
+    fn get_unchecked_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64> {
+        // in the current implementation this inserts zeros
+
+        Some(self.data.entry(loc).or_insert(0.0))
+    }
+}
+
 // matrixlike implementations
 
 impl MatrixLike for CompressedRow {
@@ -499,6 +542,61 @@ impl MatrixLike for LowerRowEnvelope {
     }
 }
 
+impl MatrixLike for Dictionary {
+    fn shape(&self) -> (usize, usize) {
+        self.shape
+    }
+
+    fn get(&self, loc: (usize, usize)) -> Option<&f64> {
+        // in the current implementation this doesn't insert zeros
+        if self.in_bounds(loc) {
+            self.get_unchecked(loc)
+        } else {
+            None
+        }
+    }
+
+    fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64> {
+        // in the current implementation thi inserts zeros
+        if self.in_bounds(loc) {
+            self.get_unchecked_mut(loc)
+        } else {
+            None
+        }
+    }
+
+    fn transpose(&mut self) {
+        unimplemented!()
+    }
+
+    fn zeros<T: Into<MatrixShape>>(shape: T) -> Self {
+        Self {
+            shape: shape.into().to_rc(),
+            data: HashMap::new(),
+        }
+    }
+
+    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, vals: U) -> Self {
+        let shape = shape.into();
+        let mut res = Self::zeros(shape.clone());
+
+        let mut vals = vals.into_iter();
+
+        for r in 0..res.shape().0 {
+            for c in 0..res.shape().1 {
+                let v = vals
+                    .next()
+                    .expect("supplied iterator contains too few elements");
+                if v != 0.0 {
+                    res.data.insert((r, c), v);
+                }
+            }
+        }
+
+        res
+    }
+}
+
 // trait implementations to satisfy matrixlike bounds
 
 impl fmt::Display for CompressedRow {
@@ -552,6 +650,41 @@ impl IndexMut<(usize, usize)> for LowerRowEnvelope {
             Entry::Zero => panic!("indexmut value insertion is unimplemented for LowerRowEnvelope"),
             Entry::Oob => panic!("matrix index out of bounds"),
         }
+    }
+}
+
+impl fmt::Display for Dictionary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.disp())
+    }
+}
+
+impl Index<(usize, usize)> for Dictionary {
+    type Output = f64;
+    fn index(&self, loc: (usize, usize)) -> &Self::Output {
+        if !self.in_bounds(loc) {
+            panic!(
+                "index out of bounds: the shape is {:?} but the index is {:?}",
+                self.shape(),
+                loc
+            );
+        }
+
+        self.get_unchecked(loc).unwrap_or(&0.0)
+    }
+}
+
+impl IndexMut<(usize, usize)> for Dictionary {
+    fn index_mut(&mut self, loc: (usize, usize)) -> &mut Self::Output {
+        if !self.in_bounds(loc) {
+            panic!(
+                "index out of bounds: the shape is {:?} but the index is {:?}",
+                self.shape(),
+                loc
+            );
+        }
+
+        self.get_unchecked_mut(loc).unwrap()
     }
 }
 

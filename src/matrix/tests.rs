@@ -2,7 +2,8 @@ use super::graph::Graph;
 use super::inverse::Inverse;
 use super::norm::Norm;
 use super::{
-    CompressedRow, LinearMatrix, LowerRowEnvelope, LowerTriangular, MatrixLike, UpperTriangular,
+    CompressedRow, Dictionary, LinearMatrix, LowerRowEnvelope, LowerTriangular, MatrixLike,
+    UpperTriangular,
 };
 
 #[test]
@@ -331,7 +332,7 @@ fn envelope_l_solve_transposed() {
 
 #[test]
 fn envelope_submatrix_solve() {
-    let mut a = LowerRowEnvelope::from_envelope(vec![1, 1, 2, 3, 4, 1]);
+    let mut a = LowerRowEnvelope::from_envelope(vec![1, 1, 2, 2, 4, 1]);
     for i in 0..6 {
         a[(i, i)] = 1.0;
     }
@@ -348,4 +349,20 @@ fn envelope_submatrix_solve() {
     let target = LinearMatrix::from_flat((4, 1), vec![1.0, 0.0, 2.0, -33.0]);
 
     assert!((&x - &target).frobenius() < 1.0e-10);
+}
+
+#[test]
+fn dictionary() {
+    let mut a = Dictionary::zeros(6);
+
+    for i in 0..6 {
+        a[(i, i)] = 1.0;
+    }
+    a[(2, 1)] = -1.0;
+    a[(3, 2)] = 0.5;
+    a[(4, 3)] = 14.0;
+    a[(4, 2)] = 1.0;
+    a[(4, 1)] = 6.0;
+
+    assert_eq!(a.envelope(), vec![1, 1, 2, 2, 4, 1])
 }

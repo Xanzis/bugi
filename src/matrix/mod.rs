@@ -17,7 +17,7 @@ pub use norm::Norm;
 mod tests;
 
 pub use buffer::{LinearMatrix, LowerTriangular, UpperTriangular};
-pub use sparse::{CompressedRow, LowerRowEnvelope};
+pub use sparse::{CompressedRow, Dictionary, LowerRowEnvelope};
 //type Matrix = LinearMatrix; // default implementation
 
 // rolling my own (pretty limited) matrix math
@@ -48,10 +48,17 @@ impl error::Error for MatrixError {}
 
 // data type for matrix shapes
 // will eventually add fields to help initialize sparse matrices
+#[derive(Clone, Copy, Debug)]
 pub struct MatrixShape {
     ncol: usize,
     nrow: usize,
     max_dim: usize,
+}
+
+impl MatrixShape {
+    pub fn to_rc(self) -> (usize, usize) {
+        (self.nrow, self.ncol)
+    }
 }
 
 impl From<(usize, usize)> for MatrixShape {
