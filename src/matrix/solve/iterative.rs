@@ -1,5 +1,5 @@
 use super::Solver;
-use crate::matrix::{CompressedRow, LinearMatrix, MatrixLike, Norm, Dictionary};
+use crate::matrix::{CompressedRow, Dictionary, LinearMatrix, MatrixLike, Norm};
 
 pub struct GaussSeidelSolver {
     tolerance: f64,
