@@ -25,7 +25,9 @@ impl Solver for DenseGaussSolver {
     }
 
     fn solve(mut self) -> Result<Vec<f64>, ()> {
+        eprintln!("beginning dense gauss solution ...");
         let res = self.k.solve_gausselim(self.r).map_err(|_| ())?;
+        eprintln!("dense gauss solution complete");
 
         Ok(res.flat().cloned().collect())
     }
@@ -55,7 +57,14 @@ impl Solver for CholeskyEnvelopeSolver {
     }
 
     fn solve(self) -> Result<Vec<f64>, ()> {
+        eprintln!("beginning envelope cholesky solution ...");
         let dofs = self.dofs;
+
+        let initial_envelope_sum = self.k.envelope().into_iter().sum::<usize>();
+        eprintln!(
+            "computing reordering (initial total envelope: {}) ...",
+            initial_envelope_sum
+        );
 
         let mut graph = Graph::from_edges(dofs, self.k.edges());
         let perm = graph.reverse_cuthill_mckee();
@@ -66,7 +75,15 @@ impl Solver for CholeskyEnvelopeSolver {
 
         let k: LowerRowEnvelope = k.into();
 
+        eprintln!(
+            "reordering computed (total envelope: {})",
+            k.non_zero_count()
+        );
+        eprintln!("computing cholesky decomposition ...");
+
         let chol = cholesky_envelope(&k);
+
+        eprintln!("decomposition computed.\nsolving system...");
 
         // solve the system L L' x = b as L y = b, L' x = y
         let mut y = vec![0.0; dofs];
@@ -78,6 +95,8 @@ impl Solver for CholeskyEnvelopeSolver {
         // invert the permutation
         let perm = perm.invert();
         perm.permute_slice(x.as_mut_slice());
+
+        eprintln!("envelope cholesky solution complete");
 
         Ok(x)
     }

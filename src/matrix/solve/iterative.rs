@@ -29,10 +29,12 @@ impl Solver for GaussSeidelSolver {
     }
 
     fn solve(self) -> Result<Vec<f64>, ()> {
+        eprintln!("beginning gauss-seidel iteration ...");
         let k: CompressedRow = self.k_constructor.into();
         let res = gauss_seidel(k, self.r, self.tolerance, self.max_iter);
 
         // TODO pass informative errors up, remove gauss_seidel panics
+        eprintln!("iteration converged, gauss-seidel solution complete");
         Ok(res.flat().cloned().collect())
     }
 }
