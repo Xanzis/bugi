@@ -33,11 +33,16 @@ fn main() -> Result<(), BugiError> {
 
 fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     // compute a linear study with the given mesh/setup file
+    eprintln!("computing linear study ...");
+
     let file_path = args.value_of("INPUT").unwrap();
     let file_path = path::Path::new(file_path);
 
+    eprintln!("reading mesh file ...");
     let mut elas = file::read_to_elas(file_path)?;
+    eprintln!("file read");
 
+    eprintln!("solving ...");
     match args.value_of("solver") {
         None => elas.calc_displacements::<DenseGaussSolver>(),
         Some("densegauss") => elas.calc_displacements::<DenseGaussSolver>(),
@@ -45,6 +50,20 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
         Some("gaussseidel") => elas.calc_displacements::<GaussSeidelSolver>(),
         _ => return Err(BugiError::arg_error("unimplemented solver name")),
     };
+    eprintln!("solution complete\npost processing solution ...");
+
+    // TODO elas APIs should return references
+    let max_von_mises = elas
+        .von_mises()
+        .into_iter()
+        .max_by(|x, y| x.partial_cmp(y).expect("encountered unstable stress value"))
+        .unwrap();
+    let max_displacement = elas
+        .displacement_norms()
+        .unwrap()
+        .into_iter()
+        .max_by(|x, y| x.partial_cmp(y).expect("encountered unstable stress value"))
+        .unwrap();
 
     let scale = args
         .value_of("imsize")
@@ -81,6 +100,13 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     // TODO incorporate rust's PATH logic and check path validities
 
     vis.draw(out_path.as_str(), vis_options);
+
+    eprintln!("processing complete\n---------------");
+
+    println!(
+        "max von mises: {}\nmax displacement: {}",
+        max_von_mises, max_displacement
+    );
 
     Ok(())
 }
