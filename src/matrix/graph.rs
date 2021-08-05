@@ -1,3 +1,6 @@
+use std::collections::HashSet;
+use std::cmp::Ordering;
+
 #[derive(Debug, Clone)]
 pub struct Graph {
     adjacent: Vec<usize>,
@@ -24,6 +27,50 @@ impl Graph {
             for a in adj.into_iter() {
                 res.adjacent.push(a);
             }
+        }
+
+        res
+    }
+
+    pub fn from_edges<T>(v_count: usize, edge_iter: T) -> Self
+    where 
+        T: IntoIterator<Item = (usize, usize)>
+    {
+        // construct a graph from directed edges
+
+        // ensure edge list is clean and add reverses
+        let mut edges = HashSet::new();
+        for (x, y) in edge_iter.into_iter() {
+            if x >= v_count || y >= v_count {
+                panic!("edge vertex out of bounds");
+            }
+
+            if x == y { continue }
+
+            edges.insert((x, y));
+            edges.insert((y, x));
+        }
+
+        let mut edges: Vec<(usize, usize)> = edges.into_iter().collect();
+
+        // sort edges by first vertex then second edge (ascending)
+        edges.sort_by(|x, y| match x.0.cmp(&y.0) {
+            Ordering::Equal => x.1.cmp(&y.1),
+            o => o,
+        });
+
+        let mut res = Self {
+            adjacent: Vec::new(),
+            indices: Vec::new(),
+            temp: Vec::new(),
+        };
+
+        for (x, y) in edges.into_iter() {
+            while (x + 1) > res.indices.len() {
+                res.indices.push(res.adjacent.len());
+            }
+
+            res.adjacent.push(y);
         }
 
         res
@@ -149,14 +196,12 @@ impl Graph {
             if length > longest {
                 longest = length;
             } else {
-                break;
+                break x
             }
         }
-
-        x
     }
 
-    pub fn reverse_cuthill_mckee(&mut self) -> Vec<usize> {
+    pub fn reverse_cuthill_mckee(&mut self) -> Permutation {
         // find the reverse cuthill mckee labelling of the graph's nodes
 
         let mut ordering = Vec::new();
@@ -176,6 +221,47 @@ impl Graph {
 
         assert_eq!(ordering.len(), self.vertex_count());
         ordering.reverse();
-        ordering
+        Permutation::from_placement(ordering)
+    }
+}
+
+impl PartialEq for Graph {
+    fn eq(&self, other: &Self) -> bool {
+        self.adjacent == other.adjacent && self.indices == other.indices
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Permutation {
+    forward: Vec<usize>,
+    back: Vec<usize>,
+}
+
+impl Permutation {
+    pub(super) fn from_placement(p: Vec<usize>) -> Self {
+        // build a permutation from a placement
+        // where value n being in the ith place means n transforms to i
+
+        let len = p.len();
+        let mut res = Self { forward: vec![0; len], back: vec![0; len], };
+
+        // confirm values are unique and bounded properly
+        let mut items = HashSet::new();
+        assert!(p.iter().all(move |x| items.insert(x) && *x < len), "improper permutation");
+
+        for (i, x) in p.into_iter().enumerate() {
+            res.forward[x] = i;
+            res.back[i] = x;
+        }
+
+        res
+    }
+
+    pub fn permute(&self, x: usize) -> usize {
+        self.forward[x]
+    }
+
+    pub fn unpermute(&self, x: usize) -> usize {
+        self.back[x]
     }
 }

@@ -1,4 +1,4 @@
-use super::graph::Graph;
+use super::graph::{Graph, Permutation};
 use super::inverse::Inverse;
 use super::norm::Norm;
 use super::{
@@ -248,6 +248,14 @@ fn sparse_cr() {
 }
 
 #[test]
+fn graph_constructors() {
+    let g = Graph::from_lol(vec![vec![1, 3], vec![0, 2, 3], vec![1], vec![0, 1]]);
+    let h = Graph::from_edges(4, vec![(0, 1), (3, 0), (2, 1), (3, 1)]);
+
+    assert_eq!(g, h);
+}
+
+#[test]
 fn graph_peripheral() {
     let mut g = Graph::from_lol(vec![
         vec![1],
@@ -277,7 +285,7 @@ fn graph_rcm() {
         vec![3, 4, 6],
     ]);
 
-    assert_eq!(g.reverse_cuthill_mckee(), vec![7, 4, 6, 3, 5, 2, 1, 0]);
+    assert_eq!(g.reverse_cuthill_mckee(), Permutation::from_placement(vec![7, 4, 6, 3, 5, 2, 1, 0]));
 }
 
 #[test]
