@@ -104,7 +104,7 @@ impl CompressedRow {
         });
 
         // vals should now be contiguous stretches of same-row values in ascending column order
-        let nz_count = vals.len();
+        let nz_count = vals.len(    );
 
         // TODO decide if it's worth performing a bounds check on the supplied values
         let data: Vec<f64> = vals.iter().map(|(_, x)| *x).collect();
@@ -335,6 +335,27 @@ impl Dictionary {
         // in the current implementation this inserts zeros
 
         Some(self.data.entry(loc).or_insert(0.0))
+    }
+}
+
+impl From<Dictionary> for LowerRowEnvelope {
+    fn from(dct: Dictionary) -> Self {
+        // conversion ignores all values above the diagonal
+
+        let env = dct.envelope();
+        let mut res = Self::from_envelope(env);
+
+        for (loc, v) in dct.data.into_iter() {
+            res[loc] = v;
+        }
+
+        res
+    }
+}
+
+impl From<Dictionary> for CompressedRow {
+    fn from(dct: Dictionary) -> Self {
+        Self::from_labeled_vals(dct.shape(), dct.data.into_iter().collect())
     }
 }
 

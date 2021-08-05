@@ -1,56 +1,35 @@
 use super::Solver;
-use crate::matrix::{CompressedRow, LinearMatrix, MatrixLike, Norm};
-use std::collections::HashMap;
+use crate::matrix::{CompressedRow, LinearMatrix, MatrixLike, Norm, Dictionary};
 
 pub struct GaussSeidelSolver {
-    dofs: usize,
     tolerance: f64,
     max_iter: usize,
-    k_constructor: HashMap<(usize, usize), f64>,
+    k_constructor: Dictionary,
     r: LinearMatrix,
 }
 
 impl Solver for GaussSeidelSolver {
     fn new(dofs: usize) -> Self {
         Self {
-            dofs,
             // TODO add interface for tol, max_iter specification
             tolerance: 0.001,
             max_iter: 200,
 
-            k_constructor: HashMap::new(),
+            k_constructor: Dictionary::zeros(dofs),
             r: LinearMatrix::zeros((dofs, 1)),
         }
     }
 
     fn add_coefficient(&mut self, loc: (usize, usize), val: f64) {
-        if loc.0 >= self.dofs || loc.1 >= self.dofs {
-            panic!(
-                "index out of bounds: n is {} but the index is {:?}",
-                self.dofs, loc
-            );
-        }
-
-        let x = self.k_constructor.entry(loc).or_insert(0.0);
-        *x += val;
+        self.k_constructor[loc] += val;
     }
 
     fn add_rhs_val(&mut self, loc: usize, val: f64) {
-        if loc >= self.dofs {
-            panic!(
-                "index out of bounds: n is {} but the index is {:?}",
-                self.dofs, loc
-            );
-        }
-
         self.r[(loc, 0)] += val;
     }
 
     fn solve(self) -> Result<Vec<f64>, ()> {
-        let k_constructor = self.k_constructor.into_iter().collect();
-
-        let k = CompressedRow::from_labeled_vals((self.dofs, self.dofs), k_constructor);
-
+        let k: CompressedRow = self.k_constructor.into();
         let res = gauss_seidel(k, self.r, self.tolerance, self.max_iter);
 
         // TODO pass informative errors up, remove gauss_seidel panics

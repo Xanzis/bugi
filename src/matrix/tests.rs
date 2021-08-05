@@ -364,5 +364,20 @@ fn dictionary() {
     a[(4, 2)] = 1.0;
     a[(4, 1)] = 6.0;
 
-    assert_eq!(a.envelope(), vec![1, 1, 2, 2, 4, 1])
+    assert_eq!(a.envelope(), vec![1, 1, 2, 2, 4, 1]);
+
+    // test conversion to envelope storage
+    let mut target = LowerRowEnvelope::from_envelope(vec![1, 1, 2, 2, 4, 1]);
+    for i in 0..6 {
+        target[(i, i)] = 1.0;
+    }
+    target[(2, 1)] = -1.0;
+    target[(3, 2)] = 0.5;
+    target[(4, 3)] = 14.0;
+    target[(4, 2)] = 1.0;
+    target[(4, 1)] = 6.0;
+
+    let a: LowerRowEnvelope = a.into();
+
+    assert_eq!(a, target)
 }
