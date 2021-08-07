@@ -3,7 +3,10 @@ use crate::matrix::MatrixLike;
 pub mod direct;
 pub mod iterative;
 
-pub trait Solver {
+pub trait Solver
+where
+    Self: Clone + std::fmt::Debug,
+{
     fn new(dofs: usize) -> Self;
 
     // set a new coefficient if not present or add to existing one

@@ -3,6 +3,7 @@ use crate::matrix::{Dictionary, Inverse, LinearMatrix, LowerRowEnvelope, MatrixL
 
 use super::Solver;
 
+#[derive(Clone, Debug)]
 pub struct DenseGaussSolver {
     k: LinearMatrix,
     r: LinearMatrix,
@@ -33,6 +34,7 @@ impl Solver for DenseGaussSolver {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct CholeskyEnvelopeSolver {
     dofs: usize,
     k: Dictionary,

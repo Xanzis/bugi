@@ -1,6 +1,7 @@
 use super::Solver;
 use crate::matrix::{CompressedRow, Dictionary, LinearMatrix, MatrixLike, Norm};
 
+#[derive(Clone, Debug)]
 pub struct GaussSeidelSolver {
     tolerance: f64,
     max_iter: usize,
