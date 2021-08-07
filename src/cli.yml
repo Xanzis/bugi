@@ -84,3 +84,8 @@ subcommands:
                 value_name: NAME
                 help: specify the solution algorithm; options are gaussseidel, cholesky, densegauss
                 takes_value: true
+            - showmesh:
+                long: showmesh
+                value_name: BOOL
+                help: set whether the mesh is diplayed in the output image
+                takes_value: true

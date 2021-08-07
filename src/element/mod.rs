@@ -174,7 +174,7 @@ impl ElementAssemblage {
         }
     }
 
-    fn node_count(&self) -> usize {
+    pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
 

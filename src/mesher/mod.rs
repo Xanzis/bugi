@@ -70,6 +70,7 @@ mod tests {
     fn big_mesh() {
         use super::bounds;
         use super::plane;
+        use crate::visual::VisOptions;
 
         let mut b = bounds::PlaneBoundary::new();
 
@@ -95,7 +96,8 @@ mod tests {
         mesh.chew_mesh(0.5);
 
         let mut vis = mesh.visualize();
-        vis.draw("test_generated/chew_big_mesh.png", vec!["im_size=512"]);
+        let vis_options = VisOptions::new().im_size(512);
+        vis.draw("test_generated/chew_big_mesh.png", vis_options);
     }
 
     #[test]

@@ -40,7 +40,7 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
     eprintln!("reading mesh file ...");
     let mut elas = file::read_to_elas(file_path)?;
-    eprintln!("file read");
+    eprintln!("file read (node count: {})", elas.node_count());
 
     eprintln!("solving ...");
     match args.value_of("solver") {
@@ -66,7 +66,7 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
         .unwrap();
 
     let scale = args
-        .value_of("imsize")
+        .value_of("scale")
         .unwrap_or("50.0")
         .parse::<f64>()
         .map_err(|_| BugiError::arg_error("could not parse displacement scale argument"))?;
@@ -82,20 +82,28 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
     let out_path = args.value_of("out").unwrap_or("out.png").to_string();
 
-    let vis_options: VisOptions = match args.value_of("colormap") {
+    let vis_options = VisOptions::new();
+
+    let vis_options = match args.value_of("colormap") {
         None => ().into(),
-        Some("hot") => VisOptions::with_color_map(Box::new(|x| color::hot_map(x))),
-        Some("rgb") => VisOptions::with_color_map(Box::new(|x| color::rgb_map(x))),
+        Some("hot") => vis_options.color_map(Box::new(|x| color::hot_map(x))),
+        Some("rgb") => vis_options.color_map(Box::new(|x| color::rgb_map(x))),
         _ => return Err(BugiError::arg_error("unimplemented colormap name")),
     };
 
-    // TODO allow manual specification of image size
     let im_size = args
         .value_of("imsize")
         .unwrap_or("1024")
-        .parse::<usize>()
+        .parse::<u32>()
         .map_err(|_| BugiError::arg_error("could not parse image size argument"))?;
-    let vis_options = vis_options.with(vec![format!("im_size={}", im_size)]);
+    let vis_options = vis_options.im_size(im_size);
+
+    let show_mesh = args
+        .value_of("showmesh")
+        .unwrap_or("true")
+        .parse::<bool>()
+        .map_err(|_| BugiError::arg_error("could not parse show mesh argument"))?;
+    let vis_options = vis_options.show_mesh(show_mesh);
 
     // TODO incorporate rust's PATH logic and check path validities
 
@@ -147,10 +155,12 @@ fn mesh<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     let im_size = args
         .value_of("imsize")
         .unwrap_or("1024")
-        .parse::<usize>()
+        .parse::<u32>()
         .map_err(|_| BugiError::arg_error("could not parse image size argument"))?;
 
-    vis.draw(vis_out_path.as_str(), vec![format!("im_size={}", im_size)]);
+    let vis_options = VisOptions::new().im_size(im_size);
+
+    vis.draw(vis_out_path.as_str(), vis_options);
 
     let elas: element::ElementAssemblage = msh.assemble().map_err(|e| BugiError::run_error(e))?;
 

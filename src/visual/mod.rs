@@ -16,6 +16,7 @@ const DOT_SIZE: u32 = 1;
 pub struct VisOptions {
     color_map: Option<Box<dyn Fn(f64) -> Rgb<u8>>>,
     im_size: Option<u32>,
+    show_mesh: bool,
 }
 
 impl VisOptions {
@@ -23,67 +24,29 @@ impl VisOptions {
         Self {
             color_map: None,
             im_size: None,
+            show_mesh: true,
         }
     }
 
-    pub fn with_color_map(map: Box<dyn Fn(f64) -> Rgb<u8>>) -> Self {
-        let mut res = Self::new();
-        res.color_map = Some(map);
-        res
+    pub fn color_map(mut self, map: Box<dyn Fn(f64) -> Rgb<u8>>) -> Self {
+        self.color_map = Some(map);
+        self
     }
 
-    pub fn with<T: Into<VisOptions>>(self, other: T) -> Self {
-        // overwrite any specified options
-        let other = other.into();
+    pub fn im_size(mut self, size: u32) -> Self {
+        self.im_size = Some(size);
+        self
+    }
 
-        let mut res = self;
-        if let Some(cm) = other.color_map {
-            res.color_map = Some(cm);
-        }
-        if let Some(is) = other.im_size {
-            res.im_size = Some(is);
-        }
-
-        res
+    pub fn show_mesh(mut self, x: bool) -> Self {
+        self.show_mesh = x;
+        self
     }
 }
 
 impl From<()> for VisOptions {
     fn from(_x: ()) -> Self {
         Self::new()
-    }
-}
-
-impl<T: ToString> From<Vec<T>> for VisOptions {
-    fn from(x: Vec<T>) -> Self {
-        // parse a list of visualization settings as key=value pairs
-        // improper options don't panic but do print warnings
-        let mut res = Self::new();
-
-        for s in x.into_iter().map(|a| a.to_string()) {
-            let mut words = s.as_str().split('=');
-            let attribute = words.next().expect("unreachable");
-            if let Some(value) = words.next() {
-                // entry was formatted correctly, pick out recognisable settings
-                match attribute {
-                    "color_map" => match value {
-                        "rgb_map" => res.color_map = Some(color::rgb_map_boxed()),
-                        "hot_map" => res.color_map = Some(color::hot_map_boxed()),
-                        _ => eprintln!("WARNING: unrecognized visualizer color map option"),
-                    },
-                    "im_size" => {
-                        if let Ok(val) = value.parse::<u32>() {
-                            res.im_size = Some(val);
-                        } else {
-                            eprintln!("WARNING: unreadable visualizer im_size, ignoring")
-                        }
-                    }
-                    _ => eprintln!("WARNING: unrecognized visualizer option name"),
-                }
-            }
-        }
-
-        res
     }
 }
 
@@ -218,7 +181,7 @@ impl Visualizer {
         }
 
         let pix_points = self.enpixel();
-        let mut img = RgbImage::new(self.im_size, self.im_size);
+        let mut img = RgbImage::from_pixel(self.im_size, self.im_size, color::BACK);
 
         // draw triangles if present
         if let (Some(triangles), Some(node_vals)) = (self.triangles.clone(), self.node_vals.clone())
@@ -239,25 +202,27 @@ impl Visualizer {
             }
         }
 
-        // draw lines
-        if let Some(edges) = &self.edges {
-            for e in edges.iter() {
-                let orig = pix_points.get(e.0);
-                let end = pix_points.get(e.1);
-                if let (Some(o), Some(e)) = (orig, end) {
-                    let to_draw = bresenham::line_unsigned(o, e);
-                    for d in to_draw {
-                        img.put_pixel(d.0, d.1, Rgb([0, 255, 0]))
+        if options.show_mesh {
+            // draw lines
+            if let Some(edges) = &self.edges {
+                for e in edges.iter() {
+                    let orig = pix_points.get(e.0);
+                    let end = pix_points.get(e.1);
+                    if let (Some(o), Some(e)) = (orig, end) {
+                        let to_draw = bresenham::line_unsigned(o, e);
+                        for d in to_draw {
+                            img.put_pixel(d.0, d.1, Rgb([0, 255, 0]))
+                        }
                     }
                 }
             }
-        }
 
-        // draw points
-        for ((x, y), c) in pix_points.into_iter().zip(self.colors.iter()) {
-            let to_draw = fill::dot_points(x, y);
-            for (i, j) in to_draw.into_iter() {
-                img.put_pixel(i, j, color::STDCOL[*c]);
+            // draw points
+            for ((x, y), c) in pix_points.into_iter().zip(self.colors.iter()) {
+                let to_draw = fill::dot_points(x, y);
+                for (i, j) in to_draw.into_iter() {
+                    img.put_pixel(i, j, color::STDCOL[*c]);
+                }
             }
         }
 
