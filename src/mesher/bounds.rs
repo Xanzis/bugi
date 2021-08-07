@@ -263,6 +263,10 @@ impl PlaneBoundary {
         }
 
         self.store_segment_unchecked((cur, end));
+
+        if let Some(f) = dist_f {
+            self.distributed_forces.insert((cur, end).into(), f);
+        }
     }
 
     pub fn divide_all_segments(&mut self, h: f64) {

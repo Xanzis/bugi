@@ -328,7 +328,7 @@ impl IsoparElement {
         }
 
         if f.shape() != (self.dim(), 1) {
-            panic!("dsitributed force must have dimensions ({}, 1)", self.dim());
+            panic!("distributed force must have dimensions ({}, 1)", self.dim());
         }
 
         // find the node points, first converting to the local point indices
@@ -349,7 +349,20 @@ impl IsoparElement {
             h.mul(f)
         };
 
-        integrate::gauss_segment_mat(integrand, a, b, self.integration_order())
+        let mut res = integrate::gauss_segment_mat(integrand, a, b, self.integration_order());
+
+        // rescale the integral from natural coordinates
+        // divide by natural segment length, multiply by real length
+
+        let nat_len = a.dist(b);
+
+        let a_real = self.node(self.global_to_own_idx(a_idx).unwrap());
+        let b_real = self.node(self.global_to_own_idx(b_idx).unwrap());
+        let real_len = a_real.dist(b_real);
+
+        res *= (real_len) / nat_len;
+
+        res
     }
 
     pub fn node_stress(&self, node_idx: usize, u: Vec<f64>) -> StressState {
