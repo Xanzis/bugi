@@ -33,6 +33,88 @@ impl Segment {
     }
 }
 
+// Wall is an iterator over connecting segments
+#[derive(Clone, Debug)]
+pub struct Wall<'a> {
+    bound: &'a PlaneBoundary,
+    start: VIdx,
+    prev: VIdx,
+    done: bool,
+}
+
+impl<'a> Wall<'a> {
+    fn new(bound: &'a PlaneBoundary, start: VIdx) -> Self {
+        Self {
+            bound,
+            start,
+            prev: start,
+            done: false,
+        }
+    }
+}
+
+impl<'a> Iterator for Wall<'a> {
+    type Item = Segment;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+
+        if let Some(cur) = self.bound.seg_map.get(&self.prev).cloned() {
+            if cur == self.start {
+                self.done = true;
+            }
+
+            let seg = (self.prev, cur).into();
+            self.prev = cur;
+            Some(seg)
+        } else {
+            self.done = true;
+            None
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct AllWalls<'a> {
+    bound: &'a PlaneBoundary,
+    wall: Wall<'a>,
+    wall_idx: usize,
+}
+
+impl<'a> AllWalls<'a> {
+    fn new(bound: &'a PlaneBoundary) -> Self {
+        if bound.wall_starts.len() == 0 {
+            panic!("cannot iterate over empty wall list");
+        }
+
+        Self {
+            bound,
+            wall: Wall::new(bound, bound.wall_starts[0]),
+            wall_idx: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for AllWalls<'a> {
+    type Item = Segment;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(seg) = self.wall.next() {
+            Some(seg)
+        } else {
+            self.wall_idx += 1;
+            if self.wall_idx >= self.bound.wall_starts.len() {
+                None
+            } else {
+                self.wall = Wall::new(self.bound, self.bound.wall_starts[self.wall_idx]);
+                Some(self.wall.next().expect("zero length wall"))
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct PlaneBoundary {
     vertices: Vec<(f64, f64)>,
@@ -276,29 +358,9 @@ impl PlaneBoundary {
         }
     }
 
-    pub fn wall(&self, p: VIdx) -> Vec<Segment> {
-        // return a vector of all contiguous walls following p
-        // if the walls are a closed loop, finish before repeating a segment
-        let mut res: Vec<Segment> = Vec::new();
-        let start = p;
-        let mut past = p;
-        while let Some(current) = self.seg_map.get(&past).cloned() {
-            res.push((past, current).into());
-
-            if current == start {
-                break;
-            }
-            past = current;
-        }
-        res
-    }
-
-    pub fn all_walls(&self) -> Vec<Segment> {
+    pub fn all_walls<'a>(&'a self) -> AllWalls<'a> {
         // return a vector of all walls of the boundary, oriented with inside on the left
-        self.wall_starts
-            .iter()
-            .flat_map(|p| self.wall(*p).into_iter())
-            .collect()
+        AllWalls::new(self)
     }
 
     pub fn all_distributed_forces(&self) -> Vec<(Segment, Point)> {

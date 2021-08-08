@@ -555,10 +555,13 @@ impl PlaneTriangulation {
     pub fn chew_mesh(&mut self, h: f64) {
         // starting from a rough boundary
         // refine first boundary then interior via chew's 1st method
+        eprintln!("beginning chew mesh generation ...");
 
         // refine the boundary and construct initial triangulation
+        eprintln!("finding initial triangulation ...");
         self.bound.divide_all_segments(h);
         self.gift_wrap();
+        eprintln!("boundary triangulated\ninserting nodes ...");
 
         //while let Some(tri) = self.all_triangles().find(|&t| if let Some(rad) = self.circumradius(t) { rad > h } else { false }) {
         while let Some(tri) = self.large_triangle(h) {
@@ -571,6 +574,7 @@ impl PlaneTriangulation {
 
             self.bowyer_watson_insert(center_id, tri);
         }
+        eprintln!("chew mesh generation complete");
     }
 
     pub fn visualize(&self) -> Visualizer {
