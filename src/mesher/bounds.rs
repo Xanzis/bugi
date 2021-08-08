@@ -36,16 +36,16 @@ impl Segment {
 // Wall is an iterator over connecting segments
 #[derive(Clone, Debug)]
 pub struct Wall<'a> {
-    bound: &'a PlaneBoundary,
+    seg_map: &'a HashMap<VIdx, VIdx>,
     start: VIdx,
     prev: VIdx,
     done: bool,
 }
 
 impl<'a> Wall<'a> {
-    fn new(bound: &'a PlaneBoundary, start: VIdx) -> Self {
+    fn new(seg_map: &'a HashMap<VIdx, VIdx>, start: VIdx) -> Self {
         Self {
-            bound,
+            seg_map,
             start,
             prev: start,
             done: false,
@@ -61,7 +61,7 @@ impl<'a> Iterator for Wall<'a> {
             return None;
         }
 
-        if let Some(cur) = self.bound.seg_map.get(&self.prev).cloned() {
+        if let Some(cur) = self.seg_map.get(&self.prev).cloned() {
             if cur == self.start {
                 self.done = true;
             }
@@ -78,20 +78,20 @@ impl<'a> Iterator for Wall<'a> {
 
 #[derive(Clone, Debug)]
 pub struct AllWalls<'a> {
-    bound: &'a PlaneBoundary,
+    seg_map: &'a HashMap<VIdx, VIdx>,
+    wall_starts: &'a Vec<VIdx>,
     wall: Wall<'a>,
     wall_idx: usize,
 }
 
 impl<'a> AllWalls<'a> {
-    fn new(bound: &'a PlaneBoundary) -> Self {
-        if bound.wall_starts.len() == 0 {
-            panic!("cannot iterate over empty wall list");
-        }
+    fn new(seg_map: &'a HashMap<VIdx, VIdx>, wall_starts: &'a Vec<VIdx>) -> Self {
+        assert!(wall_starts.len() > 0, "cannot iterate over empty wall list");
 
         Self {
-            bound,
-            wall: Wall::new(bound, bound.wall_starts[0]),
+            seg_map,
+            wall_starts,
+            wall: Wall::new(seg_map, wall_starts[0]),
             wall_idx: 0,
         }
     }
@@ -105,10 +105,10 @@ impl<'a> Iterator for AllWalls<'a> {
             Some(seg)
         } else {
             self.wall_idx += 1;
-            if self.wall_idx >= self.bound.wall_starts.len() {
+            if self.wall_idx >= self.wall_starts.len() {
                 None
             } else {
-                self.wall = Wall::new(self.bound, self.bound.wall_starts[self.wall_idx]);
+                self.wall = Wall::new(self.seg_map, self.wall_starts[self.wall_idx]);
                 Some(self.wall.next().expect("zero length wall"))
             }
         }
@@ -121,6 +121,10 @@ pub struct PlaneBoundary {
     wall_starts: Vec<VIdx>,
     seg_map: HashMap<VIdx, VIdx>,
     seg_set: HashSet<Segment>,
+
+    // storage for undivided walls (for cheaper visibility tests)
+    base_wall_starts: Vec<VIdx>,
+    base_seg_map: HashMap<VIdx, VIdx>,
 
     // also store some BC / material information
     thickness: Option<f64>,
@@ -137,6 +141,9 @@ impl PlaneBoundary {
             wall_starts: Vec::new(),
             seg_map: HashMap::new(),
             seg_set: HashSet::new(),
+
+            base_wall_starts: Vec::new(),
+            base_seg_map: HashMap::new(),
 
             thickness: None,
             material: None,
@@ -167,6 +174,23 @@ impl PlaneBoundary {
         }
 
         self.seg_map.insert(s.0, s.1);
+        self.seg_set.insert(s);
+    }
+
+    fn store_base_segment<S: Into<Segment>>(&mut self, s: S) {
+        // store a segment into both the main and base maps
+        let s = s.into();
+
+        let a = self.get(s.0).expect("bad index");
+        let b = self.get(s.1).expect("bad index");
+
+        // possibly avoid this O(n) check for at-scale work
+        if self.intersects(a, b, Some(s)) {
+            panic!("segment overlaps with existing segment");
+        }
+
+        self.seg_map.insert(s.0, s.1);
+        self.base_seg_map.insert(s.0, s.1);
         self.seg_set.insert(s);
     }
 
@@ -261,18 +285,20 @@ impl PlaneBoundary {
         let start = poly.next().unwrap();
         let start_idx = self.store_vertex(start);
         ids.push(start_idx);
+
         self.wall_starts.push(start_idx);
+        self.base_wall_starts.push(start_idx);
 
         let mut prev_idx = start_idx;
         for p in poly {
             let p_idx = self.store_vertex(p);
             ids.push(p_idx);
-            self.store_segment((prev_idx, p_idx));
+            self.store_base_segment((prev_idx, p_idx));
 
             prev_idx = p_idx;
         }
 
-        self.store_segment((prev_idx, start_idx));
+        self.store_base_segment((prev_idx, start_idx));
         ids
     }
 
@@ -359,8 +385,14 @@ impl PlaneBoundary {
     }
 
     pub fn all_walls<'a>(&'a self) -> AllWalls<'a> {
-        // return a vector of all walls of the boundary, oriented with inside on the left
-        AllWalls::new(self)
+        // an iterator over every boundary segment
+        AllWalls::new(&self.seg_map, &self.wall_starts)
+    }
+
+    pub fn all_base_walls<'a>(&'a self) -> AllWalls<'a> {
+        // an iterator over every base boundary segment
+        // does not include wall subdivisions, for faster visibility checks
+        AllWalls::new(&self.base_seg_map, &self.base_wall_starts)
     }
 
     pub fn all_distributed_forces(&self) -> Vec<(Segment, Point)> {

@@ -383,32 +383,31 @@ impl PlaneTriangulation {
 
     fn midpoint_visible<E: Into<Edge>>(&self, e: E, v: VIdx) -> bool {
         // determine whether the midpoint of e is visible from v
+        const TOLERANCE: f64 = 1e-6;
+
         let e = e.into();
         if let (Some(p), Some(q), Some(x)) = (self.get(e.0), self.get(e.1), self.get(v)) {
             let p: Point = p.into();
-            let m = p.mid(q.into()); // midpoint
+            let q: Point = q.into();
+            let m = p.mid(q); // midpoint
             let x: Point = x.into();
 
             // check if any wall obstructs mx
-            for wall in self.bound.all_walls().into_iter() {
-                let (a_id, b_id) = (VIdx::Bound(wall.0), VIdx::Bound(wall.1));
-                if a_id == e.0
-                    || a_id == e.1
-                    || a_id == v
-                    || b_id == e.0
-                    || b_id == e.1
-                    || b_id == v
-                {
-                    // don't check walls which touch the query points (they are always in contact)
-                    continue;
-                }
-
+            // make sure to skip walls which m or x contact
+            // this was previously done by checking if e.0 or e.1 are wall endpoints
+            // now that only base walls are checked, a spatial predicate is used
+            for wall in self.bound.all_base_walls() {
                 if let Some((a, b)) = self.bound.get_segment_points(wall) {
-                    if predicates::segments_intersect((a, b), (m, x)) {
+                    if predicates::lies_on((a, b), m, TOLERANCE) {
+                        continue;
+                    } else if predicates::lies_on((a, b), x, TOLERANCE) {
+                        continue;
+                    } else if predicates::segments_intersect((a, b), (m, x)) {
                         return false;
                     }
                 }
             }
+
             true
         } else {
             // default false, TODO make sure this makes sense
@@ -510,11 +509,7 @@ impl PlaneTriangulation {
         self.tris.clear();
         self.recents.clear();
 
-        let mut to_finish: HashSet<Edge> = HashSet::new();
-
-        for e in self.bound.all_walls().into_iter().map(|s| s.into()) {
-            to_finish.insert(e);
-        }
+        let mut to_finish: HashSet<Edge> = self.bound.all_walls().map(Into::into).collect();
 
         while !to_finish.is_empty() {
             // remove an element from the set
