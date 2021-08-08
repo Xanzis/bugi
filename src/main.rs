@@ -122,13 +122,17 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 fn mesh<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     // compute a mesh from a boundary definition
     // save a mesh definition file and a mesh visualization
+    eprintln!("computing mesh ...");
+
     let file_path = args.value_of("INPUT").unwrap();
     let file_path = path::Path::new(file_path);
 
+    eprintln!("initializing boundary ...");
     let bnd = file::read_to_bound(file_path)?;
 
     // TODO will need to add 3d options when available
     let mut msh = plane::PlaneTriangulation::new(bnd);
+    eprintln!("boundary initialized");
 
     let size = args
         .value_of("elementsize")
@@ -136,6 +140,7 @@ fn mesh<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
         .parse::<f64>()
         .or(Err(BugiError::arg_error("could not parse element size")))?;
 
+    eprintln!("meshing ...");
     match args.value_of("mesher") {
         None | Some("chew") => msh.chew_mesh(size),
         _ => {
@@ -144,6 +149,8 @@ fn mesh<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
             ))
         }
     }
+
+    eprintln!("mesh complete\nvisualizing ...");
 
     let vis_out_path = args.value_of("imageout").unwrap_or("out.png").to_string();
     let mesh_out_path = args.value_of("meshout").unwrap_or("out.bmsh").to_string();
@@ -162,9 +169,13 @@ fn mesh<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
     vis.draw(vis_out_path.as_str(), vis_options);
 
+    eprintln!("visualization complete\nbuilding element assemblage ...");
+
     let elas: element::ElementAssemblage = msh.assemble().map_err(|e| BugiError::run_error(e))?;
 
     file::save_elas(mesh_out_path.as_str(), elas);
+
+    eprintln!("mesh generation complete");
 
     Ok(())
 }
