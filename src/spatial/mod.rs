@@ -71,6 +71,11 @@ impl Point {
         (v.data[0].powi(2) + v.data[1].powi(2) + v.data[2].powi(2)).sqrt()
     }
 
+    pub fn dot(self, other: Point) -> f64 {
+        let n = min(self.n, other.n);
+        (0..n).map(|i| self[i] * other[i]).sum()
+    }
+
     pub fn norm(self) -> f64 {
         (self.data[0].powi(2) + self.data[1].powi(2) + self.data[2].powi(2)).sqrt()
     }
@@ -273,21 +278,25 @@ mod tests {
         assert!(Point::new(&[1.2, 2.3]) == Point::from((1.2, 2.3)));
         assert!(Point::new(&[1.2, 2.3, 3.4]) == Point::from((1.2, 2.3, 3.4)));
     }
+
     #[test]
     fn point_disp() {
         let goal = "(0.0000)";
         assert!(format!("{}", Point::new(&[0.0])) == goal)
     }
+
     #[test]
     fn good_try() {
         let test = Point::try_from(vec![1.0, 2.0, 3.0]);
         assert!(test == Ok(Point::new(&[1.0, 2.0, 3.0])))
     }
+
     #[test]
     fn bad_try() {
         let test = Point::try_from(vec![1.0, 2.0, 3.0, 4.0]);
         assert!(test.is_err())
     }
+
     #[test]
     fn orientation() {
         use super::predicates;
@@ -299,6 +308,7 @@ mod tests {
         assert_eq!(predicates::triangle_dir((b, a, c)), Orient::Positive);
         assert_eq!(predicates::triangle_dir((c, b, a)), Orient::Positive);
     }
+
     #[test]
     fn simple_hull() {
         use super::hull;
@@ -311,6 +321,7 @@ mod tests {
         ];
         assert_eq!(hull::jarvis_hull(&points), vec![0, 3, 4, 1]);
     }
+
     #[test]
     fn point_arithmetic() {
         let p = Point::new(&[-1.0, 5.0]);
@@ -318,6 +329,7 @@ mod tests {
         assert_eq!(p + Point::new(&[1.0, 2.0]), Point::new(&[0.0, 7.0]));
         assert_eq!(p * 2.0, Point::new(&[-2.0, 10.0]));
     }
+
     #[test]
     fn point_in_triangle() {
         use super::predicates;
@@ -333,6 +345,7 @@ mod tests {
         assert!(!predicates::in_triangle(q, (a, b, c)));
         assert!(!predicates::in_triangle(q, (c, b, a)));
     }
+
     #[test]
     fn in_circle() {
         use super::predicates;
@@ -345,6 +358,7 @@ mod tests {
 
         assert!(predicates::in_circle(x, (p, q, r)))
     }
+
     #[test]
     fn intersections() {
         use super::predicates;
@@ -362,6 +376,7 @@ mod tests {
         assert!(predicates::segments_intersect((p, q), (t, u)));
         assert!(!predicates::segments_intersect((r, s), (t, u)))
     }
+
     #[test]
     fn unit() {
         let p: Point = (5.0, 0.0).into();
@@ -369,6 +384,7 @@ mod tests {
         let q: Point = (3.0, 3.0).into();
         assert!((q.unit() - Point::new(&[0.7071, 0.7071])).norm() < 1e-2);
     }
+
     #[test]
     fn circumradius() {
         use super::predicates;
@@ -376,6 +392,7 @@ mod tests {
         let tri = ((0.0, 0.0).into(), (3.0, 0.0).into(), (0.0, 4.0).into());
         assert!((predicates::circumradius(tri) - 2.5).abs() < 1e-10)
     }
+
     #[test]
     fn circumcenter() {
         use super::predicates;
@@ -387,5 +404,18 @@ mod tests {
                 .dist((1.5, 2.0).into())
                 < 1e-10
         )
+    }
+
+    #[test]
+    fn lies_on() {
+        use super::predicates;
+
+        let seg = ((2.0, 3.0).into(), (4.0, 6.0).into());
+
+        assert!(!predicates::lies_on(seg, (1.0, 1.5).into(), 0.001));
+        assert!(!predicates::lies_on(seg, (5.0, 7.5).into(), 0.001));
+        assert!(!predicates::lies_on(seg, (3.0, 4.6).into(), 0.001));
+
+        assert!(predicates::lies_on(seg, (3.0, 4.5001).into(), 0.001));
     }
 }

@@ -189,6 +189,31 @@ pub fn segments_intersect(a: (Point, Point), b: (Point, Point)) -> bool {
     }
 }
 
+pub fn lies_on(seg: (Point, Point), r: Point, tol: f64) -> bool {
+    // test whether r lies on seg (pq) to within tol
+    let (p, q) = seg;
+
+    let seg_len = p.dist(q);
+
+    let pq_unit = (q - p).unit();
+    let pr_vec = r - p;
+
+    let dot = pq_unit.dot(pr_vec);
+
+    if dot < -tol {
+        false
+    } else if dot > (seg_len + tol) {
+        false
+    } else {
+        let projected = pq_unit * dot;
+        if projected.dist(pr_vec) > tol {
+            false
+        } else {
+            true
+        }
+    }
+}
+
 pub fn circumradius(tri: (Point, Point, Point)) -> f64 {
     // compute a triangle circumradius
     let a = tri.0.dist(tri.1);
