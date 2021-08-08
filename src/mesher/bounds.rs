@@ -9,16 +9,16 @@ use crate::element::material::Material;
 
 // a bounds vertex id
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum VIdx {
+pub enum VId {
     Real(usize),
 }
 
 // a directed boundary segment
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Segment(pub VIdx, pub VIdx);
+pub struct Segment(pub VId, pub VId);
 
-impl From<(VIdx, VIdx)> for Segment {
-    fn from(s: (VIdx, VIdx)) -> Segment {
+impl From<(VId, VId)> for Segment {
+    fn from(s: (VId, VId)) -> Segment {
         Segment(s.0, s.1)
     }
 }
@@ -28,7 +28,7 @@ impl Segment {
         Segment(self.1, self.0)
     }
 
-    fn has(self, v: VIdx) -> bool {
+    fn has(self, v: VId) -> bool {
         self.0 == v || self.1 == v
     }
 }
@@ -36,14 +36,14 @@ impl Segment {
 // Wall is an iterator over connecting segments
 #[derive(Clone, Debug)]
 pub struct Wall<'a> {
-    seg_map: &'a HashMap<VIdx, VIdx>,
-    start: VIdx,
-    prev: VIdx,
+    seg_map: &'a HashMap<VId, VId>,
+    start: VId,
+    prev: VId,
     done: bool,
 }
 
 impl<'a> Wall<'a> {
-    fn new(seg_map: &'a HashMap<VIdx, VIdx>, start: VIdx) -> Self {
+    fn new(seg_map: &'a HashMap<VId, VId>, start: VId) -> Self {
         Self {
             seg_map,
             start,
@@ -78,14 +78,14 @@ impl<'a> Iterator for Wall<'a> {
 
 #[derive(Clone, Debug)]
 pub struct AllWalls<'a> {
-    seg_map: &'a HashMap<VIdx, VIdx>,
-    wall_starts: &'a Vec<VIdx>,
+    seg_map: &'a HashMap<VId, VId>,
+    wall_starts: &'a Vec<VId>,
     wall: Wall<'a>,
     wall_idx: usize,
 }
 
 impl<'a> AllWalls<'a> {
-    fn new(seg_map: &'a HashMap<VIdx, VIdx>, wall_starts: &'a Vec<VIdx>) -> Self {
+    fn new(seg_map: &'a HashMap<VId, VId>, wall_starts: &'a Vec<VId>) -> Self {
         assert!(wall_starts.len() > 0, "cannot iterate over empty wall list");
 
         Self {
@@ -118,18 +118,18 @@ impl<'a> Iterator for AllWalls<'a> {
 #[derive(Clone, Debug)]
 pub struct PlaneBoundary {
     vertices: Vec<(f64, f64)>,
-    wall_starts: Vec<VIdx>,
-    seg_map: HashMap<VIdx, VIdx>,
+    wall_starts: Vec<VId>,
+    seg_map: HashMap<VId, VId>,
     seg_set: HashSet<Segment>,
 
     // storage for undivided walls (for cheaper visibility tests)
-    base_wall_starts: Vec<VIdx>,
-    base_seg_map: HashMap<VIdx, VIdx>,
+    base_wall_starts: Vec<VId>,
+    base_seg_map: HashMap<VId, VId>,
 
     // also store some BC / material information
     thickness: Option<f64>,
     material: Option<Material>,
-    constraints: HashMap<VIdx, Constraint>,
+    constraints: HashMap<VId, Constraint>,
     distributed_forces: HashMap<Segment, Point>,
     distributed_constraints: HashMap<Segment, Constraint>,
 }
@@ -153,10 +153,10 @@ impl PlaneBoundary {
         }
     }
 
-    pub fn store_vertex<T: TryInto<(f64, f64)>>(&mut self, p: T) -> VIdx {
+    pub fn store_vertex<T: TryInto<(f64, f64)>>(&mut self, p: T) -> VId {
         if let Ok((x, y)) = p.try_into() {
             self.vertices.push((x, y));
-            VIdx::Real(self.vertices.len() - 1)
+            VId::Real(self.vertices.len() - 1)
         } else {
             panic!("bad vertex input");
         }
@@ -210,15 +210,15 @@ impl PlaneBoundary {
         self.material
     }
 
-    pub fn store_constraint(&mut self, v: VIdx, c: Constraint) {
+    pub fn store_constraint(&mut self, v: VId, c: Constraint) {
         self.constraints.insert(v, c);
     }
 
-    pub fn store_distributed_force(&mut self, v: VIdx, w: VIdx, f: Point) {
+    pub fn store_distributed_force(&mut self, v: VId, w: VId, f: Point) {
         self.distributed_forces.insert((v, w).into(), f);
     }
 
-    pub fn store_distributed_constraint(&mut self, v: VIdx, w: VIdx, c: Constraint) {
+    pub fn store_distributed_constraint(&mut self, v: VId, w: VId, c: Constraint) {
         self.distributed_constraints.insert((v, w).into(), c);
     }
 
@@ -242,14 +242,14 @@ impl PlaneBoundary {
         self.seg_map.insert(s.0, s.1);
     }
 
-    pub fn get(&self, id: VIdx) -> Option<(f64, f64)> {
+    pub fn get(&self, id: VId) -> Option<(f64, f64)> {
         match id {
-            VIdx::Real(i) => self.vertices.get(i).cloned(),
+            VId::Real(i) => self.vertices.get(i).cloned(),
         }
     }
 
-    pub fn all_vidx(&self) -> impl Iterator<Item = VIdx> {
-        (0..self.vertices.len()).map(|x| VIdx::Real(x))
+    pub fn all_vid(&self) -> impl Iterator<Item = VId> {
+        (0..self.vertices.len()).map(|x| VId::Real(x))
     }
 
     pub fn get_segment_points(&self, seg: Segment) -> Option<(Point, Point)> {
@@ -276,7 +276,7 @@ impl PlaneBoundary {
         false
     }
 
-    pub fn store_polygon<T: IntoIterator<Item = (f64, f64)>>(&mut self, poly: T) -> Vec<VIdx> {
+    pub fn store_polygon<T: IntoIterator<Item = (f64, f64)>>(&mut self, poly: T) -> Vec<VId> {
         // store an ordered set of points as a polygon
         // the polygon should be oriented so positive triangles off the edges are inside the body
         // TODO enforce this
@@ -402,20 +402,20 @@ impl PlaneBoundary {
             .collect()
     }
 
-    pub fn all_constraints(&self) -> Vec<(VIdx, Constraint)> {
+    pub fn all_constraints(&self) -> Vec<(VId, Constraint)> {
         self.constraints.iter().map(|(&v, &c)| (v, c)).collect()
     }
 
     pub fn visualize(&self) -> Visualizer {
         let nodes: Vec<Point> = self
-            .all_vidx()
+            .all_vid()
             .map(|x| self.get(x).unwrap().into())
             .collect();
 
         let mut edges = Vec::new();
         for s in self.seg_set.iter() {
             match s {
-                Segment(VIdx::Real(i), VIdx::Real(j)) => edges.push((*i, *j)),
+                Segment(VId::Real(i), VId::Real(j)) => edges.push((*i, *j)),
             }
         }
 

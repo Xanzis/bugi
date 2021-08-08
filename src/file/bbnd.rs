@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::element::loading::Constraint;
 use crate::element::material::Material;
-use crate::mesher::bounds::{PlaneBoundary, VIdx};
+use crate::mesher::bounds::{PlaneBoundary, VId};
 
 use super::FileError;
 
@@ -13,7 +13,7 @@ where
     T: Iterator<Item = &'a str>,
 {
     let mut b = PlaneBoundary::new();
-    let mut named_vertices: HashMap<String, VIdx> = HashMap::new();
+    let mut named_vertices: HashMap<String, VId> = HashMap::new();
     let mut no = 0;
 
     while let Some(line) = lines.next() {

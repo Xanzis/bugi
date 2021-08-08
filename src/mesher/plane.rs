@@ -13,32 +13,32 @@ use super::MeshError;
 
 // enum for vertex indices in the ghost vertex scheme
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum VIdx {
+enum VId {
     Real(usize),
-    Bound(bounds::VIdx),
+    Bound(bounds::VId),
     Ghost,
 }
 
-impl VIdx {
+impl VId {
     fn is_ghost(&self) -> bool {
         match self {
-            VIdx::Ghost => true,
+            VId::Ghost => true,
             _ => false,
         }
     }
 }
 
-impl From<bounds::VIdx> for VIdx {
-    fn from(id: bounds::VIdx) -> Self {
-        VIdx::Bound(id)
+impl From<bounds::VId> for VId {
+    fn from(id: bounds::VId) -> Self {
+        VId::Bound(id)
     }
 }
 
 // structs for ordered pairs / triplets of vertex indices
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct Triangle(VIdx, VIdx, VIdx);
+struct Triangle(VId, VId, VId);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct Edge(VIdx, VIdx);
+struct Edge(VId, VId);
 
 impl Triangle {
     fn edges(self) -> [Edge; 3] {
@@ -88,8 +88,8 @@ impl Triangle {
     }
 }
 
-impl From<(VIdx, VIdx, VIdx)> for Triangle {
-    fn from(t: (VIdx, VIdx, VIdx)) -> Triangle {
+impl From<(VId, VId, VId)> for Triangle {
+    fn from(t: (VId, VId, VId)) -> Triangle {
         Triangle(t.0, t.1, t.2)
     }
 }
@@ -104,8 +104,8 @@ impl Edge {
     }
 }
 
-impl From<(VIdx, VIdx)> for Edge {
-    fn from(e: (VIdx, VIdx)) -> Edge {
+impl From<(VId, VId)> for Edge {
+    fn from(e: (VId, VId)) -> Edge {
         Edge(e.0, e.1)
     }
 }
@@ -125,11 +125,11 @@ pub struct PlaneTriangulation {
     vertices: Vec<(f64, f64)>,
 
     // map with three entries per triangle for fast lookup
-    tris: HashMap<Edge, VIdx>,
+    tris: HashMap<Edge, VId>,
     full_tris: HashSet<Triangle>,
 
     // record of coappearing vertices in recently added triangles
-    recents: HashMap<VIdx, VIdx>,
+    recents: HashMap<VId, VId>,
 }
 
 impl PlaneTriangulation {
@@ -144,11 +144,11 @@ impl PlaneTriangulation {
         }
     }
 
-    fn store_vertex<T: TryInto<(f64, f64)>>(&mut self, p: T) -> VIdx {
+    fn store_vertex<T: TryInto<(f64, f64)>>(&mut self, p: T) -> VId {
         // store a new vertex, returning its index
         if let Ok((x, y)) = p.try_into() {
             self.vertices.push((x, y));
-            VIdx::Real(self.vertices.len() - 1)
+            VId::Real(self.vertices.len() - 1)
         } else {
             panic!("bad vertex input");
         }
@@ -158,17 +158,17 @@ impl PlaneTriangulation {
         self.vertices.len()
     }
 
-    fn get(&self, v: VIdx) -> Option<(f64, f64)> {
+    fn get(&self, v: VId) -> Option<(f64, f64)> {
         // retrieve a vertex
         match v {
-            VIdx::Real(i) => self.vertices.get(i).cloned(),
-            VIdx::Bound(i) => self.bound.get(i),
-            VIdx::Ghost => None,
+            VId::Real(i) => self.vertices.get(i).cloned(),
+            VId::Bound(i) => self.bound.get(i),
+            VId::Ghost => None,
         }
     }
 
-    fn get_perturbed(&self, v: VIdx) -> Option<(f64, f64)> {
-        // retrieve a vertex, perturbing it slightly using a hash of the VIdx
+    fn get_perturbed(&self, v: VId) -> Option<(f64, f64)> {
+        // retrieve a vertex, perturbing it slightly using a hash of the VId
         // TODO confirm this is sound
         const MAX_PERTURB: f64 = 1e-9;
         let mut hasher = DefaultHasher::new();
@@ -178,12 +178,12 @@ impl PlaneTriangulation {
         self.get(v).map(|(x, y)| (x + perturb, y + perturb))
     }
 
-    fn all_vidx(&self) -> impl Iterator<Item = VIdx> {
-        // return an iterator over all nonghost VIdxs
+    fn all_vid(&self) -> impl Iterator<Item = VId> {
+        // return an iterator over all nonghost VIds
         (0..self.vertices.len())
-            .map(|x| VIdx::Real(x))
-            .chain(self.bound.all_vidx().map(|x| VIdx::Bound(x)))
-        //    .chain(iter::once(VIdx::Ghost))
+            .map(|x| VId::Real(x))
+            .chain(self.bound.all_vid().map(|x| VId::Bound(x)))
+        //    .chain(iter::once(VId::Ghost))
     }
 
     fn all_triangles<'a>(&'a self) -> impl Iterator<Item = Triangle> + 'a {
@@ -215,7 +215,7 @@ impl PlaneTriangulation {
         ))
     }
 
-    fn in_circle<T: Into<Triangle>>(&self, tri: T, x: VIdx, perturb: bool) -> bool {
+    fn in_circle<T: Into<Triangle>>(&self, tri: T, x: VId, perturb: bool) -> bool {
         // determine whether x lies in the oriented triangle tri's circumcircle
         // perturb determines whether or not to perturb the inputs (which helps avoid chew edge cases)
         let tri = tri.into();
@@ -245,12 +245,12 @@ impl PlaneTriangulation {
         // don't check tri for positivity, important that negative triangles return inverse results
         if perturb {
             predicates::in_circle(
-                self.get_perturbed(x).expect("nonexistent vidx").into(),
+                self.get_perturbed(x).expect("nonexistent vid").into(),
                 self.get_triangle_points_perturbed(tri).unwrap(),
             )
         } else {
             predicates::in_circle(
-                self.get(x).expect("nonexistent vidx").into(),
+                self.get(x).expect("nonexistent vid").into(),
                 self.get_triangle_points(tri).unwrap(),
             )
         }
@@ -262,7 +262,7 @@ impl PlaneTriangulation {
             .map(predicates::triangle_dir)
     }
 
-    fn to_left<E: Into<Edge>>(&self, e: E, p: VIdx) -> bool {
+    fn to_left<E: Into<Edge>>(&self, e: E, p: VId) -> bool {
         // determine whether p is to the left of ('in front of') e
         // in constrast to triangle_dir, this properly handles ghost points
         // TODO make sure this is in fact the right ghost handling
@@ -338,13 +338,13 @@ impl PlaneTriangulation {
         }
     }
 
-    fn adjacent<E: Into<Edge>>(&self, e: E) -> Option<VIdx> {
+    fn adjacent<E: Into<Edge>>(&self, e: E) -> Option<VId> {
         // return Some(w) if the positively oriented uvw exists
         self.tris.get(&e.into()).cloned()
     }
 
     #[allow(dead_code)]
-    fn adjacent_one(&self, u: VIdx) -> Option<Edge> {
+    fn adjacent_one(&self, u: VId) -> Option<Edge> {
         // return an arbitrary triangle including u, if one exists
         // if u has been part of a recent triangle, return it
         // warning, may return a ghost triangle
@@ -360,7 +360,7 @@ impl PlaneTriangulation {
 
         // otherwise, search everything
         for i in 0..self.vertex_count() {
-            let v = VIdx::Real(i);
+            let v = VId::Real(i);
             let e = Edge(u, v);
             if let Some(w) = self.tris.get(&e).cloned() {
                 return Some((v, w).into());
@@ -371,17 +371,17 @@ impl PlaneTriangulation {
         }
 
         // check if there's a ghost triangle
-        if let Some(w) = self.tris.get(&(u, VIdx::Ghost).into()).cloned() {
-            return Some((VIdx::Ghost, w).into());
+        if let Some(w) = self.tris.get(&(u, VId::Ghost).into()).cloned() {
+            return Some((VId::Ghost, w).into());
         }
-        if let Some(w) = self.tris.get(&(VIdx::Ghost, u).into()).cloned() {
-            return Some((w, VIdx::Ghost).into());
+        if let Some(w) = self.tris.get(&(VId::Ghost, u).into()).cloned() {
+            return Some((w, VId::Ghost).into());
         }
 
         None
     }
 
-    fn midpoint_visible<E: Into<Edge>>(&self, e: E, v: VIdx) -> bool {
+    fn midpoint_visible<E: Into<Edge>>(&self, e: E, v: VId) -> bool {
         // determine whether the midpoint of e is visible from v
         const TOLERANCE: f64 = 1e-6;
 
@@ -433,11 +433,11 @@ impl PlaneTriangulation {
         }
     }
 
-    fn bowyer_watson_dig(&mut self, u: VIdx, v: VIdx, w: VIdx) {
+    fn bowyer_watson_dig(&mut self, u: VId, v: VId, w: VId) {
         // u is a new vertex
 
         // if wv or vw is a segment, do not cross it; add uvw
-        if let (VIdx::Bound(a), VIdx::Bound(b)) = (w, v) {
+        if let (VId::Bound(a), VId::Bound(b)) = (w, v) {
             if self.bound.is_segment((a, b)) || self.bound.is_segment((b, a)) {
                 self.add_triangle((u, v, w))
                     .expect("could not add triangle");
@@ -471,7 +471,7 @@ impl PlaneTriangulation {
         }
     }
 
-    fn bowyer_watson_insert<T: Into<Triangle>>(&mut self, u: VIdx, tri: T) {
+    fn bowyer_watson_insert<T: Into<Triangle>>(&mut self, u: VId, tri: T) {
         // insert a vertex into a delaunay triangulation, maintaining the delaunay property
         // tri is a triangle whose cirmcumcircle encloses u
         let Triangle(v, w, x) = tri.into();
@@ -487,7 +487,7 @@ impl PlaneTriangulation {
         // return the triangle and the two new directed edges
 
         let mut tri: Option<Triangle> = None;
-        for v in self.all_vidx() {
+        for v in self.all_vid() {
             // do not construct doubly-ghost triangles
             if e.is_ghost() && v.is_ghost() {
                 continue;
@@ -573,11 +573,11 @@ impl PlaneTriangulation {
     }
 
     pub fn visualize(&self) -> Visualizer {
-        let vidxs: Vec<VIdx> = self.all_vidx().filter(|x| !x.is_ghost()).collect();
+        let vids: Vec<VId> = self.all_vid().filter(|x| !x.is_ghost()).collect();
 
-        let nodes: Vec<Point> = vidxs.iter().map(|x| self.get(*x).unwrap().into()).collect();
+        let nodes: Vec<Point> = vids.iter().map(|x| self.get(*x).unwrap().into()).collect();
 
-        let idx_map: HashMap<VIdx, usize> = vidxs
+        let idx_map: HashMap<VId, usize> = vids
             .iter()
             .cloned()
             .enumerate()
@@ -618,11 +618,11 @@ impl PlaneTriangulation {
         }
 
         let mut vertex_list: Vec<(f64, f64)> = Vec::new();
-        let mut vertex_lookup: HashMap<VIdx, usize> = HashMap::new();
+        let mut vertex_lookup: HashMap<VId, usize> = HashMap::new();
 
         // translate vertex ids to indices in a now-frozen vertex list
 
-        for id in self.all_vidx() {
+        for id in self.all_vid() {
             vertex_lookup.insert(id, vertex_list.len());
             vertex_list.push(self.get(id).unwrap());
         }
@@ -645,8 +645,8 @@ impl PlaneTriangulation {
         // pull the various boundary conditions through from bound
 
         for (id, con) in self.bound.all_constraints() {
-            // upgrade the bounds::VIdx to a VIdx
-            let id: VIdx = id.into();
+            // upgrade the bounds::VId to a VId
+            let id: VId = id.into();
             res.add_constraint(*vertex_lookup.get(&id).unwrap(), con);
         }
 
