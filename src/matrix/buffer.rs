@@ -477,7 +477,7 @@ impl MatrixLike for Diagonal {
         let shape = shape.into().to_rc();
         assert_eq!(shape.0, shape.1, "requested diagonal shape is not square");
         Self {
-            data: vec![0.0;shape.0],
+            data: vec![0.0; shape.0],
         }
     }
 
@@ -539,8 +539,6 @@ impl IndexMut<usize> for Diagonal {
 
 impl From<Vec<f64>> for Diagonal {
     fn from(data: Vec<f64>) -> Self {
-        Self {
-            data
-        }
+        Self { data }
     }
 }
