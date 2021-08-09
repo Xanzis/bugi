@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn envelope_cholesky() {
-        use crate::matrix::{LinearMatrix, LowerRowEnvelope, MatrixLike, Norm};
+        use crate::matrix::{LinearMatrix, LowerRowEnvelope, MatrixLike, Norm, Diagonal};
 
         // testing cholesky decomposition for correctness
         // don't copy this usage pattern for speed-critical operations
@@ -153,5 +153,47 @@ mod tests {
         );
 
         assert!((&target - &m_remade).frobenius() <= 1e-8);
+
+        let (l, d) = super::direct::cholesky_envelope_no_root(&m);
+
+        let mut l_transpose = LinearMatrix::from_flat(4, l.flat().cloned());
+        l_transpose.transpose();
+
+        let temp: LinearMatrix = d.mul(&l_transpose);
+        let m_remade: LinearMatrix = l.mul(&temp);
+
+        assert!((&target - &m_remade).frobenius() <= 1e-8);
+
+        // example LDL' decomposition on non positive-definite problem
+
+        let m = LowerRowEnvelope::from_flat(
+            4,
+            vec![
+                2.0, 0.0, 0.0, 0.0, 6.0, 17.0, 0.0, 0.0, 0.0, 2.0, -1.0, 0.0, 6.0, 17.0, -4.0, 33.0,
+            ],
+        );
+
+        let (l, d) = super::direct::cholesky_envelope_no_root(&m);
+
+        let mut l_transpose = LinearMatrix::from_flat(4, l.flat().cloned());
+        l_transpose.transpose();
+
+        let temp: LinearMatrix = d.mul(&l_transpose);
+        let m_remade: LinearMatrix = l.mul(&temp);
+
+        let target = LinearMatrix::from_flat(
+            4,
+            vec![
+                2.0, 6.0, 0.0, 6.0, 6.0, 17.0, 2.0, 17.0, 0.0, 2.0, -1.0, -4.0, 6.0, 17.0, -4.0, 33.0,
+            ],
+        );
+
+        assert!((&target - &m_remade).frobenius() <= 1e-8);
+
+        let target_diagonal: Diagonal = vec![2.0, -1.0, 3.0, 4.0].into();
+        let target_diagonal = LinearMatrix::from_flat(4, target_diagonal.flat().cloned());
+        let d = LinearMatrix::from_flat(4, d.flat().cloned());
+
+        assert!((&target_diagonal - &d).frobenius() <= 1e-8);
     }
 }

@@ -1,5 +1,5 @@
 use crate::matrix::graph::Graph;
-use crate::matrix::{Dictionary, Inverse, LinearMatrix, LowerRowEnvelope, MatrixLike};
+use crate::matrix::{Dictionary, Inverse, LinearMatrix, LowerRowEnvelope, MatrixLike, Diagonal};
 
 use super::Solver;
 
@@ -152,4 +152,38 @@ pub fn cholesky_envelope(a: &LowerRowEnvelope) -> LowerRowEnvelope {
     }
 
     l
+}
+
+pub fn cholesky_envelope_no_root(a: &LowerRowEnvelope) -> (LowerRowEnvelope, Diagonal) {
+    // find the LDL' factorization of symmetric matrix A, where D may have negative elements
+
+    let n = a.shape().0;
+    let mut l = LowerRowEnvelope::from_envelope(a.envelope());
+    let mut d = Diagonal::zeros(n);
+
+    for i in 0..n {
+        let (start_col, u) = l.row_stored(i);
+        let dot = (start_col..i).zip(u.iter()).map(|(j, x)| x * x * d[j]).sum::<f64>();
+        d[(i, i)] = a[(i, i)] - dot;
+
+        for j in (i + 1) .. n {
+            if l.row_stored(j).0 > i { continue };
+
+            let (start_i, u) = l.row_stored(i);
+            let (start_j, v) = l.row_stored(j);
+
+            // properly align the i and j rows
+            let start_col = std::cmp::max(start_i, start_j);
+            let u = u[(start_col - start_i)..].iter();
+            let v = v[(start_col - start_j)..].iter();
+
+            let dot = (start_col..i).zip(u.zip(v)).map(|(k, (x, y))| x * y * d[k]).sum::<f64>();
+
+            l[(j, i)] = (a[(j, i)] - dot) / d[i];
+        }
+
+        l[(i, i)] = 1.0;
+    }
+
+    (l, d)
 }
