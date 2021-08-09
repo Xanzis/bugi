@@ -22,6 +22,11 @@ pub struct UpperTriangular {
     data: Vec<f64>,
 }
 
+#[derive(Clone, Debug)]
+pub struct Diagonal {
+    data: Vec<f64>,
+}
+
 impl LinearMatrix {
     fn pos(&self, loc: (usize, usize)) -> Option<usize> {
         // find the location of the desired element in data
@@ -128,6 +133,13 @@ impl UpperTriangular {
             b[i] = 0.0; // put it back :)
         }
         res
+    }
+}
+
+impl Diagonal {
+    pub fn num_neg(&self) -> usize {
+        // count the number of negative entries
+        self.data.iter().filter(|&&x| x < 0.0).count()
     }
 }
 
@@ -428,6 +440,107 @@ impl IndexMut<(usize, usize)> for UpperTriangular {
             unsafe { self.data.get_unchecked_mut(i) }
         } else {
             panic!("matrix index out of bounds")
+        }
+    }
+}
+
+// *****
+// LowerTriangular Implementations
+// *****
+
+impl MatrixLike for Diagonal {
+    fn shape(&self) -> (usize, usize) {
+        (self.data.len(), self.data.len())
+    }
+
+    fn get(&self, loc: (usize, usize)) -> Option<&f64> {
+        if loc.0 == loc.1 && loc.0 < self.data.len() {
+            unsafe { Some(self.data.get_unchecked(loc.0)) }
+        } else if loc.0 < self.data.len() && loc.1 < self.data.len() {
+            Some(&0.0)
+        } else {
+            None
+        }
+    }
+
+    fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64> {
+        if loc.0 == loc.1 && loc.0 < self.data.len() {
+            unsafe { Some(self.data.get_unchecked_mut(loc.0)) }
+        } else {
+            None
+        }
+    }
+
+    fn transpose(&mut self) {}
+
+    fn zeros<T: Into<MatrixShape>>(shape: T) -> Self {
+        let shape = shape.into().to_rc();
+        assert_eq!(shape.0, shape.1, "requested diagonal shape is not square");
+        Self {
+            data: vec![0.0;shape.0],
+        }
+    }
+
+    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(_shape: T, _data: U) -> Self {
+        // don't feel like it
+        unimplemented!()
+    }
+}
+
+impl PartialEq for Diagonal {
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data
+    }
+}
+
+impl fmt::Display for Diagonal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.disp())
+    }
+}
+
+impl Index<(usize, usize)> for Diagonal {
+    type Output = f64;
+    fn index(&self, loc: (usize, usize)) -> &Self::Output {
+        match self.get(loc) {
+            Some(x) => x,
+            None => panic!("index out of bounds"),
+        }
+    }
+}
+
+impl Index<usize> for Diagonal {
+    type Output = f64;
+    fn index(&self, loc: usize) -> &Self::Output {
+        match self.data.get(loc) {
+            Some(x) => x,
+            None => panic!("index out of bounds"),
+        }
+    }
+}
+
+impl IndexMut<(usize, usize)> for Diagonal {
+    fn index_mut(&mut self, loc: (usize, usize)) -> &mut Self::Output {
+        match self.get_mut(loc) {
+            Some(x) => x,
+            None => panic!("index out of bounds"),
+        }
+    }
+}
+
+impl IndexMut<usize> for Diagonal {
+    fn index_mut(&mut self, loc: usize) -> &mut Self::Output {
+        match self.data.get_mut(loc) {
+            Some(x) => x,
+            None => panic!("index out of bounds"),
+        }
+    }
+}
+
+impl From<Vec<f64>> for Diagonal {
+    fn from(data: Vec<f64>) -> Self {
+        Self {
+            data
         }
     }
 }
