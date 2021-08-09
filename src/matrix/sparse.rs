@@ -1,6 +1,6 @@
 // sparse matrix storage schemes
 use super::graph::Permutation;
-use super::{MatrixLike, MatrixShape};
+use super::{LinearMatrix, MatrixLike, MatrixShape};
 
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
@@ -380,6 +380,20 @@ impl From<Dictionary> for LowerRowEnvelope {
 impl From<Dictionary> for CompressedRow {
     fn from(dct: Dictionary) -> Self {
         Self::from_labeled_vals(dct.shape(), dct.data.into_iter().collect())
+    }
+}
+
+impl From<Dictionary> for LinearMatrix {
+    fn from(dct: Dictionary) -> Self {
+        let mut res = LinearMatrix::zeros(dct.shape());
+
+        for r in 0..res.shape().0 {
+            for c in 0..res.shape().1 {
+                res[(r, c)] = dct[(r, c)];
+            }
+        }
+
+        res
     }
 }
 

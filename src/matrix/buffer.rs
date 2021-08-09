@@ -283,6 +283,13 @@ impl IndexMut<(usize, usize)> for LinearMatrix {
     }
 }
 
+impl From<Vec<f64>> for LinearMatrix {
+    fn from(v: Vec<f64>) -> Self {
+        // build a column vector
+        Self::from_flat((v.len(), 1), v)
+    }
+}
+
 // *****
 // LowerTriangular Implementations
 // *****

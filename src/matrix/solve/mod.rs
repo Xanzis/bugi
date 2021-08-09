@@ -1,51 +1,67 @@
-use crate::matrix::MatrixLike;
+use crate::matrix::{Dictionary, MatrixLike};
 
 pub mod direct;
 pub mod iterative;
 
-pub trait Solver
-where
-    Self: Clone + std::fmt::Debug,
-{
-    fn new(dofs: usize) -> Self;
+pub trait Solver {
+    fn new(sys: System) -> Self;
 
-    // set a new coefficient if not present or add to existing one
-    fn add_coefficient(&mut self, loc: (usize, usize), val: f64);
+    // TODO improve matrix::Error API and add to this result
+    fn solve(self) -> Result<Vec<f64>, ()>;
+}
 
-    fn add_rhs_val(&mut self, loc: usize, val: f64);
+#[derive(Debug, Clone)]
+pub struct System {
+    mat: Dictionary,
+    rhs: Vec<f64>,
+}
 
-    // slow implementation for tests and small solves
-    fn from_kr<T: MatrixLike, U: MatrixLike>(k: &T, r: &U) -> Self
+impl System {
+    pub fn new(dofs: usize) -> Self {
+        Self {
+            mat: Dictionary::zeros(dofs),
+            rhs: vec![0.0; dofs],
+        }
+    }
+
+    pub fn add_coefficient(&mut self, loc: (usize, usize), val: f64) {
+        self.mat[loc] += val;
+    }
+
+    pub fn add_rhs_val(&mut self, loc: usize, val: f64) {
+        self.rhs[loc] += val;
+    }
+
+    pub fn from_kr<T, U>(k: &T, r: &U) -> Self
     where
-        Self: Sized,
+        T: MatrixLike,
+        U: MatrixLike,
     {
         let dofs = k.shape().0;
 
         if dofs != k.shape().1 || dofs != r.shape().0 || r.shape().1 != 1 {
-            panic!(
-                "dimensions invalid: k and r shapes are {:?} and {:?}",
-                k.shape(),
-                r.shape()
-            );
+            panic!("bad k, r shapes: {:?}, {:?}", k, r);
         }
 
         let mut res = Self::new(dofs);
 
         for row in 0..dofs {
             for col in 0..dofs {
-                if k[(row, col)] != 0.0 {
-                    res.add_coefficient((row, col), k[(row, col)]);
-                }
+                res.mat[(row, col)] = k[(row, col)];
             }
-
-            res.add_rhs_val(row, r[(row, 0)]);
+            res.rhs[row] = r[(row, 0)];
         }
 
         res
     }
 
-    // TODO improve matrix::Error API and add to this result
-    fn solve(self) -> Result<Vec<f64>, ()>;
+    fn into_parts<T, U>(self) -> (T, U)
+    where
+        T: From<Dictionary>,
+        U: From<Vec<f64>>,
+    {
+        (self.mat.into(), self.rhs.into())
+    }
 }
 
 #[cfg(test)]
@@ -74,7 +90,7 @@ mod tests {
     fn solver_impls() {
         use super::{
             direct::CholeskyEnvelopeSolver, direct::DenseGaussSolver, iterative::GaussSeidelSolver,
-            Solver,
+            Solver, System,
         };
         use crate::matrix::{LinearMatrix, MatrixLike};
 
@@ -87,9 +103,11 @@ mod tests {
         );
         let r = LinearMatrix::from_flat((4, 1), vec![0.0, 1.0, 0.0, 0.0]);
 
+        let sys = System::from_kr(&k, &r);
+
         let target = vec![1.6, 2.6, 2.4, 1.4];
 
-        let dg = DenseGaussSolver::from_kr(&k, &r);
+        let dg = DenseGaussSolver::new(sys.clone());
         let dg_res = dg.solve().unwrap();
         assert!(
             dg_res
@@ -100,7 +118,7 @@ mod tests {
                 <= 1.0e-8
         );
 
-        let gs = GaussSeidelSolver::from_kr(&k, &r);
+        let gs = GaussSeidelSolver::new(sys.clone());
         let gs_res = gs.solve().unwrap();
         assert!(
             gs_res
@@ -111,7 +129,7 @@ mod tests {
                 <= 1.0e-2
         );
 
-        let ch = CholeskyEnvelopeSolver::from_kr(&k, &r);
+        let ch = CholeskyEnvelopeSolver::new(sys.clone());
         let ch_res = ch.solve().unwrap();
         assert!(
             ch_res
@@ -125,7 +143,7 @@ mod tests {
 
     #[test]
     fn envelope_cholesky() {
-        use crate::matrix::{LinearMatrix, LowerRowEnvelope, MatrixLike, Norm, Diagonal};
+        use crate::matrix::{Diagonal, LinearMatrix, LowerRowEnvelope, MatrixLike, Norm};
 
         // testing cholesky decomposition for correctness
         // don't copy this usage pattern for speed-critical operations
@@ -184,7 +202,8 @@ mod tests {
         let target = LinearMatrix::from_flat(
             4,
             vec![
-                2.0, 6.0, 0.0, 6.0, 6.0, 17.0, 2.0, 17.0, 0.0, 2.0, -1.0, -4.0, 6.0, 17.0, -4.0, 33.0,
+                2.0, 6.0, 0.0, 6.0, 6.0, 17.0, 2.0, 17.0, 0.0, 2.0, -1.0, -4.0, 6.0, 17.0, -4.0,
+                33.0,
             ],
         );
 

@@ -1,38 +1,31 @@
-use super::Solver;
-use crate::matrix::{CompressedRow, Dictionary, LinearMatrix, MatrixLike, Norm};
+use super::{Solver, System};
+use crate::matrix::{CompressedRow, LinearMatrix, MatrixLike, Norm};
 
 #[derive(Clone, Debug)]
 pub struct GaussSeidelSolver {
     tolerance: f64,
     max_iter: usize,
-    k_constructor: Dictionary,
+    k: CompressedRow,
     r: LinearMatrix,
 }
 
 impl Solver for GaussSeidelSolver {
-    fn new(dofs: usize) -> Self {
+    fn new(sys: System) -> Self {
+        let (k, r) = sys.into_parts();
+
         Self {
             // TODO add interface for tol, max_iter specification
             tolerance: 0.001,
             max_iter: 200,
 
-            k_constructor: Dictionary::zeros(dofs),
-            r: LinearMatrix::zeros((dofs, 1)),
+            k,
+            r,
         }
-    }
-
-    fn add_coefficient(&mut self, loc: (usize, usize), val: f64) {
-        self.k_constructor[loc] += val;
-    }
-
-    fn add_rhs_val(&mut self, loc: usize, val: f64) {
-        self.r[(loc, 0)] += val;
     }
 
     fn solve(self) -> Result<Vec<f64>, ()> {
         eprintln!("beginning gauss-seidel iteration ...");
-        let k: CompressedRow = self.k_constructor.into();
-        let res = gauss_seidel(k, self.r, self.tolerance, self.max_iter);
+        let res = gauss_seidel(self.k, self.r, self.tolerance, self.max_iter);
 
         // TODO pass informative errors up, remove gauss_seidel panics
         eprintln!("iteration converged, gauss-seidel solution complete");

@@ -1,7 +1,7 @@
 use crate::matrix::graph::Graph;
-use crate::matrix::{Dictionary, Inverse, LinearMatrix, LowerRowEnvelope, MatrixLike, Diagonal};
+use crate::matrix::{Diagonal, Dictionary, Inverse, LinearMatrix, LowerRowEnvelope, MatrixLike};
 
-use super::Solver;
+use super::{Solver, System};
 
 #[derive(Clone, Debug)]
 pub struct DenseGaussSolver {
@@ -10,19 +10,9 @@ pub struct DenseGaussSolver {
 }
 
 impl Solver for DenseGaussSolver {
-    fn new(dofs: usize) -> Self {
-        Self {
-            k: LinearMatrix::zeros(dofs),
-            r: LinearMatrix::zeros((dofs, 1)),
-        }
-    }
-
-    fn add_coefficient(&mut self, loc: (usize, usize), val: f64) {
-        self.k[loc] += val;
-    }
-
-    fn add_rhs_val(&mut self, loc: usize, val: f64) {
-        self.r[(loc, 0)] += val;
+    fn new(sys: System) -> Self {
+        let (k, r) = sys.into_parts();
+        Self { k, r }
     }
 
     fn solve(mut self) -> Result<Vec<f64>, ()> {
@@ -42,20 +32,14 @@ pub struct CholeskyEnvelopeSolver {
 }
 
 impl Solver for CholeskyEnvelopeSolver {
-    fn new(dofs: usize) -> Self {
+    fn new(sys: System) -> Self {
+        let (k, r): (Dictionary, _) = sys.into_parts();
+
         Self {
-            dofs,
-            k: Dictionary::zeros(dofs),
-            r: vec![0.0; dofs],
+            dofs: k.shape().0,
+            k,
+            r,
         }
-    }
-
-    fn add_coefficient(&mut self, loc: (usize, usize), val: f64) {
-        self.k[loc] += val;
-    }
-
-    fn add_rhs_val(&mut self, loc: usize, val: f64) {
-        self.r[loc] += val;
     }
 
     fn solve(self) -> Result<Vec<f64>, ()> {
@@ -163,11 +147,16 @@ pub fn cholesky_envelope_no_root(a: &LowerRowEnvelope) -> (LowerRowEnvelope, Dia
 
     for i in 0..n {
         let (start_col, u) = l.row_stored(i);
-        let dot = (start_col..i).zip(u.iter()).map(|(j, x)| x * x * d[j]).sum::<f64>();
+        let dot = (start_col..i)
+            .zip(u.iter())
+            .map(|(j, x)| x * x * d[j])
+            .sum::<f64>();
         d[(i, i)] = a[(i, i)] - dot;
 
-        for j in (i + 1) .. n {
-            if l.row_stored(j).0 > i { continue };
+        for j in (i + 1)..n {
+            if l.row_stored(j).0 > i {
+                continue;
+            };
 
             let (start_i, u) = l.row_stored(i);
             let (start_j, v) = l.row_stored(j);
@@ -177,7 +166,10 @@ pub fn cholesky_envelope_no_root(a: &LowerRowEnvelope) -> (LowerRowEnvelope, Dia
             let u = u[(start_col - start_i)..].iter();
             let v = v[(start_col - start_j)..].iter();
 
-            let dot = (start_col..i).zip(u.zip(v)).map(|(k, (x, y))| x * y * d[k]).sum::<f64>();
+            let dot = (start_col..i)
+                .zip(u.zip(v))
+                .map(|(k, (x, y))| x * y * d[k])
+                .sum::<f64>();
 
             l[(j, i)] = (a[(j, i)] - dot) / d[i];
         }

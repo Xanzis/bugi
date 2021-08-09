@@ -5,7 +5,7 @@ pub mod material;
 pub mod strain;
 pub mod stress;
 
-use crate::matrix::solve::Solver;
+use crate::matrix::solve::{Solver, System};
 use crate::matrix::{Average, LinearMatrix, MatrixLike};
 use crate::spatial::Point;
 use crate::visual::Visualizer;
@@ -242,7 +242,9 @@ impl ElementAssemblage {
         Box::new(k_func)
     }
 
-    fn find_k<T: Solver>(&mut self, solver: &mut T) {
+    fn calc_k(&self, sys: &mut System) {
+        // evaluate the global K matrix, filling it into sys
+
         for (i, el) in self.elements.iter().enumerate() {
             let int_func = self.k_integrand_func(i);
             let el_k = integrate::nd_gauss_mat(int_func, self.dim, el.integration_order());
@@ -257,7 +259,7 @@ impl ElementAssemblage {
                         let (j_node_idx, j_node_dof) = el.i_to_dof(j);
                         if let Some(j_dof) = self.find_dof(j_node_idx, j_node_dof) {
                             // wooo finally
-                            solver.add_coefficient((i_dof, j_dof), el_k[(i, j)]);
+                            sys.add_coefficient((i_dof, j_dof), el_k[(i, j)]);
                         }
                     }
                 }
@@ -265,20 +267,14 @@ impl ElementAssemblage {
         }
     }
 
-    pub fn calc_displacements<T: Solver>(&mut self) {
-        // find the displacements under load and store them in the assemblage
-        if self.dof_lookup.is_none() {
-            self.compile_lookup();
-        }
-
-        let mut solver = T::new(self.dofs);
-        self.find_k(&mut solver);
+    fn calc_load(&self, sys: &mut System) {
+        // evaluate the global load vector, filling it into the solver
 
         for (&n, &f) in self.concentrated_forces.iter() {
             // check if each node dof still exists and if so apply that part of force
             for d in 0..self.dim() {
                 if let Some(dof) = self.find_dof(n, d) {
-                    solver.add_rhs_val(dof, f[d]);
+                    sys.add_rhs_val(dof, f[d]);
                 }
             }
         }
@@ -298,7 +294,7 @@ impl ElementAssemblage {
                         // check if the degree of freedom still exists, and if so add the force
                         if let Some(dof) = self.find_dof(node_idx, node_dof) {
                             // TODO have f_l be a full Matrix seems silly
-                            solver.add_rhs_val(dof, f_l[(i, 0)])
+                            sys.add_rhs_val(dof, f_l[(i, 0)])
                         }
                     }
                 }
@@ -306,6 +302,19 @@ impl ElementAssemblage {
         }
 
         // TODO add area body forces / initial loads
+    }
+
+    pub fn calc_displacements<T: Solver>(&mut self) {
+        // find the displacements under load and store them in the assemblage
+        if self.dof_lookup.is_none() {
+            self.compile_lookup();
+        }
+
+        let mut system = System::new(self.dofs);
+        self.calc_k(&mut system);
+        self.calc_load(&mut system);
+
+        let solver = T::new(system);
 
         // TODO properly handle solver errors
         let raw_displacements = solver.solve().unwrap();
