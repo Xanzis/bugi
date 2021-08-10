@@ -1,5 +1,5 @@
-use crate::matrix::graph::Graph;
-use crate::matrix::{Diagonal, Dictionary, Inverse, LinearMatrix, LowerRowEnvelope, MatrixLike};
+use crate::matrix::graph::Permutation;
+use crate::matrix::{Diagonal, Inverse, LinearMatrix, LowerRowEnvelope, MatrixLike};
 
 use super::{Solver, System};
 
@@ -11,7 +11,7 @@ pub struct DenseGaussSolver {
 
 impl Solver for DenseGaussSolver {
     fn new(sys: System) -> Self {
-        let (k, r) = sys.into_parts();
+        let (k, r, _) = sys.into_parts();
         Self { k, r }
     }
 
@@ -27,60 +27,53 @@ impl Solver for DenseGaussSolver {
 #[derive(Clone, Debug)]
 pub struct CholeskyEnvelopeSolver {
     dofs: usize,
-    k: Dictionary,
+    k: LowerRowEnvelope,
     r: Vec<f64>,
+    perm: Permutation,
 }
 
 impl Solver for CholeskyEnvelopeSolver {
-    fn new(sys: System) -> Self {
-        let (k, r): (Dictionary, _) = sys.into_parts();
-
-        Self {
-            dofs: k.shape().0,
-            k,
-            r,
-        }
-    }
-
-    fn solve(self) -> Result<Vec<f64>, ()> {
+    fn new(mut sys: System) -> Self {
         eprintln!("beginning envelope cholesky solution ...");
-        let dofs = self.dofs;
 
-        let initial_envelope_sum = self.k.envelope().into_iter().sum::<usize>();
         eprintln!(
             "computing reordering (initial total envelope: {}) ...",
-            initial_envelope_sum
+            sys.envelope_sum()
         );
 
-        let mut graph = Graph::from_edges(dofs, self.k.edges());
-        let perm = graph.reverse_cuthill_mckee();
+        let dofs = sys.dofs();
+        sys.reduce_envelope();
 
-        let k = self.k.permute(&perm);
-        let mut r = self.r;
-        perm.permute_slice(r.as_mut_slice());
-
-        let k: LowerRowEnvelope = k.into();
+        let (k, r, perm): (LowerRowEnvelope, _, _) = sys.into_parts();
 
         eprintln!(
             "reordering computed (total envelope: {})",
             k.non_zero_count()
         );
+
+        let perm = perm.unwrap();
+
+        Self { dofs, k, r, perm }
+    }
+
+    fn solve(self) -> Result<Vec<f64>, ()> {
+        let dofs = self.dofs;
+
         eprintln!("computing cholesky decomposition ...");
 
-        let chol = cholesky_envelope(&k);
+        let chol = cholesky_envelope(&self.k);
 
         eprintln!("decomposition computed.\nsolving system...");
 
         // solve the system L L' x = b as L y = b, L' x = y
         let mut y = vec![0.0; dofs];
-        chol.solve(r.as_slice(), y.as_mut_slice());
+        chol.solve(self.r.as_slice(), y.as_mut_slice());
 
         let mut x = vec![0.0; dofs];
         chol.solve_transposed(y.as_slice(), x.as_mut_slice());
 
         // invert the permutation
-        let perm = perm.invert();
-        perm.permute_slice(x.as_mut_slice());
+        self.perm.permute_slice(x.as_mut_slice());
 
         eprintln!("envelope cholesky solution complete");
 

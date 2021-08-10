@@ -1,3 +1,4 @@
+use crate::matrix::graph::{Graph, Permutation};
 use crate::matrix::{Dictionary, MatrixLike};
 
 pub mod direct;
@@ -14,6 +15,7 @@ pub trait Solver {
 pub struct System {
     mat: Dictionary,
     rhs: Vec<f64>,
+    perm: Option<Permutation>,
 }
 
 impl System {
@@ -21,7 +23,16 @@ impl System {
         Self {
             mat: Dictionary::zeros(dofs),
             rhs: vec![0.0; dofs],
+            perm: None,
         }
+    }
+
+    pub fn dofs(&self) -> usize {
+        self.rhs.len()
+    }
+
+    pub fn envelope_sum(&self) -> usize {
+        self.mat.envelope().into_iter().sum::<usize>()
     }
 
     pub fn add_coefficient(&mut self, loc: (usize, usize), val: f64) {
@@ -55,12 +66,33 @@ impl System {
         res
     }
 
-    fn into_parts<T, U>(self) -> (T, U)
+    pub fn reduce_envelope(&mut self) {
+        // apply the reverse cuthill-mkcee ordering, storing the permutation
+
+        if self.perm.is_some() {
+            unimplemented!("double permutation");
+        }
+
+        let mut graph = Graph::from_edges(self.dofs(), self.mat.edges());
+        let perm = graph.reverse_cuthill_mckee();
+
+        self.mat.permute(&perm);
+        perm.permute_slice(self.rhs.as_mut_slice());
+
+        self.perm = Some(perm);
+    }
+
+    fn into_parts<T, U>(self) -> (T, U, Option<Permutation>)
     where
         T: From<Dictionary>,
         U: From<Vec<f64>>,
     {
-        (self.mat.into(), self.rhs.into())
+        // return the matrices and optionally the permutation to apply to the solution
+        (
+            self.mat.into(),
+            self.rhs.into(),
+            self.perm.map(Permutation::invert),
+        )
     }
 }
 

@@ -11,7 +11,7 @@ pub struct GaussSeidelSolver {
 
 impl Solver for GaussSeidelSolver {
     fn new(sys: System) -> Self {
-        let (k, r) = sys.into_parts();
+        let (k, r, _) = sys.into_parts();
 
         Self {
             // TODO add interface for tol, max_iter specification

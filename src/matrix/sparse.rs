@@ -338,17 +338,17 @@ impl Dictionary {
         Some(self.data.entry(loc).or_insert(0.0))
     }
 
-    pub fn permute(self, p: &Permutation) -> Self {
-        let mut res = Self {
-            shape: self.shape(),
-            data: HashMap::with_capacity(self.data.capacity()),
-        };
+    pub fn permute(&mut self, p: &Permutation) {
+        let mut new_data = HashMap::new();
+        let mut temp = HashMap::new();
 
-        for ((r, c), v) in self.data {
-            res.data.insert((p.permute(r), p.permute(c)), v);
+        std::mem::swap(&mut temp, &mut self.data);
+
+        for ((r, c), v) in temp {
+            new_data.insert((p.permute(r), p.permute(c)), v);
         }
 
-        res
+        self.data = new_data;
     }
 
     pub fn edges(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
