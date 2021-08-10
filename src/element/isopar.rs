@@ -319,6 +319,20 @@ impl IsoparElement {
         inter.mul(&mats.b)
     }
 
+    pub fn find_m_integrand(&self, nat_coor: Point) -> LinearMatrix {
+        // compute the integrand of the mass participation matrix integral
+        // integrand is rho * H_t * H
+        let mats = self.find_mats(nat_coor);
+
+        let h = mats.h.unwrap();
+
+        let mut ht = h.clone();
+        ht.transpose();
+
+        ht *= self.material.density();
+        ht.mul(&h)
+    }
+
     pub fn find_f_l(&self, a_idx: usize, b_idx: usize, f: &LinearMatrix) -> LinearMatrix {
         // integrate the interpolation of a distributed force over an element edge
         // a_idx and b_idx are node indices of the edge ends in the global node array

@@ -242,6 +242,31 @@ impl ElementAssemblage {
         Box::new(k_func)
     }
 
+    fn m_integrand_func(&self, i: usize) -> Box<dyn Fn(Point) -> LinearMatrix> {
+        // get a colosure for computing the M integrand at a given location
+
+        let multiplier = match self.dim {
+            1 => self.area().expect("missing bar/beam area"),
+            2 => self.thickness().expect("missing plane thickness"),
+            3 => 1.0,
+            _ => unimplemented!(),
+        };
+
+        let el = self
+            .elements
+            .get(i)
+            .expect("element id out of bounds")
+            .clone();
+
+        let m_func = move |p| {
+            let mut m = el.find_k_integrand(p);
+            m *= multiplier;
+            m
+        };
+
+        Box::new(m_func)
+    }
+
     fn calc_k(&self, sys: &mut System) {
         // evaluate the global K matrix, filling it into sys
 
@@ -259,7 +284,32 @@ impl ElementAssemblage {
                         let (j_node_idx, j_node_dof) = el.i_to_dof(j);
                         if let Some(j_dof) = self.find_dof(j_node_idx, j_node_dof) {
                             // wooo finally
-                            sys.add_coefficient((i_dof, j_dof), el_k[(i, j)]);
+                            sys.add_k_coefficient((i_dof, j_dof), el_k[(i, j)]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn calc_m(&self, sys: &mut System) {
+        // evaluate the global M matrix
+
+        for (i, el) in self.elements.iter().enumerate() {
+            let int_func = self.m_integrand_func(i);
+            let el_m = integrate::nd_gauss_mat(int_func, self.dim, el.integration_order());
+            let (el_m_dim, temp) = el_m.shape();
+            assert_eq!(el_m_dim, temp);
+
+            // TODO could probably reduce unnecessary checks here by precomputing
+            for i in 0..el_m_dim {
+                let (i_node_idx, i_node_dof) = el.i_to_dof(i);
+                if let Some(i_dof) = self.find_dof(i_node_idx, i_node_dof) {
+                    for j in 0..el_m_dim {
+                        let (j_node_idx, j_node_dof) = el.i_to_dof(j);
+                        if let Some(j_dof) = self.find_dof(j_node_idx, j_node_dof) {
+                            // wooo finally
+                            sys.add_m_coefficient((i_dof, j_dof), el_m[(i, j)]);
                         }
                     }
                 }
@@ -268,7 +318,7 @@ impl ElementAssemblage {
     }
 
     fn calc_load(&self, sys: &mut System) {
-        // evaluate the global load vector, filling it into the solver
+        // evaluate the global load vector, filling it into the system
 
         for (&n, &f) in self.concentrated_forces.iter() {
             // check if each node dof still exists and if so apply that part of force

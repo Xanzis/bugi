@@ -17,17 +17,20 @@ pub struct Material {
     name: &'static str,
     youngs: f64,
     poisson: f64,
+    density: f64,
 }
 
 pub const AL6061: Material = Material {
     name: "AL6061",
     youngs: 6.89e10,
     poisson: 0.33,
+    density: 2700.0,
 };
 pub const TEST: Material = Material {
     name: "TEST",
     youngs: 1.0,
     poisson: 0.0,
+    density: 1.0,
 };
 
 impl Material {
@@ -37,6 +40,10 @@ impl Material {
 
     fn poisson(&self) -> f64 {
         self.poisson
+    }
+
+    pub fn density(&self) -> f64 {
+        self.density
     }
 
     fn inertia_moment(&self) -> Option<f64> {
