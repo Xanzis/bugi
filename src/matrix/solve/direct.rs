@@ -11,7 +11,7 @@ pub struct DenseGaussSolver {
 
 impl Solver for DenseGaussSolver {
     fn new(sys: System) -> Self {
-        let (k, r, _) = sys.into_parts();
+        let (k, r, _) = sys.into_krp();
         Self { k, r }
     }
 
@@ -38,13 +38,13 @@ impl Solver for CholeskyEnvelopeSolver {
 
         eprintln!(
             "computing reordering (initial total envelope: {}) ...",
-            sys.envelope_sum()
+            sys.k_envelope().sum::<usize>()
         );
 
         let dofs = sys.dofs();
         sys.reduce_envelope();
 
-        let (k, r, perm): (LowerRowEnvelope, _, _) = sys.into_parts();
+        let (k, r, perm): (LowerRowEnvelope, _, _) = sys.into_krp();
 
         eprintln!(
             "reordering computed (total envelope: {})",

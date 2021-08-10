@@ -13,34 +13,72 @@ pub trait Solver {
 
 #[derive(Debug, Clone)]
 pub struct System {
-    mat: Dictionary,
-    rhs: Vec<f64>,
+    dofs: usize,
+    k_mat: Option<Dictionary>,
+    m_mat: Option<Dictionary>,
+    rhs: Option<Vec<f64>>,
     perm: Option<Permutation>,
 }
 
 impl System {
     pub fn new(dofs: usize) -> Self {
         Self {
-            mat: Dictionary::zeros(dofs),
-            rhs: vec![0.0; dofs],
+            dofs,
+            k_mat: None,
+            m_mat: None,
+            rhs: None,
             perm: None,
         }
     }
 
     pub fn dofs(&self) -> usize {
-        self.rhs.len()
+        self.dofs
     }
 
-    pub fn envelope_sum(&self) -> usize {
-        self.mat.envelope().into_iter().sum::<usize>()
+    pub fn k_envelope(&self) -> impl Iterator<Item = usize> {
+        self.k_mat
+            .as_ref()
+            .expect("k matrix not initialized")
+            .envelope()
+            .into_iter()
     }
 
-    pub fn add_coefficient(&mut self, loc: (usize, usize), val: f64) {
-        self.mat[loc] += val;
+    pub fn m_envelope(&self) -> impl Iterator<Item = usize> {
+        self.m_mat
+            .as_ref()
+            .expect("m matrix not initialized")
+            .envelope()
+            .into_iter()
+    }
+
+    pub fn add_k_coefficient(&mut self, loc: (usize, usize), val: f64) {
+        if let Some(k) = self.k_mat.as_mut() {
+            k[loc] += val;
+        } else {
+            let mut k = Dictionary::zeros(self.dofs);
+            k[loc] = val;
+            self.k_mat = Some(k);
+        }
+    }
+
+    pub fn add_m_coefficient(&mut self, loc: (usize, usize), val: f64) {
+        if let Some(m) = self.m_mat.as_mut() {
+            m[loc] += val;
+        } else {
+            let mut m = Dictionary::zeros(self.dofs);
+            m[loc] = val;
+            self.m_mat = Some(m);
+        }
     }
 
     pub fn add_rhs_val(&mut self, loc: usize, val: f64) {
-        self.rhs[loc] += val;
+        if let Some(r) = self.rhs.as_mut() {
+            r[loc] += val;
+        } else {
+            let mut r = vec![0.0; self.dofs];
+            r[loc] = val;
+            self.rhs = Some(r);
+        }
     }
 
     pub fn from_kr<T, U>(k: &T, r: &U) -> Self
@@ -56,12 +94,18 @@ impl System {
 
         let mut res = Self::new(dofs);
 
+        let mut k_mat = Dictionary::zeros(dofs);
+        let mut r_vec = vec![0.0; dofs];
+
         for row in 0..dofs {
             for col in 0..dofs {
-                res.mat[(row, col)] = k[(row, col)];
+                k_mat[(row, col)] = k[(row, col)];
             }
-            res.rhs[row] = r[(row, 0)];
+            r_vec[row] = r[(row, 0)];
         }
+
+        res.k_mat = Some(k_mat);
+        res.rhs = Some(r_vec);
 
         res
     }
@@ -73,24 +117,46 @@ impl System {
             unimplemented!("double permutation");
         }
 
-        let mut graph = Graph::from_edges(self.dofs(), self.mat.edges());
+        let edges = self.k_mat.as_ref().expect("no k matrix loaded").edges();
+        let mut graph = Graph::from_edges(self.dofs(), edges);
         let perm = graph.reverse_cuthill_mckee();
 
-        self.mat.permute(&perm);
-        perm.permute_slice(self.rhs.as_mut_slice());
+        self.k_mat.as_mut().unwrap().permute(&perm);
+
+        if let Some(m) = self.m_mat.as_mut() {
+            m.permute(&perm);
+        }
+
+        if let Some(r) = self.rhs.as_mut() {
+            perm.permute_slice(r.as_mut_slice());
+        }
 
         self.perm = Some(perm);
     }
 
-    fn into_parts<T, U>(self) -> (T, U, Option<Permutation>)
+    fn into_krp<T, U>(self) -> (T, U, Option<Permutation>)
     where
         T: From<Dictionary>,
         U: From<Vec<f64>>,
     {
-        // return the matrices and optionally the permutation to apply to the solution
         (
-            self.mat.into(),
-            self.rhs.into(),
+            self.k_mat.expect("no k matrix loaded").into(),
+            self.rhs.expect("no rhs vector loaded").into(),
+            self.perm.map(Permutation::invert),
+        )
+    }
+
+    fn into_parts<T, U, V>(self) -> (Option<T>, Option<U>, Option<V>, Option<Permutation>)
+    where
+        T: From<Dictionary>,
+        U: From<Dictionary>,
+        V: From<Vec<f64>>,
+    {
+        // return the converted matrices if available
+        (
+            self.k_mat.map(Into::into),
+            self.m_mat.map(Into::into),
+            self.rhs.map(Into::into),
             self.perm.map(Permutation::invert),
         )
     }
