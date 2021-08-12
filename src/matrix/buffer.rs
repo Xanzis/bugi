@@ -153,6 +153,15 @@ impl Diagonal {
     pub fn mean(&self) -> f64 {
         self.data.iter().sum::<f64>() / (self.data.len() as f64)
     }
+
+    pub fn solve(&self, x: &mut [f64]) {
+        // solve Dx = x in-place
+        assert_eq!(x.len(), self.data.len());
+
+        for i in 0..self.data.len() {
+            x[i] /= self.data[i];
+        }
+    }
 }
 
 // *****

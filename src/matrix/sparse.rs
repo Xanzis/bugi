@@ -345,6 +345,27 @@ impl LowerRowEnvelope {
             row_nnz,
         }
     }
+
+    pub fn add_scaled_bienv(&mut self, bmat: &BiEnvelope, scale: f64) {
+        // add scale * B to self
+        // only add below the diagonal, panic if b rows extend to the left of self rows
+
+        assert_eq!(self.shape(), bmat.shape());
+
+        for row in 0..self.n {
+            let (b_start, b_row) = bmat.row_stored(row);
+            let (s_start, s_row) = self.row_stored_mut(row);
+
+            if b_start < s_start {
+                panic!("supplied matrix extends past envelope");
+            }
+
+            s_row
+                .iter_mut()
+                .zip(b_row.iter())
+                .for_each(|(s, b)| *s += b * scale);
+        }
+    }
 }
 
 impl BiEnvelope {
@@ -395,17 +416,28 @@ impl BiEnvelope {
         }
     }
 
+    pub fn row_stored(&self, row: usize) -> (usize, &[f64]) {
+        // return the first column number and a slice of the stored portion of the row
+
+        let (start_col, end_col) = self.row_bounds[row];
+        let len = end_col - start_col;
+
+        let start_idx = self.row_starts[row];
+
+        (start_col, &self.data[start_idx..(start_idx + len)])
+    }
+
     pub fn mul_vec(&self, x: &[f64], y: &mut [f64]) {
         // compute y = Bx fast, without allocating
         assert_eq!(x.len(), y.len());
         assert_eq!(self.n, y.len());
 
         for row in 0..self.n {
-            let (start_col, end_col) = self.row_bounds[row];
+            let (start_col, rs) = self.row_stored(row);
 
-            y[row] = x[start_col..end_col]
+            y[row] = x[start_col..]
                 .iter()
-                .zip(self.data[self.row_starts[row]..].iter())
+                .zip(rs.iter())
                 .map(|(x, b)| x * b)
                 .sum();
         }
