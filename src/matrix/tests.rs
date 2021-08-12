@@ -2,8 +2,8 @@ use super::graph::{Graph, Permutation};
 use super::inverse::Inverse;
 use super::norm::Norm;
 use super::{
-    CompressedRow, Dictionary, LinearMatrix, LowerRowEnvelope, LowerTriangular, MatrixLike,
-    UpperTriangular,
+    BiEnvelope, CompressedRow, Dictionary, LinearMatrix, LowerRowEnvelope, LowerTriangular,
+    MatrixLike, UpperTriangular,
 };
 
 #[test]
@@ -391,4 +391,42 @@ fn dictionary() {
     let a: LowerRowEnvelope = a.into();
 
     assert_eq!(a, target)
+}
+
+#[test]
+fn bienvelope() {
+    let mut a = Dictionary::zeros(6);
+
+    for i in 0..6 {
+        a[(i, i)] = 1.0;
+    }
+    a[(2, 1)] = -1.0;
+    a[(3, 2)] = 0.5;
+    a[(4, 3)] = 14.0;
+    a[(4, 2)] = 1.0;
+    a[(4, 1)] = 6.0;
+
+    let a: BiEnvelope = a.into();
+
+    let x = vec![1.0; 6];
+    let mut y = vec![0.0; 6];
+
+    a.mul_vec(x.as_slice(), y.as_mut_slice());
+
+    assert_eq!(y, vec![1.0, 1.0, 0.0, 1.5, 22.0, 1.0]);
+
+    // test conversion into lower
+    let mut target = LowerRowEnvelope::from_envelope(vec![1, 1, 2, 2, 4, 1]);
+    for i in 0..6 {
+        target[(i, i)] = 1.0;
+    }
+    target[(2, 1)] = -1.0;
+    target[(3, 2)] = 0.5;
+    target[(4, 3)] = 14.0;
+    target[(4, 2)] = 1.0;
+    target[(4, 1)] = 6.0;
+
+    let b = LowerRowEnvelope::from_bienv(&a);
+
+    assert_eq!(b, target);
 }

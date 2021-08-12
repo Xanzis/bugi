@@ -26,7 +26,7 @@ pub struct CompressedRow {
     row_starts: Vec<usize>,
 }
 
-// lower triangular row enelope matrix storage
+// lower triangular row envelope matrix storage
 // stores the shortest possible row segments left of the diagonal
 // each row is required to store at least one value (which may be a numerical zero)
 #[derive(Debug, Clone, PartialEq)]
@@ -34,6 +34,17 @@ pub struct LowerRowEnvelope {
     n: usize,
     data: Vec<f64>,
     row_nnz: Vec<usize>,
+    row_starts: Vec<usize>,
+}
+
+// row envelope matrix storage
+// stores one contiguous run of values per row
+// keeping this square for now, exists to store symmetric matrices
+#[derive(Debug, Clone, PartialEq)]
+pub struct BiEnvelope {
+    n: usize,
+    data: Vec<f64>,
+    row_bounds: Vec<(usize, usize)>,
     row_starts: Vec<usize>,
 }
 
@@ -298,10 +309,106 @@ impl LowerRowEnvelope {
         }
     }
 
-    #[allow(dead_code)]
     pub fn non_zero_count(&self) -> usize {
         // includes zeros within the envelope
         self.data.len()
+    }
+
+    pub fn from_bienv(b: &BiEnvelope) -> Self {
+        let n = b.n;
+
+        let mut data = Vec::new();
+        let mut row_starts = Vec::new();
+        let mut row_nnz = Vec::new();
+
+        for row in 0..n {
+            row_starts.push(data.len());
+
+            let (start_col, end_col) = b.row_bounds[row];
+
+            if start_col > row || end_col <= row {
+                panic!("from_bienv only implemented for envelopes overlapping diagonal");
+            }
+
+            let nnz = (row + 1) - start_col;
+            row_nnz.push(nnz);
+
+            let b_start = b.row_starts[row];
+
+            data.extend_from_slice(&b.data[b_start..(b_start + nnz)]);
+        }
+
+        Self {
+            n,
+            data,
+            row_starts,
+            row_nnz,
+        }
+    }
+}
+
+impl BiEnvelope {
+    fn pos(&self, loc: (usize, usize)) -> Entry<usize> {
+        let (row, col) = loc;
+
+        // TODO add methods for lookup that use fewer comparisons
+        // or take advantage of structure with method for cheap slices
+
+        if row >= self.n || col >= self.n {
+            return Entry::Oob;
+        }
+
+        // column of the first element of this row's contiguous values
+        let (start_col, end_col) = self.row_bounds[row];
+
+        if col < start_col {
+            return Entry::Zero;
+        }
+
+        if col >= end_col {
+            return Entry::Zero;
+        }
+
+        let offset = col - start_col;
+        Entry::Data(self.row_starts[row] + offset)
+    }
+
+    fn from_row_bounds(bnd: Vec<(usize, usize)>) -> Self {
+        // initialize a zero matrix with the given shape
+        let n = bnd.len();
+        // for now, this matrix type is always square
+
+        let mut row_starts = vec![0];
+
+        for &(a, b) in bnd.iter() {
+            let len = b - a;
+            row_starts.push(row_starts.last().unwrap() + len);
+        }
+
+        let data = vec![0.0; *row_starts.last().unwrap()];
+
+        Self {
+            n,
+            row_starts,
+            row_bounds: bnd,
+            data,
+        }
+    }
+
+    pub fn mul_vec(&self, x: &[f64], y: &mut [f64]) {
+        // compute y = Bx fast, without allocating
+        assert_eq!(x.len(), y.len());
+        assert_eq!(self.n, y.len());
+
+        for row in 0..self.n {
+            let (start_col, end_col) = self.row_bounds[row];
+
+            y[row] = x[start_col..end_col]
+                .iter()
+                .zip(self.data[self.row_starts[row]..].iter())
+                .map(|(x, b)| x * b)
+                .sum();
+        }
     }
 }
 
@@ -320,6 +427,19 @@ impl Dictionary {
         }
 
         env
+    }
+
+    pub fn row_bounds(&self) -> Vec<(usize, usize)> {
+        // find the start column (inclusive) and end (exclusive) of each row
+
+        let mut bnd = vec![(self.shape().1, 0); self.shape().0];
+
+        for &(r, c) in self.data.keys() {
+            bnd[r].0 = bnd[r].0.min(c);
+            bnd[r].1 = bnd[r].1.max(c + 1);
+        }
+
+        bnd
     }
 
     fn in_bounds(&self, loc: (usize, usize)) -> bool {
@@ -370,6 +490,19 @@ impl From<Dictionary> for LowerRowEnvelope {
                 continue;
             }
 
+            res[loc] = v;
+        }
+
+        res
+    }
+}
+
+impl From<Dictionary> for BiEnvelope {
+    fn from(dct: Dictionary) -> Self {
+        let bnd = dct.row_bounds();
+        let mut res = Self::from_row_bounds(bnd);
+
+        for (loc, v) in dct.data.into_iter() {
             res[loc] = v;
         }
 
@@ -601,6 +734,42 @@ impl MatrixLike for LowerRowEnvelope {
     }
 }
 
+impl MatrixLike for BiEnvelope {
+    fn shape(&self) -> (usize, usize) {
+        (self.n, self.n)
+    }
+
+    fn get(&self, loc: (usize, usize)) -> Option<&f64> {
+        match self.pos(loc) {
+            Entry::Data(i) => unsafe { Some(self.data.get_unchecked(i)) },
+            Entry::Zero => Some(&0.0),
+            Entry::Oob => None,
+        }
+    }
+
+    fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64> {
+        if let Entry::Data(i) = self.pos(loc) {
+            unsafe { Some(self.data.get_unchecked_mut(i)) }
+        } else {
+            None
+        }
+    }
+
+    fn transpose(&mut self) {
+        unimplemented!()
+    }
+
+    fn zeros<T: Into<MatrixShape>>(_shape: T) -> Self {
+        // will never want this, always want to initialize with envelope
+        unimplemented!()
+    }
+
+    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, vals: U) -> Self {
+        // not doing this for now
+        unimplemented!()
+    }
+}
+
 impl MatrixLike for Dictionary {
     fn shape(&self) -> (usize, usize) {
         self.shape
@@ -707,6 +876,33 @@ impl IndexMut<(usize, usize)> for LowerRowEnvelope {
         match self.pos(loc) {
             Entry::Data(i) => unsafe { self.data.get_unchecked_mut(i) },
             Entry::Zero => panic!("indexmut value insertion is unimplemented for LowerRowEnvelope"),
+            Entry::Oob => panic!("matrix index out of bounds"),
+        }
+    }
+}
+
+impl fmt::Display for BiEnvelope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.disp())
+    }
+}
+
+impl Index<(usize, usize)> for BiEnvelope {
+    type Output = f64;
+    fn index(&self, loc: (usize, usize)) -> &Self::Output {
+        match self.pos(loc) {
+            Entry::Data(i) => unsafe { self.data.get_unchecked(i) },
+            Entry::Zero => &0.0,
+            Entry::Oob => panic!("matrix index out of bounds"),
+        }
+    }
+}
+
+impl IndexMut<(usize, usize)> for BiEnvelope {
+    fn index_mut(&mut self, loc: (usize, usize)) -> &mut Self::Output {
+        match self.pos(loc) {
+            Entry::Data(i) => unsafe { self.data.get_unchecked_mut(i) },
+            Entry::Zero => panic!("indexmut value insertion is unimplemented for BiEnvelope"),
             Entry::Oob => panic!("matrix index out of bounds"),
         }
     }

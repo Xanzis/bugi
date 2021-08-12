@@ -17,7 +17,7 @@ pub use norm::Norm;
 mod tests;
 
 pub use buffer::{Diagonal, LinearMatrix, LowerTriangular, UpperTriangular};
-pub use sparse::{CompressedRow, Dictionary, LowerRowEnvelope};
+pub use sparse::{BiEnvelope, CompressedRow, Dictionary, LowerRowEnvelope};
 //type Matrix = LinearMatrix; // default implementation
 
 // rolling my own (pretty limited) matrix math
