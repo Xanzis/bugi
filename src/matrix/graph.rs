@@ -265,6 +265,15 @@ impl Permutation {
         res
     }
 
+    pub fn identity(n: usize) -> Self {
+        let forward: Vec<usize> = (0..n).collect();
+
+        Self {
+            back: forward.clone(),
+            forward,
+        }
+    }
+
     pub fn permute(&self, x: usize) -> usize {
         self.forward[x]
     }

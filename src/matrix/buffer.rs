@@ -141,6 +141,18 @@ impl Diagonal {
         // count the number of negative entries
         self.data.iter().filter(|&&x| x < 0.0).count()
     }
+
+    pub fn product(&self) -> f64 {
+        self.data.iter().product()
+    }
+
+    pub fn product_scaled(&self, scale: f64) -> f64 {
+        self.data.iter().map(|x| x * scale).product()
+    }
+
+    pub fn mean(&self) -> f64 {
+        self.data.iter().sum::<f64>() / (self.data.len() as f64)
+    }
 }
 
 // *****
