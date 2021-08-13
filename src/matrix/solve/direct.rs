@@ -65,12 +65,8 @@ impl Solver for CholeskyEnvelopeSolver {
 
         eprintln!("decomposition computed.\nsolving system...");
 
-        // solve the system L L' x = b as L y = b, L' x = y
-        let mut y = vec![0.0; dofs];
-        chol.solve(self.r.as_slice(), y.as_mut_slice());
-
         let mut x = vec![0.0; dofs];
-        chol.solve_transposed(y.as_slice(), x.as_mut_slice());
+        solve_ll(&chol, self.r.as_slice(), x.as_mut_slice());
 
         // invert the permutation
         self.perm.permute_slice(x.as_mut_slice());
@@ -131,6 +127,22 @@ pub fn cholesky_envelope(a: &LowerRowEnvelope) -> LowerRowEnvelope {
     l
 }
 
+pub fn solve_ll(l: &LowerRowEnvelope, b: &[f64], x: &mut [f64]) {
+    // solve the system (L L') x = b
+    // as first L y = b
+    // then     L' x = y
+    // TODO: make non-allocating in the future?
+
+    let n = l.shape().0;
+    assert_eq!(n, b.len());
+    assert_eq!(n, x.len());
+
+    let mut y = vec![0.0; n];
+
+    l.solve(b, y.as_mut_slice());
+    l.solve_transposed(y.as_slice(), x);
+}
+
 pub fn cholesky_envelope_no_root(a: &LowerRowEnvelope) -> (LowerRowEnvelope, Diagonal) {
     // find the LDL' factorization of symmetric matrix A, where D may have negative elements
 
@@ -171,4 +183,23 @@ pub fn cholesky_envelope_no_root(a: &LowerRowEnvelope) -> (LowerRowEnvelope, Dia
     }
 
     (l, d)
+}
+
+pub fn solve_ldl(l: &LowerRowEnvelope, d: &Diagonal, b: &[f64], x: &mut [f64]) {
+    // solve the system (L D L') x = b
+    // as first L z = b
+    // then     D y = z  (here done in-place)
+    // then     L' x = y (here still using the variable z)
+    // TODO: make non-allocating in the future?
+
+    let n = l.shape().0;
+    assert_eq!(l.shape(), d.shape());
+    assert_eq!(n, b.len());
+    assert_eq!(n, x.len());
+
+    let mut z = vec![0.0; n];
+
+    l.solve(b, z.as_mut_slice());
+    d.solve(z.as_mut_slice());
+    l.solve_transposed(z.as_slice(), x);
 }

@@ -2,6 +2,7 @@ use crate::matrix::graph::{Graph, Permutation};
 use crate::matrix::{Dictionary, MatrixLike};
 
 pub mod direct;
+pub mod eigen;
 pub mod iterative;
 
 pub trait Solver {
@@ -110,6 +111,33 @@ impl System {
         res
     }
 
+    pub fn from_km<T, U>(k: &T, m: &U) -> Self
+    where
+        T: MatrixLike,
+        U: MatrixLike,
+    {
+        let dofs = k.shape().0;
+        assert_eq!(k.shape().0, k.shape().1);
+        assert_eq!(m.shape().0, m.shape().1);
+
+        let mut res = Self::new(dofs);
+
+        let mut k_mat = Dictionary::zeros(dofs);
+        let mut m_mat = Dictionary::zeros(dofs);
+
+        for row in 0..dofs {
+            for col in 0..dofs {
+                k_mat[(row, col)] = k[(row, col)];
+                m_mat[(row, col)] = m[(row, col)];
+            }
+        }
+
+        res.k_mat = Some(k_mat);
+        res.m_mat = Some(m_mat);
+
+        res
+    }
+
     pub fn reduce_envelope(&mut self) {
         // apply the reverse cuthill-mkcee ordering, storing the permutation
 
@@ -130,6 +158,11 @@ impl System {
         if let Some(r) = self.rhs.as_mut() {
             perm.permute_slice(r.as_mut_slice());
         }
+
+        println!(
+            "hi hello i am reduce evelope\n{}",
+            self.k_mat.clone().unwrap()
+        );
 
         self.perm = Some(perm);
     }
@@ -312,5 +345,39 @@ mod tests {
         let d = LinearMatrix::from_flat(4, d.flat().cloned());
 
         assert!((&target_diagonal - &d).frobenius() <= 1e-8);
+    }
+
+    #[test]
+    fn eigen_determinant_search() {
+        use super::eigen::{DeterminantSearcher, EigenSystem};
+        use super::System;
+        use crate::matrix::solve::direct;
+        use crate::matrix::{LinearMatrix, MatrixLike};
+
+        let k = LinearMatrix::from_flat(
+            4,
+            vec![
+                5.0, -4.0, 1.0, 0.0, -4.0, 6.0, -4.0, 1.0, 1.0, -4.0, 6.0, -4.0, 0.0, 1.0, -4.0,
+                5.0,
+            ],
+        );
+
+        let m = LinearMatrix::from_flat(
+            4,
+            vec![
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 6.0, 0.0, 0.0, 1.0,
+            ],
+        );
+
+        let sys = System::from_km(&k, &m);
+        let eigsys = EigenSystem::new(sys);
+        let mut searcher = DeterminantSearcher::new(eigsys);
+
+        assert_eq!(searcher.eigenvalues_under(2.0), 2);
+        assert_eq!(searcher.eigenvalues_under(8.0), 3);
+
+        searcher.secant_iterate_one();
+        println!("{:?}", searcher.eigenpairs());
+        assert!(false);
     }
 }
