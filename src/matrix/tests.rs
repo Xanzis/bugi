@@ -2,7 +2,7 @@ use super::graph::{Graph, Permutation};
 use super::inverse::Inverse;
 use super::norm::Norm;
 use super::{
-    BiEnvelope, CompressedRow, Dictionary, LinearMatrix, LowerRowEnvelope, LowerTriangular,
+    dot, BiEnvelope, CompressedRow, Dictionary, LinearMatrix, LowerRowEnvelope, LowerTriangular,
     MatrixLike, UpperTriangular,
 };
 
@@ -96,11 +96,8 @@ fn dots() {
     let a = LinearMatrix::from_flat(2, vec![1.0, 2.0, 3.0, 4.0]);
     let b = LinearMatrix::from_flat(2, vec![2.0, 3.0, 4.0, 5.0]);
 
-    assert_eq!(
-        a.row(0).dot(b.col(1)).last().unwrap_or(0.0),
-        b.col(1).dot(a.row(0)).last().unwrap_or(0.0)
-    );
-    assert_eq!(a.row(0).dot(b.col(1)).last().unwrap_or(0.0), 13.0);
+    assert_eq!(dot(a.row(0), b.col(1)), dot(b.col(1), a.row(0)),);
+    assert_eq!(dot(a.row(0), b.col(1)), 13.0);
 }
 
 #[test]

@@ -1,4 +1,4 @@
-use super::{LowerTriangular, MatrixError, MatrixLike, UpperTriangular};
+use super::{dot, LowerTriangular, MatrixError, MatrixLike, UpperTriangular};
 
 const SMALL_NUM: f64 = 1e-100;
 
@@ -89,7 +89,7 @@ where
 
         for i in 0..dim {
             for k in i..dim {
-                let sum = upper.col(k).dot(lower.row(i).take(i)).end();
+                let sum = dot(upper.col(k), lower.row(i));
                 upper[(i, k)] = self[(i, k)] - sum;
             }
 
@@ -97,7 +97,7 @@ where
                 if i == k {
                     lower[(i, i)] = 1.0;
                 } else {
-                    let sum = lower.row(k).dot(upper.col(i)).end();
+                    let sum = dot(lower.row(k), upper.col(i));
                     lower[(k, i)] = (self[(k, i)] - sum) / upper[(i, i)];
                 }
             }
