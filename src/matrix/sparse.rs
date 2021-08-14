@@ -796,7 +796,7 @@ impl MatrixLike for BiEnvelope {
         unimplemented!()
     }
 
-    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, vals: U) -> Self {
+    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(_shape: T, _vals: U) -> Self {
         // not doing this for now
         unimplemented!()
     }
