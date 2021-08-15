@@ -360,8 +360,11 @@ impl LowerRowEnvelope {
                 panic!("supplied matrix extends past envelope");
             }
 
+            let offset = b_start - s_start;
+
             s_row
                 .iter_mut()
+                .skip(offset)
                 .zip(b_row.iter())
                 .for_each(|(s, b)| *s += b * scale);
         }
