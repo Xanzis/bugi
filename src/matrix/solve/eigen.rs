@@ -1,6 +1,6 @@
 use crate::matrix::graph::Permutation;
 use crate::matrix::solve::{direct, System};
-use crate::matrix::{BiEnvelope, LinearMatrix, LowerRowEnvelope, MatrixLike, dot};
+use crate::matrix::{dot, BiEnvelope, LinearMatrix, LowerRowEnvelope, MatrixLike};
 
 // a range known to contain an eigenvalue
 // stores the number of eigenvalues under this one (same as val index)
@@ -65,13 +65,13 @@ impl ManyEigenRange {
         let l_range = match l_count {
             0 => Empty,
             1 => One(OneEigenRange::new(self.lower, mid_val, self.low_i)),
-            x => Many(ManyEigenRange::new(self.lower, mid_val, self.low_i, n)),
+            _ => Many(ManyEigenRange::new(self.lower, mid_val, self.low_i, n)),
         };
 
         let u_range = match u_count {
             0 => Empty,
             1 => One(OneEigenRange::new(mid_val, self.upper, n)),
-            x => Many(ManyEigenRange::new(mid_val, self.upper, n, self.next_i)),
+            _ => Many(ManyEigenRange::new(mid_val, self.upper, n, self.next_i)),
         };
 
         (l_range, u_range)
@@ -87,23 +87,44 @@ enum EigenRange {
 
 impl EigenRange {
     fn new(lower: f64, upper: f64, under_lower: usize, under_upper: usize) -> Self {
-
         assert!(under_lower < under_upper);
 
         if under_upper - under_lower == 1 {
-            Self::One(OneEigenRange::new(
-                lower, upper, under_lower
-            ))
+            Self::One(OneEigenRange::new(lower, upper, under_lower))
         } else {
-            Self::Many(ManyEigenRange::new(
-                lower, upper, under_lower, under_upper
-            ))
+            Self::Many(ManyEigenRange::new(lower, upper, under_lower, under_upper))
         }
     }
 }
 
 #[derive(Clone, Debug)]
+pub struct EigenPair {
+    value: f64,
+    vector: Vec<f64>,
+}
+
+impl EigenPair {
+    fn new(value: f64, vector: Vec<f64>) -> Self {
+        Self { value, vector }
+    }
+
+    pub fn value(&self) -> f64 {
+        self.value
+    }
+
+    pub fn vector(&self) -> &[f64] {
+        self.vector.as_slice()
+    }
+
+    pub fn permute(&mut self, perm: &Permutation) {
+        perm.permute_slice(self.vector.as_mut_slice())
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct EigenSystem {
+    dofs: usize,
+
     k_mat: LowerRowEnvelope,
 
     // storing the full M matrix is convenient for inverse iteration
@@ -133,22 +154,30 @@ impl EigenSystem {
         let m_mat = m_mat.expect("m matrix not provided");
         let perm = perm.unwrap_or_else(|| Permutation::identity(dofs));
 
-        Self { k_mat, m_mat, k_full, perm }
+        Self {
+            dofs,
+            k_mat,
+            m_mat,
+            k_full,
+            perm,
+        }
+    }
+
+    pub fn dofs(&self) -> usize {
+        self.dofs
     }
 }
 
 pub struct DeterminantSearcher {
     sys: EigenSystem,
-    ranges: Vec<EigenRange>,
 
-    eigenpairs: Vec<(f64, Vec<f64>)>,
+    eigenpairs: Vec<EigenPair>,
 }
 
 impl DeterminantSearcher {
     pub fn new(sys: EigenSystem) -> Self {
         Self {
             sys,
-            ranges: Vec::new(),
             eigenpairs: Vec::new(),
         }
     }
@@ -165,14 +194,28 @@ impl DeterminantSearcher {
         d.num_neg()
     }
 
-    fn process_one(&mut self, mut r: OneEigenRange) {
+    fn process_one(&mut self, r: OneEigenRange) {
         // refine an eigenrange, then send it to inverse iteration and store the result
         // TODO improve this procedure - might need to improve guess first
 
-        // accept the middle of the resulting range for inverse iteration
-        let eigenpair = inverse_iterate(&self.sys.k_mat, &self.sys.m_mat, r.mid_val(), 1e-6);
+        // choose slice of pairs for gram-schmidt orthogonalization
+        let gso = if self.eigenpairs.len() == 0 {
+            None
+        } else {
+            // pick the last six eigens found
+            let lower_idx = if self.eigenpairs.len() < 6 {
+                0
+            } else {
+                self.eigenpairs.len() - 6
+            };
 
-        self.eigenpairs.push(eigenpair);
+            Some(&self.eigenpairs[lower_idx..])
+        };
+
+        // accept the middle of the resulting range for inverse iteration
+        let pair = inverse_iterate(&self.sys.k_mat, &self.sys.m_mat, r.mid_val(), gso);
+
+        self.eigenpairs.push(pair);
 
         // process_eigenrange's order should ensure eigenpairs ends up sorted by value
     }
@@ -193,6 +236,15 @@ impl DeterminantSearcher {
         }
     }
 
+    fn deflation_factor(&self, mu: f64) -> f64 {
+        // calculate the factor by which to multiply the characteristic polynomial
+        // in order to deflate the polynomial with respect to known eigenvalues
+        self.eigenpairs
+            .iter()
+            .map(|e| 1.0 / (mu - e.value()))
+            .product()
+    }
+
     fn char_ratio(&self, mu_old: f64, mu_new: f64) -> f64 {
         // evaluate the characteristic polynomial ratio of the eigenproblem at mu
         // find p(mu_new) / (p(mu_new) - p(mu_old))
@@ -206,15 +258,16 @@ impl DeterminantSearcher {
         let (_, d) = direct::cholesky_envelope_no_root(&a);
         let mean_diag = d.mean();
         let p_new = d.product_scaled(1.0 / mean_diag);
+        let p_new = p_new * self.deflation_factor(mu_new);
 
         // compute the characteristic polynomial for the old shift
         // K - mu_old * M = K - mu_new * M + (mu_new - mu_old) * M
         a.add_scaled_bienv(&self.sys.m_mat, mu_diff);
 
-
         // TODO avoid recomputing p_old (can reuse previous value)
         let (_, d) = direct::cholesky_envelope_no_root(&a);
         let p_old = d.product_scaled(1.0 / mean_diag);
+        let p_old = p_old * self.deflation_factor(mu_old);
 
         p_new / (p_new - p_old)
     }
@@ -225,25 +278,35 @@ impl DeterminantSearcher {
         mu_new - (eta * self.char_ratio(mu_old, mu_new) * (mu_new - mu_old))
     }
 
-    pub fn secant_iterate_one(&mut self) {
-        // discover the next undiscovered eigenvalue(s) by secant iteration
-
-        // find first two lower bounds on the first eigenvalue
-        let mut mu_old = 0.0;
-
-        // inverse iterate three times at zero shift
+    fn secant_starts(&self) -> (f64, f64) {
+        // find two lower eigenvalue bounds for the first secant iteration round
         let x = inverse_iterate_times(&self.sys.k_mat, &self.sys.m_mat, 3);
 
-        let mut mu_new = 0.99 * rayleigh_quotient(x.as_slice(), &self.sys.k_full, &self.sys.m_mat);
+        let mut new = 0.99 * rayleigh_quotient(x.as_slice(), &self.sys.k_full, &self.sys.m_mat);
 
         loop {
-            let p = self.eigenvalues_under(mu_new);
+            let p = self.eigenvalues_under(new);
             if p == 0 {
-                break
+                break;
             } else {
-                mu_new /= p as f64;
+                new /= p as f64;
             }
         }
+
+        (0.0, new)
+    }
+
+    pub fn secant_iterate_one(&mut self, prev_mus: Option<(f64, f64)>) -> (f64, f64) {
+        // discover the next undiscovered eigenvalue(s) by secant iteration
+
+        if self.eigenpairs.len() >= self.sys.dofs() {
+            // nop
+            return prev_mus.unwrap_or((0.0, 0.0));
+        }
+
+        // choose the first two sample points
+        // use sample points from a previous iteration round if available
+        let (mut mu_old, mut mu_new) = prev_mus.unwrap_or_else(|| self.secant_starts());
 
         // begin the iteration
         let mut eta = 2.0;
@@ -251,13 +314,21 @@ impl DeterminantSearcher {
         let eigens_under = self.eigenpairs.len();
 
         let range = loop {
+            count += 1;
+
             let temp = self.next_val(mu_old, mu_new, eta);
             mu_old = mu_new;
             mu_new = temp;
 
             let new_under = self.eigenvalues_under(mu_new);
-            if new_under != eigens_under {
-                break EigenRange::new(mu_old, mu_new, eigens_under, new_under)
+            {
+                use std::cmp::Ordering::{Equal, Greater, Less};
+
+                match new_under.cmp(&eigens_under) {
+                    Greater => break EigenRange::new(mu_old, mu_new, eigens_under, new_under),
+                    Equal => (),
+                    Less => panic!("secant iteration moving backwards"),
+                }
             }
 
             // if the relative change is small, double eta
@@ -267,22 +338,51 @@ impl DeterminantSearcher {
         };
 
         self.process_eigenrange(range);
+
+        // return sample points for use in future rounds
+        (mu_old, mu_new)
     }
 
-    pub fn eigenpairs(&self) -> Vec<(f64, Vec<f64>)> {
-        self.eigenpairs.iter()
+    pub fn find_eigens(&mut self, n: usize) -> Vec<EigenPair> {
+        // find the n eigenpairs with the lowest eigenvalues
+        assert!(n <= self.sys.dofs());
+
+        let mut mus = None;
+        while self.eigenpairs.len() < n {
+            let m = self.secant_iterate_one(mus);
+            mus = Some(m);
+        }
+
+        let mut pairs = self.eigenpairs();
+        pairs.truncate(n);
+        pairs
+    }
+
+    pub fn eigenpairs(&self) -> Vec<EigenPair> {
+        self.eigenpairs
+            .iter()
             .cloned()
-            .map(|(val, mut v)| {
-                self.sys.perm.permute_slice(v.as_mut_slice());
-                (val, v)
+            .map(|mut e| {
+                e.permute(&self.sys.perm);
+                e
             })
             .collect()
     }
 }
 
-fn inverse_iterate(k: &LowerRowEnvelope, m: &BiEnvelope, shift: f64, tol: f64) -> (f64, Vec<f64>) {
+fn inverse_iterate(
+    k: &LowerRowEnvelope,
+    m: &BiEnvelope,
+    shift: f64,
+    eigs: Option<&[EigenPair]>,
+) -> EigenPair {
     // perform inverse iteration on the shifted eigenproblem
     // (K - shift * M) * v = l * M * v
+
+    // if a slice of eigenpairs eigs is provided, deflate the starting vector with respect
+    // to the provided eigenvectors using gram-schmidt orthogonalization
+
+    const TOLERANCE: f64 = 1e-6;
 
     assert_eq!(k.shape(), m.shape());
     let n = k.shape().0;
@@ -298,11 +398,18 @@ fn inverse_iterate(k: &LowerRowEnvelope, m: &BiEnvelope, shift: f64, tol: f64) -
 
     let mut old_rho: Option<f64> = None;
 
-    // begin iteration with x as all-ones
-    let mut x = vec![1.0; n];
+    // generate a random starting vector
+    let rng = fastrand::Rng::with_seed(1337);
+    let mut x: Vec<_> = std::iter::repeat_with(|| rng.f64()).take(n).collect();
+
     let mut x_bar = vec![0.0; n];
     let mut y = vec![0.0; n];
     let mut y_bar = vec![0.0; n];
+
+    if let Some(e) = eigs {
+        // orthogonalize the starting vector to know eigenvectors for better convergence
+        gram_schmidt_orthogonalize(x.as_mut_slice(), m, e);
+    }
 
     // y(0) = M x(0)
     m.mul_vec(x.as_slice(), y.as_mut_slice());
@@ -320,14 +427,14 @@ fn inverse_iterate(k: &LowerRowEnvelope, m: &BiEnvelope, shift: f64, tol: f64) -
         let mag = dot(&x_bar, &y_bar).sqrt();
 
         if let Some(r) = old_rho {
-            if ((rho - r) / rho).abs() <= tol {
+            if ((rho - r) / rho).abs() <= TOLERANCE {
                 // ready to return, construct the final approximation
                 for i in 0..n {
                     x[i] = x_bar[i] / mag;
                 }
 
                 // add the shift back on
-                break (rho + shift, x);
+                break EigenPair::new(rho + shift, x);
             }
         }
 
@@ -360,7 +467,7 @@ fn inverse_iterate_times(k: &LowerRowEnvelope, m: &BiEnvelope, times: usize) -> 
     // y(0) = M x(0)
     m.mul_vec(x.as_slice(), y.as_mut_slice());
 
-    for _ in 0..n {
+    for _ in 0..times {
         // K x_bar(k+1) = y(k)
         direct::solve_ldl(&k_l, &k_d, y.as_slice(), x_bar.as_mut_slice());
         // y_bar(k+1) = M x_bar(k+1)
@@ -397,4 +504,22 @@ fn rayleigh_quotient(x: &[f64], k: &BiEnvelope, m: &BiEnvelope) -> f64 {
     let den = dot(x, &temp);
 
     num / den
+}
+
+fn gram_schmidt_orthogonalize(x: &mut [f64], m: &BiEnvelope, eigs: &[EigenPair]) {
+    // orthogonalize x with respect to the provided eigenvectors and M
+
+    let mut temp = vec![0.0; x.len()];
+
+    for eig in eigs {
+        let v = eig.vector(); // this is a slice
+
+        // compute weight = v' M x
+        m.mul_vec(x.as_ref(), temp.as_mut_slice());
+        let weight = dot(v, &temp);
+
+        for i in 0..x.len() {
+            x[i] -= weight * v[i];
+        }
+    }
 }

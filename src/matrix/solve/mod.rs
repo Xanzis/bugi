@@ -127,8 +127,12 @@ impl System {
 
         for row in 0..dofs {
             for col in 0..dofs {
-                k_mat[(row, col)] = k[(row, col)];
-                m_mat[(row, col)] = m[(row, col)];
+                if k[(row, col)] != 0.0 {
+                    k_mat[(row, col)] = k[(row, col)];
+                }
+                if m[(row, col)] != 0.0 {
+                    m_mat[(row, col)] = m[(row, col)];
+                }
             }
         }
 
@@ -158,11 +162,6 @@ impl System {
         if let Some(r) = self.rhs.as_mut() {
             perm.permute_slice(r.as_mut_slice());
         }
-
-        println!(
-            "hi hello i am reduce evelope\n{}",
-            self.k_mat.clone().unwrap()
-        );
 
         self.perm = Some(perm);
     }
@@ -365,7 +364,7 @@ mod tests {
         let m = LinearMatrix::from_flat(
             4,
             vec![
-                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 6.0, 0.0, 0.0, 1.0,
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
             ],
         );
 
@@ -376,8 +375,19 @@ mod tests {
         assert_eq!(searcher.eigenvalues_under(2.0), 2);
         assert_eq!(searcher.eigenvalues_under(8.0), 3);
 
-        searcher.secant_iterate_one();
-        println!("{:?}", searcher.eigenpairs());
-        assert!(false);
+        let pairs = searcher.find_eigens(4);
+
+        println!("{:?}", pairs);
+
+        // check against independently-verified eigenvalues
+        assert!((pairs[0].value() - 0.1459).abs() <= 1e-3);
+        assert!((pairs[1].value() - 1.9098).abs() <= 1e-3);
+        assert!((pairs[2].value() - 6.8541).abs() <= 1e-3);
+        assert!((pairs[3].value() - 13.0902).abs() <= 1e-3);
+
+        use crate::matrix::dot;
+        assert!(
+            (dot(pairs[3].vector(), &[-0.3717, 0.6015, -0.6015, 0.3717]).abs() - 1.0).abs() <= 1e-3
+        );
     }
 }
