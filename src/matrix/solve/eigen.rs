@@ -124,7 +124,6 @@ impl EigenPair {
 #[derive(Clone, Debug)]
 pub struct EigenSystem {
     dofs: usize,
-
     k_mat: LowerRowEnvelope,
 
     // storing the full M matrix is convenient for inverse iteration
@@ -172,6 +171,11 @@ pub struct DeterminantSearcher {
     sys: EigenSystem,
 
     eigenpairs: Vec<EigenPair>,
+    last_mus: Option<(f64, f64)>,
+
+    // cached characteristic polynomial data
+    // as a (mu, undeflated p, diag rescale) tuple
+    prev_char: Option<(f64, f64, f64)>,
 }
 
 impl DeterminantSearcher {
@@ -179,6 +183,8 @@ impl DeterminantSearcher {
         Self {
             sys,
             eigenpairs: Vec::new(),
+            last_mus: None,
+            prev_char: None,
         }
     }
 
@@ -245,7 +251,7 @@ impl DeterminantSearcher {
             .product()
     }
 
-    fn char_ratio(&self, mu_old: f64, mu_new: f64) -> f64 {
+    fn char_ratio(&mut self, mu_old: f64, mu_new: f64) -> f64 {
         // evaluate the characteristic polynomial ratio of the eigenproblem at mu
         // find p(mu_new) / (p(mu_new) - p(mu_old))
         // scale by p(mu_new) during calculation to keep numbers manageable
@@ -257,22 +263,31 @@ impl DeterminantSearcher {
 
         let (_, d) = direct::cholesky_envelope_no_root(&a);
         let mean_diag = d.mean();
-        let p_new = d.product_scaled(1.0 / mean_diag);
-        let p_new = p_new * self.deflation_factor(mu_new);
+        let p_new_undeflated = d.product_scaled(1.0 / mean_diag);
+        let p_new = p_new_undeflated * self.deflation_factor(mu_new);
 
-        // compute the characteristic polynomial for the old shift
-        // K - mu_old * M = K - mu_new * M + (mu_new - mu_old) * M
-        a.add_scaled_bienv(&self.sys.m_mat, mu_diff);
+        let p_old = if self.prev_char.map_or(false, |ch| ch.0 == mu_old) {
+            // cached, undeflated polynomial exists and matches mu_old
+            let (_, mut p_old_undeflated, prev_diag) = self.prev_char.as_ref().unwrap();
+            p_old_undeflated *= (prev_diag / mean_diag).powi(self.sys.dofs() as i32);
+            p_old_undeflated * self.deflation_factor(mu_old)
+        } else {
+            // compute the characteristic polynomial for the old shift
+            // K - mu_old * M = K - mu_new * M + (mu_new - mu_old) * M
+            a.add_scaled_bienv(&self.sys.m_mat, mu_diff);
 
-        // TODO avoid recomputing p_old (can reuse previous value)
-        let (_, d) = direct::cholesky_envelope_no_root(&a);
-        let p_old = d.product_scaled(1.0 / mean_diag);
-        let p_old = p_old * self.deflation_factor(mu_old);
+            // TODO avoid recomputing p_old (can reuse previous value)
+            let (_, d) = direct::cholesky_envelope_no_root(&a);
+            let p_old_undeflated = d.product_scaled(1.0 / mean_diag);
+            p_old_undeflated * self.deflation_factor(mu_old)
+        };
+
+        self.prev_char = Some((mu_new, p_new_undeflated, mean_diag));
 
         p_new / (p_new - p_old)
     }
 
-    fn next_val(&self, mu_old: f64, mu_new: f64, eta: f64) -> f64 {
+    fn next_val(&mut self, mu_old: f64, mu_new: f64, eta: f64) -> f64 {
         // one secant step, finding the next eigenvalue approximation to attempt
         // uses the past two approximations
         mu_new - (eta * self.char_ratio(mu_old, mu_new) * (mu_new - mu_old))
@@ -289,24 +304,24 @@ impl DeterminantSearcher {
             if p == 0 {
                 break;
             } else {
-                new /= p as f64;
+                new /= (p + 1) as f64;
             }
         }
 
         (0.0, new)
     }
 
-    pub fn secant_iterate_one(&mut self, prev_mus: Option<(f64, f64)>) -> (f64, f64) {
+    pub fn secant_iterate_one(&mut self) {
         // discover the next undiscovered eigenvalue(s) by secant iteration
 
         if self.eigenpairs.len() >= self.sys.dofs() {
             // nop
-            return prev_mus.unwrap_or((0.0, 0.0));
+            return;
         }
 
         // choose the first two sample points
         // use sample points from a previous iteration round if available
-        let (mut mu_old, mut mu_new) = prev_mus.unwrap_or_else(|| self.secant_starts());
+        let (mut mu_old, mut mu_new) = self.last_mus.unwrap_or_else(|| self.secant_starts());
 
         // begin the iteration
         let mut eta = 2.0;
@@ -314,8 +329,6 @@ impl DeterminantSearcher {
         let eigens_under = self.eigenpairs.len();
 
         let range = loop {
-            count += 1;
-
             let temp = self.next_val(mu_old, mu_new, eta);
             mu_old = mu_new;
             mu_new = temp;
@@ -339,18 +352,16 @@ impl DeterminantSearcher {
 
         self.process_eigenrange(range);
 
-        // return sample points for use in future rounds
-        (mu_old, mu_new)
+        // store sample points for use in future rounds
+        self.last_mus = Some((mu_old, mu_new))
     }
 
     pub fn find_eigens(&mut self, n: usize) -> Vec<EigenPair> {
         // find the n eigenpairs with the lowest eigenvalues
         assert!(n <= self.sys.dofs());
 
-        let mut mus = None;
         while self.eigenpairs.len() < n {
-            let m = self.secant_iterate_one(mus);
-            mus = Some(m);
+            self.secant_iterate_one();
         }
 
         let mut pairs = self.eigenpairs();
