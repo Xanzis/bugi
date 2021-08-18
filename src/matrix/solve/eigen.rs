@@ -467,8 +467,10 @@ fn inverse_iterate_times(k: &LowerRowEnvelope, m: &BiEnvelope, times: usize) -> 
 
     let (k_l, k_d) = direct::cholesky_envelope_no_root(k);
 
-    // begin iteration with x as all-ones
-    let mut x = vec![1.0; n];
+    // generate a random starting vector
+    let rng = fastrand::Rng::with_seed(1337);
+    let mut x: Vec<_> = std::iter::repeat_with(|| rng.f64()).take(n).collect();
+
     let mut x_bar = vec![0.0; n];
     let mut y = vec![0.0; n];
     let mut y_bar = vec![0.0; n];
