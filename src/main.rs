@@ -216,12 +216,6 @@ fn modal<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
         // recomputing the vis_options each time is pretty dumb, but ok hack for now
         // problem is that VisOptions is not Clone
-        let show_mesh = args
-            .value_of("showmesh")
-            .unwrap_or("true")
-            .parse::<bool>()
-            .map_err(|_| BugiError::arg_error("could not parse show mesh argument"))?;
-        let vis_options = vis_options.show_mesh(show_mesh);
 
         let vis_options = match args.value_of("colormap") {
             None => ().into(),
@@ -236,6 +230,13 @@ fn modal<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
             .parse::<u32>()
             .map_err(|_| BugiError::arg_error("could not parse image size argument"))?;
         let vis_options = vis_options.im_size(im_size);
+
+        let show_mesh = args
+            .value_of("showmesh")
+            .unwrap_or("true")
+            .parse::<bool>()
+            .map_err(|_| BugiError::arg_error("could not parse show mesh argument"))?;
+        let vis_options = vis_options.show_mesh(show_mesh);
 
         let out_path_full = format!("out_{:02}.png", i);
 
