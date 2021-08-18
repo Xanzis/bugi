@@ -529,4 +529,9 @@ impl<'a> Deformation<'a> {
 
         vis
     }
+
+    pub fn frequency(&self) -> Option<f64> {
+        // associated frequency in rad/sec, if any
+        self.ang_freq
+    }
 }

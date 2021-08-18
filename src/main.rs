@@ -26,6 +26,7 @@ fn main() -> Result<(), BugiError> {
     match matches.subcommand() {
         ("linear", Some(linear_matches)) => linear(linear_matches),
         ("mesh", Some(mesh_matches)) => mesh(mesh_matches),
+        ("modal", Some(modal_matches)) => modal(modal_matches),
         ("", None) => Ok(()),
         _ => unreachable!(),
     }
@@ -54,7 +55,6 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     };
     eprintln!("solution complete\npost processing solution ...");
 
-    // TODO elas APIs should return references
     let max_von_mises = dfm
         .von_mises()
         .into_iter()
@@ -160,10 +160,10 @@ fn mesh<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
     let mut vis = msh.visualize();
 
-    let im_size = args
+    let im_size: u32 = args
         .value_of("imsize")
         .unwrap_or("1024")
-        .parse::<u32>()
+        .parse()
         .map_err(|_| BugiError::arg_error("could not parse image size argument"))?;
 
     let vis_options = VisOptions::new().im_size(im_size);
@@ -177,6 +177,78 @@ fn mesh<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     file::save_elas(mesh_out_path.as_str(), elas);
 
     eprintln!("mesh generation complete");
+
+    Ok(())
+}
+
+fn modal<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
+    // compute a linear study with the given mesh/setup file
+    eprintln!("computing modal study ...");
+
+    let file_path = args.value_of("INPUT").unwrap();
+    let file_path = path::Path::new(file_path);
+
+    eprintln!("reading mesh file ...");
+    let mut elas = file::read_to_elas(file_path)?;
+    eprintln!("file read (node count: {})", elas.node_count());
+
+    let num: usize = args
+        .value_of("NUM")
+        .unwrap()
+        .parse()
+        .map_err(|_| BugiError::arg_error("could not parse mode count argument"))?;
+
+    eprintln!("solving ...");
+    let dfms = elas.calc_modes(num);
+    eprintln!("solution complete\npost processing solution ...");
+
+    let scale: f64 = args
+        .value_of("scale")
+        .unwrap_or("50.0")
+        .parse()
+        .map_err(|_| BugiError::arg_error("could not parse displacement scale argument"))?;
+
+    for (i, dfm) in dfms.iter().enumerate() {
+        let mut vis = dfm.visualize(scale);
+        vis.set_vals(dfm.displacement_norms());
+
+        let vis_options = VisOptions::new();
+
+        // recomputing the vis_options each time is pretty dumb, but ok hack for now
+        // problem is that VisOptions is not Clone
+        let show_mesh = args
+            .value_of("showmesh")
+            .unwrap_or("true")
+            .parse::<bool>()
+            .map_err(|_| BugiError::arg_error("could not parse show mesh argument"))?;
+        let vis_options = vis_options.show_mesh(show_mesh);
+
+        let vis_options = match args.value_of("colormap") {
+            None => ().into(),
+            Some("hot") => vis_options.color_map(Box::new(|x| color::hot_map(x))),
+            Some("rgb") => vis_options.color_map(Box::new(|x| color::rgb_map(x))),
+            _ => return Err(BugiError::arg_error("unimplemented colormap name")),
+        };
+
+        let im_size = args
+            .value_of("imsize")
+            .unwrap_or("1024")
+            .parse::<u32>()
+            .map_err(|_| BugiError::arg_error("could not parse image size argument"))?;
+        let vis_options = vis_options.im_size(im_size);
+
+        let out_path_full = format!("out_{:02}.png", i);
+
+        vis.draw(out_path_full.as_str(), vis_options);
+
+        println!(
+            "mode {:02} frequency (rad/s): {:.5}",
+            i,
+            dfm.frequency().unwrap()
+        );
+    }
+
+    eprintln!("processing complete\n---------------");
 
     Ok(())
 }

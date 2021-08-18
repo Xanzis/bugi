@@ -89,3 +89,38 @@ subcommands:
                 value_name: BOOL
                 help: set whether the mesh is diplayed in the output image
                 takes_value: true
+    - modal:
+        about: compute the first n unloaded modes of the given meshed body
+        args:
+            - INPUT:
+                help: body mesh specification, must currently be a .bmsh file
+                required: true
+                index: 1
+            - NUM:
+                help: the number of modes to calculate
+                required: true
+                value_name: INT
+                index: 2
+            - colormap:
+                short: c
+                long: colormap
+                value_name: NAME
+                help: set the color map for graphic outputs; options are hot, rgb
+                takes_value: true
+            - scale:
+                short: x
+                long: scale
+                value_name: FLOAT
+                help: specify the displacement exaggeration factor in the output image
+                takes_value: true
+            - imsize:
+                short: i
+                long: imsize
+                value_name: INT
+                help: specify the size of the output image in pixels
+                takes_value: true
+            - showmesh:
+                long: showmesh
+                value_name: BOOL
+                help: set whether the mesh is diplayed in the output image
+                takes_value: true
