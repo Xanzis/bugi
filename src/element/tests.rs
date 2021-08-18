@@ -171,3 +171,41 @@ fn dist_line() {
 
     vis.draw("test_generated/dist_line.png", ());
 }
+
+#[test]
+fn triangles_modal() {
+    let mut elas = ElementAssemblage::new(2, AL6061);
+    elas.set_thickness(0.2);
+
+    for i in 0..20 {
+        let x = i as f64 * 0.2;
+        elas.add_nodes(vec![(x, 0.0), (x + 0.1, 0.2)]);
+    }
+
+    for i in 0..19 {
+        let roota = 2 * i;
+        let rootb = roota + 1;
+        elas.add_element(vec![roota, roota + 1, roota + 2]);
+        elas.add_element(vec![rootb, rootb + 1, rootb + 2]);
+    }
+
+    elas.add_constraint(0, Constraint::PlainDof(true, true, false));
+    elas.add_constraint(29, Constraint::PlainDof(false, true, false));
+
+    let dfms = elas.calc_modes(3);
+
+    let mut vis = dfms[0].visualize(20.0);
+    vis.set_vals(dfms[0].displacement_norms());
+
+    vis.draw("test_generated/triangles_modal_1.png", ());
+
+    let mut vis = dfms[1].visualize(20.0);
+    vis.set_vals(dfms[1].displacement_norms());
+
+    vis.draw("test_generated/triangles_modal_2.png", ());
+
+    let mut vis = dfms[2].visualize(20.0);
+    vis.set_vals(dfms[2].displacement_norms());
+
+    vis.draw("test_generated/triangles_modal_3.png", ());
+}
