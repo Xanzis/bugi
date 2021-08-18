@@ -43,7 +43,9 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     eprintln!("file read (node count: {})", elas.node_count());
 
     eprintln!("solving ...");
-    match args.value_of("solver") {
+
+    // compute deformation given load parameters
+    let dfm = match args.value_of("solver") {
         None => elas.calc_displacements::<DenseGaussSolver>(),
         Some("densegauss") => elas.calc_displacements::<DenseGaussSolver>(),
         Some("cholesky") => elas.calc_displacements::<CholeskyEnvelopeSolver>(),
@@ -53,14 +55,13 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     eprintln!("solution complete\npost processing solution ...");
 
     // TODO elas APIs should return references
-    let max_von_mises = elas
+    let max_von_mises = dfm
         .von_mises()
         .into_iter()
         .max_by(|x, y| x.partial_cmp(y).expect("encountered unstable stress value"))
         .unwrap();
-    let max_displacement = elas
+    let max_displacement = dfm
         .displacement_norms()
-        .unwrap()
         .into_iter()
         .max_by(|x, y| x.partial_cmp(y).expect("encountered unstable stress value"))
         .unwrap();
@@ -70,11 +71,11 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
         .unwrap_or("50.0")
         .parse::<f64>()
         .map_err(|_| BugiError::arg_error("could not parse displacement scale argument"))?;
-    let mut vis = elas.visualize(scale);
+    let mut vis = dfm.visualize(scale);
 
     let node_vals = match args.value_of("nodevalue") {
-        None | Some("displacement") => elas.displacement_norms().unwrap(),
-        Some("vonmises") => elas.von_mises(),
+        None | Some("displacement") => dfm.displacement_norms(),
+        Some("vonmises") => dfm.von_mises(),
         _ => return Err(BugiError::arg_error("unimplemented node value name")),
     };
 

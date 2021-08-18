@@ -96,10 +96,10 @@ mod tests {
         let elas_out = super::read_to_elas("example_files/square.bmsh");
         assert!(elas_out.is_ok());
         let mut elas = elas_out.unwrap();
-        elas.calc_displacements::<DenseGaussSolver>();
+        let dfm = elas.calc_displacements::<DenseGaussSolver>();
 
-        let mut vis = elas.visualize(50.0);
-        vis.set_vals(elas.displacement_norms().unwrap());
+        let mut vis = dfm.visualize(50.0);
+        vis.set_vals(dfm.displacement_norms());
         vis.draw("test_generated/disp_bmsh_square.png", ());
     }
 }

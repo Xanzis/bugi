@@ -5,6 +5,7 @@ pub mod material;
 pub mod strain;
 pub mod stress;
 
+use crate::matrix::solve::eigen::{DeterminantSearcher, EigenSystem};
 use crate::matrix::solve::{Solver, System};
 use crate::matrix::{Average, LinearMatrix, MatrixLike};
 use crate::spatial::Point;
@@ -26,16 +27,18 @@ mod tests;
 pub struct ElementAssemblage {
     dim: usize,
     nodes: Vec<Point>,
-    displacements: Option<Vec<Point>>,
+    dofs: usize,
+
+    area: Option<f64>,
+    thickness: Option<f64>,
+    material: Material,
+
     elements: Vec<IsoparElement>,
     constraints: HashMap<usize, Constraint>,
     concentrated_forces: HashMap<usize, Point>,
     line_forces: HashMap<(usize, usize), Point>,
+
     dof_lookup: Option<Vec<[Option<usize>; 3]>>,
-    dofs: usize,
-    area: Option<f64>,
-    thickness: Option<f64>,
-    material: Material,
 }
 
 impl ElementAssemblage {
@@ -43,7 +46,6 @@ impl ElementAssemblage {
         ElementAssemblage {
             dim,
             nodes: Vec::new(),
-            displacements: None,
             elements: Vec::new(),
             constraints: HashMap::new(),
             concentrated_forces: HashMap::new(),
@@ -354,7 +356,27 @@ impl ElementAssemblage {
         // TODO add area body forces / initial loads
     }
 
-    pub fn calc_displacements<T: Solver>(&mut self) {
+    fn raw_to_node_disp(&self, raw_disp: &[f64]) -> Vec<Point> {
+        // internal helper to relate raw solution results to deformations
+        // use the dof lookup to fill out node displacements
+        assert_eq!(raw_disp.len(), self.dofs);
+
+        let mut node_disp = Vec::new();
+
+        for n in 0..self.node_count() {
+            let mut disp = Point::zero(self.dim);
+            for d in 0..self.dim {
+                if let Some(i) = self.find_dof(n, d) {
+                    disp[d] = raw_disp[i];
+                }
+            }
+            node_disp.push(disp);
+        }
+
+        node_disp
+    }
+
+    pub fn calc_displacements<T: Solver>(&mut self) -> Deformation {
         // find the displacements under load and store them in the assemblage
         if self.dof_lookup.is_none() {
             self.compile_lookup();
@@ -367,86 +389,36 @@ impl ElementAssemblage {
         let solver = T::new(system);
 
         // TODO properly handle solver errors
-        let raw_displacements = solver.solve().unwrap();
-        let mut node_displacements = Vec::new();
+        let raw_disp = solver.solve().unwrap();
 
-        for n in 0..self.node_count() {
-            let mut disp = Point::zero(self.dim);
-            for d in 0..self.dim {
-                if let Some(i) = self.find_dof(n, d) {
-                    disp[d] = raw_displacements[i];
-                }
-            }
-            node_displacements.push(disp);
-        }
-
-        self.displacements = Some(node_displacements);
+        Deformation::new(self, self.raw_to_node_disp(raw_disp.as_slice()))
     }
 
-    pub fn displacements(&self) -> Option<Vec<Point>> {
-        self.displacements.clone()
-    }
-
-    pub fn displacement_norms(&self) -> Option<Vec<f64>> {
-        if let Some(disp) = self.displacements() {
-            Some(disp.into_iter().map(|d| d.norm()).collect())
-        } else {
-            None
-        }
-    }
-
-    pub fn displaced_nodes(&self, scale: f64) -> Option<Vec<Point>> {
-        if let Some(disps) = self.displacements.clone() {
-            let mut res = Vec::new();
-            for (n, d) in self.nodes.iter().zip(disps.into_iter()) {
-                res.push(*n + (d * scale));
-            }
-            Some(res)
-        } else {
-            None
-        }
-    }
-
-    pub fn stresses(&self) -> Vec<Option<stress::StressState>> {
-        // TODO streamline this, maybe compute disps if necessary
-        // TODO take out panics :)
-
-        // set up displacements and stress average structures
-        let disps = self
-            .displacements
-            .as_ref()
-            .expect("compute displacements first");
-
-        let mut stress_averages: Vec<Average<StressState>> = Vec::new();
-        for _ in 0..self.nodes.len() {
-            stress_averages.push(Average::new());
+    pub fn calc_modes(&mut self, n: usize) -> Vec<Deformation> {
+        // find the n lowest-frequency modes
+        // for now, this solution  procedure ignored loads
+        if self.dof_lookup.is_none() {
+            self.compile_lookup();
         }
 
-        // compute stresses for each node, averaging for shared nodes
-        for el in self.elements.iter() {
-            let mut el_u: Vec<f64> = Vec::new();
-            for i in 0..el.dofs() {
-                let (idx, dof) = el.i_to_dof(i);
-                // idx is already an idnex in the global node list
-                // dof is the degree of freedom of the node (x/y/z)
-                el_u.push(disps[idx][dof]);
-            }
-            for i in 0..el.node_count() {
-                let nstress = el.node_stress(i, el_u.clone());
-                stress_averages[el.node_idx(i)].update(nstress);
-            }
+        let mut sys = System::new(self.dofs);
+        self.calc_k(&mut sys);
+        self.calc_m(&mut sys);
+
+        let eigensys = EigenSystem::new(sys);
+        let mut searcher = DeterminantSearcher::new(eigensys);
+        let pairs = searcher.find_eigens(n);
+
+        let mut res = Vec::new();
+
+        for p in pairs {
+            let mode_shape = self.raw_to_node_disp(p.vector());
+            // the solution eigenvalues are the square of the natural frequencies
+            let mode_freq = p.value().sqrt();
+            res.push(Deformation::with_freq(self, mode_shape, mode_freq));
         }
 
-        // collect average stresses, setting the stress to None when the average is uninitialized
-        stress_averages.into_iter().map(|x| x.consume()).collect()
-    }
-
-    pub fn von_mises(&self) -> Vec<f64> {
-        // compute the mean von mises yield criterion value for each node, with 0 for unused nodes
-        self.stresses()
-            .into_iter()
-            .map(|x| x.map(|y| y.von_mises()).unwrap_or(0.0))
-            .collect()
+        res
     }
 
     pub fn triangles(&self) -> Vec<(usize, usize, usize)> {
@@ -472,16 +444,88 @@ impl ElementAssemblage {
         let res: HashSet<(usize, usize)> = res.into_iter().collect();
         res.into_iter().collect()
     }
+}
+
+// struct for storing and post-processing displacement results
+// elas reference is nice as it ensures Def is always valid
+#[derive(Clone, Debug)]
+pub struct Deformation<'a> {
+    elas: &'a ElementAssemblage,
+    node_disp: Vec<Point>,
+    ang_freq: Option<f64>,
+}
+
+impl<'a> Deformation<'a> {
+    fn new(elas: &'a ElementAssemblage, node_disp: Vec<Point>) -> Self {
+        Self {
+            elas,
+            node_disp,
+            ang_freq: None,
+        }
+    }
+
+    fn with_freq(elas: &'a ElementAssemblage, node_disp: Vec<Point>, ang_freq: f64) -> Self {
+        Self {
+            elas,
+            node_disp,
+            ang_freq: Some(ang_freq),
+        }
+    }
+
+    pub fn displacement_norms(&self) -> Vec<f64> {
+        self.node_disp.iter().map(|p| p.norm()).collect()
+    }
+
+    pub fn displaced_nodes(&self, scale: f64) -> Vec<Point> {
+        let mut res = Vec::new();
+
+        for (n, d) in self.elas.nodes.iter().zip(self.node_disp.iter()) {
+            res.push(*n + (*d * scale));
+        }
+
+        res
+    }
+
+    pub fn stresses(&self) -> Vec<Option<stress::StressState>> {
+        let mut stress_averages: Vec<Average<StressState>> = Vec::new();
+        for _ in 0..self.elas.nodes.len() {
+            stress_averages.push(Average::new());
+        }
+
+        // compute stresses for each node, averaging for shared nodes
+        for el in self.elas.elements.iter() {
+            let mut el_u: Vec<f64> = Vec::new();
+            for i in 0..el.dofs() {
+                let (idx, dof) = el.i_to_dof(i);
+                // idx is already an index in the global node list
+                // dof is the degree of freedom of the node (x/y/z)
+                el_u.push(self.node_disp[idx][dof]);
+            }
+            for i in 0..el.node_count() {
+                let nstress = el.node_stress(i, el_u.clone());
+                stress_averages[el.node_idx(i)].update(nstress);
+            }
+        }
+
+        // collect average stresses, setting the stress to None when the average is uninitialized
+        stress_averages.into_iter().map(|x| x.consume()).collect()
+    }
+
+    pub fn von_mises(&self) -> Vec<f64> {
+        // compute the mean von mises yield criterion value for each node, with 0 for unused nodes
+        self.stresses()
+            .into_iter()
+            .map(|x| x.map(|y| y.von_mises()).unwrap_or(0.0))
+            .collect()
+    }
 
     // TODO should factor this (quite involved) visual stuff out of element
     pub fn visualize(&self, scale: f64) -> Visualizer {
-        let dispn = self
-            .displaced_nodes(scale)
-            .expect("displacements must first be calculated");
+        let dispn = self.displaced_nodes(scale);
 
         let mut vis: Visualizer = dispn.into();
-        vis.set_edges(self.edges());
-        vis.set_triangles(self.triangles());
+        vis.set_edges(self.elas.edges());
+        vis.set_triangles(self.elas.triangles());
 
         vis
     }
