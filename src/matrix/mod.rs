@@ -309,7 +309,7 @@ where
         let mut res = format!("rows: {} cols: {}\n", nrow, ncol);
         for i in 0..nrow {
             for val in self.row(i) {
-                let new = format!("{:1.5} ", val);
+                let new = format!("{:>+07.1e} ", val);
                 res.push_str(new.as_str());
             }
             res.push_str("\n");
