@@ -261,7 +261,7 @@ impl ElementAssemblage {
             .clone();
 
         let m_func = move |p| {
-            let mut m = el.find_k_integrand(p);
+            let mut m = el.find_m_integrand(p);
             m *= multiplier;
             m
         };
