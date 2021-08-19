@@ -403,22 +403,26 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
 fn name_and_num<'a>(no: usize, line: &'a str) -> Result<(&'a str, usize), FileError> {
     //convert <name x> to (name, x)
     let mut l_split = line.split(" ");
-    let name = l_split.next().ok_or(parse_error(no, "no name on line"))?;
+    let name = l_split
+        .next()
+        .ok_or_else(|| parse_error(no, "no name on line"))?;
     let num_str = l_split
         .next()
-        .ok_or(parse_error(no, "expected uint with label"))?;
+        .ok_or_else(|| parse_error(no, "expected uint with label"))?;
     let num = num_str
         .parse::<usize>()
-        .or(Err(parse_error(no, "bad uint with label")))?;
+        .or_else(|_| Err(parse_error(no, "bad uint with label")))?;
     Ok((name, num))
 }
 
 fn name_and_name<'a>(no: usize, line: &'a str) -> Result<(&'a str, &'a str), FileError> {
     let mut l_split = line.split(" ");
-    let n = l_split.next().ok_or(parse_error(no, "no name on line"))?;
+    let n = l_split
+        .next()
+        .ok_or_else(|| parse_error(no, "no name on line"))?;
     let m = l_split
         .next()
-        .ok_or(parse_error(no, "expected second name on line"))?;
+        .ok_or_else(|| parse_error(no, "expected second name on line"))?;
 
     Ok((n, m))
 }
@@ -426,13 +430,15 @@ fn name_and_name<'a>(no: usize, line: &'a str) -> Result<(&'a str, &'a str), Fil
 fn name_and_float<'a>(no: usize, line: &'a str) -> Result<(&'a str, f64), FileError> {
     //convert <name x> to (name, x)
     let mut l_split = line.split(" ");
-    let name = l_split.next().ok_or(parse_error(no, "no name on line"))?;
+    let name = l_split
+        .next()
+        .ok_or_else(|| parse_error(no, "no name on line"))?;
     let num_str = l_split
         .next()
-        .ok_or(parse_error(no, "expected float with label"))?;
+        .ok_or_else(|| parse_error(no, "expected float with label"))?;
     let num = num_str
         .parse::<f64>()
-        .or(Err(parse_error(no, "bad float with label")))?;
+        .or_else(|_| Err(parse_error(no, "bad float with label")))?;
     Ok((name, num))
 }
 
@@ -441,25 +447,25 @@ fn id_and_point(no: usize, line: &str) -> Result<(usize, Point), FileError> {
     let mut l_split = line.split(" ");
     let id = l_split
         .next()
-        .ok_or(parse_error(no, "expected id"))?
+        .ok_or_else(|| parse_error(no, "expected id"))?
         .parse::<usize>()
-        .or(Err(parse_error(no, "bad uint")))?;
+        .or_else(|_| Err(parse_error(no, "bad uint")))?;
 
     let vals_str = l_split
         .next()
-        .ok_or(parse_error(no, "expected float series"))?;
+        .ok_or_else(|| parse_error(no, "expected float series"))?;
     let mut vals: Vec<f64> = Vec::new();
     for val_str in vals_str.split("/") {
         vals.push(
             val_str
                 .parse::<f64>()
-                .or(Err(parse_error(no, "bad float")))?,
+                .or_else(|_| Err(parse_error(no, "bad float")))?,
         );
     }
 
     let p: Point = vals
         .try_into()
-        .or(Err(parse_error(no, "couldn't assemble Point")))?;
+        .or_else(|_| Err(parse_error(no, "couldn't assemble Point")))?;
 
     Ok((id, p))
 }
@@ -469,31 +475,31 @@ fn id_id_and_point(no: usize, line: &str) -> Result<(usize, usize, Point), FileE
     let mut l_split = line.split(" ");
     let ida = l_split
         .next()
-        .ok_or(parse_error(no, "expected id"))?
+        .ok_or_else(|| parse_error(no, "expected id"))?
         .parse::<usize>()
-        .or(Err(parse_error(no, "bad uint")))?;
+        .or_else(|_| Err(parse_error(no, "bad uint")))?;
 
     let idb = l_split
         .next()
-        .ok_or(parse_error(no, "expected id"))?
+        .ok_or_else(|| parse_error(no, "expected id"))?
         .parse::<usize>()
-        .or(Err(parse_error(no, "bad uint")))?;
+        .or_else(|_| Err(parse_error(no, "bad uint")))?;
 
     let vals_str = l_split
         .next()
-        .ok_or(parse_error(no, "expected float series"))?;
+        .ok_or_else(|| parse_error(no, "expected float series"))?;
     let mut vals: Vec<f64> = Vec::new();
     for val_str in vals_str.split("/") {
         vals.push(
             val_str
                 .parse::<f64>()
-                .or(Err(parse_error(no, "bad float")))?,
+                .or_else(|_| Err(parse_error(no, "bad float")))?,
         );
     }
 
     let p: Point = vals
         .try_into()
-        .or(Err(parse_error(no, "couldn't assemble Point")))?;
+        .or_else(|_| Err(parse_error(no, "couldn't assemble Point")))?;
 
     Ok((ida, idb, p))
 }
@@ -503,25 +509,25 @@ fn id_type_and_list(no: usize, line: &str) -> Result<(usize, u8, Vec<usize>), Fi
     let mut l_split = line.split(" ");
     let id = l_split
         .next()
-        .ok_or(parse_error(no, "expected id"))?
+        .ok_or_else(|| parse_error(no, "expected id"))?
         .parse::<usize>()
-        .or(Err(parse_error(no, "bad uint")))?;
+        .or_else(|_| Err(parse_error(no, "bad uint")))?;
 
     let tp = l_split
         .next()
-        .ok_or(parse_error(no, "expected type"))?
+        .ok_or_else(|| parse_error(no, "expected type"))?
         .parse::<u8>()
-        .or(Err(parse_error(no, "bad uint")))?;
+        .or_else(|_| Err(parse_error(no, "bad uint")))?;
 
     let ns_str = l_split
         .next()
-        .ok_or(parse_error(no, "expected id series"))?;
+        .ok_or_else(|| parse_error(no, "expected id series"))?;
     let mut ns: Vec<usize> = Vec::new();
     for n_str in ns_str.split("/") {
         ns.push(
             n_str
                 .parse::<usize>()
-                .or(Err(parse_error(no, "bad uint")))?,
+                .or_else(|_| Err(parse_error(no, "bad uint")))?,
         );
     }
 
