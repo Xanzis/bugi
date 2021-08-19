@@ -511,6 +511,12 @@ impl Dictionary {
         // includes 'connections' along the diagonal
         self.data.keys().cloned()
     }
+
+    pub fn edges_lower(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        // only give lower triangle edges
+        // to avoid duplicates for symmetrical matrices
+        self.data.keys().cloned().filter(|&(x, y)| x <= y)
+    }
 }
 
 impl From<Dictionary> for LowerRowEnvelope {

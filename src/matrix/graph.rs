@@ -37,9 +37,10 @@ impl Graph {
         T: IntoIterator<Item = (usize, usize)>,
     {
         // construct a graph from directed edges
+        let edge_iter = edge_iter.into_iter();
 
         // ensure edge list is clean and add reverses
-        let mut edges = HashSet::new();
+        let mut edges = Vec::with_capacity(edge_iter.size_hint().0 * 2);
         for (x, y) in edge_iter.into_iter() {
             if x >= v_count || y >= v_count {
                 panic!("edge vertex out of bounds");
@@ -49,17 +50,17 @@ impl Graph {
                 continue;
             }
 
-            edges.insert((x, y));
-            edges.insert((y, x));
+            edges.push((x, y));
+            edges.push((y, x));
         }
-
-        let mut edges: Vec<(usize, usize)> = edges.into_iter().collect();
 
         // sort edges by first vertex then second edge (ascending)
         edges.sort_by(|x, y| match x.0.cmp(&y.0) {
             Ordering::Equal => x.1.cmp(&y.1),
             o => o,
         });
+
+        edges.dedup();
 
         let mut res = Self {
             adjacent: Vec::new(),

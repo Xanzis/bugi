@@ -149,7 +149,12 @@ impl System {
             unimplemented!("double permutation");
         }
 
-        let edges = self.k_mat.as_ref().expect("no k matrix loaded").edges();
+        // can use edges_lower because k is symmetrical
+        let edges = self
+            .k_mat
+            .as_ref()
+            .expect("no k matrix loaded")
+            .edges_lower();
         let mut graph = Graph::from_edges(self.dofs(), edges);
         let perm = graph.reverse_cuthill_mckee();
 
