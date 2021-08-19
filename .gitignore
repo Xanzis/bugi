@@ -2,5 +2,8 @@
 Cargo.lock
 /test_generated/*
 !/test_generated/.gitkeep
-out.png
-out.bmsh
+perf.data
+perf.data.old
+performance.txt
+out*
+flamegraph.svg
