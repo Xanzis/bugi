@@ -458,6 +458,7 @@ where
     }
 }
 
+#[inline]
 pub fn dot<'a, T, U>(x: T, y: U) -> f64
 where
     T: IntoIterator<Item = &'a f64>,
