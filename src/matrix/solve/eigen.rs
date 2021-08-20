@@ -113,7 +113,7 @@ impl EigenPair {
     }
 
     pub fn vector(&self) -> &[f64] {
-        self.vector.as_slice()
+        &self.vector
     }
 
     pub fn permute(&mut self, perm: &Permutation) {
@@ -297,7 +297,7 @@ impl DeterminantSearcher {
         // find two lower eigenvalue bounds for the first secant iteration round
         let x = inverse_iterate_times(&self.sys.k_mat, &self.sys.m_mat, 3);
 
-        let mut new = 0.99 * rayleigh_quotient(x.as_slice(), &self.sys.k_full, &self.sys.m_mat);
+        let mut new = 0.99 * rayleigh_quotient(&x, &self.sys.k_full, &self.sys.m_mat);
 
         loop {
             let p = self.eigenvalues_under(new);
@@ -423,13 +423,13 @@ fn inverse_iterate(
     }
 
     // y(0) = M x(0)
-    m.mul_vec(x.as_slice(), y.as_mut_slice());
+    m.mul_vec(&x, &mut y);
 
     loop {
         // K x_bar(k+1) = y(k)
-        direct::solve_ldl(&k_l, &k_d, y.as_slice(), x_bar.as_mut_slice());
+        direct::solve_ldl(&k_l, &k_d, &y, &mut x_bar);
         // y_bar(k+1) = M x_bar(k+1)
-        m.mul_vec(x_bar.as_slice(), y_bar.as_mut_slice());
+        m.mul_vec(&x_bar, &mut y_bar);
 
         // Rayleigh quotient approximation:
         // rho = x_bar(k+1) . y(k) / x_bar(k+1) . y_bar(k+1)
@@ -478,13 +478,13 @@ fn inverse_iterate_times(k: &LowerRowEnvelope, m: &BiEnvelope, times: usize) -> 
     let mut mag = 0.0;
 
     // y(0) = M x(0)
-    m.mul_vec(x.as_slice(), y.as_mut_slice());
+    m.mul_vec(&x, &mut y);
 
     for _ in 0..times {
         // K x_bar(k+1) = y(k)
-        direct::solve_ldl(&k_l, &k_d, y.as_slice(), x_bar.as_mut_slice());
+        direct::solve_ldl(&k_l, &k_d, &y, &mut x_bar);
         // y_bar(k+1) = M x_bar(k+1)
-        m.mul_vec(x_bar.as_slice(), y_bar.as_mut_slice());
+        m.mul_vec(&x_bar, &mut y_bar);
 
         mag = dot(&x_bar, &y_bar).sqrt();
 
@@ -510,10 +510,10 @@ fn rayleigh_quotient(x: &[f64], k: &BiEnvelope, m: &BiEnvelope) -> f64 {
 
     let mut temp = vec![0.0; n];
 
-    k.mul_vec(x, temp.as_mut_slice());
+    k.mul_vec(x, &mut temp);
     let num = dot(x, &temp);
 
-    m.mul_vec(x, temp.as_mut_slice());
+    m.mul_vec(x, &mut temp);
     let den = dot(x, &temp);
 
     num / den
@@ -528,7 +528,7 @@ fn gram_schmidt_orthogonalize(x: &mut [f64], m: &BiEnvelope, eigs: &[EigenPair])
         let v = eig.vector(); // this is a slice
 
         // compute weight = v' M x
-        m.mul_vec(x.as_ref(), temp.as_mut_slice());
+        m.mul_vec(x, &mut temp);
         let weight = dot(v, &temp);
 
         for i in 0..x.len() {
