@@ -117,8 +117,7 @@ where
         }
         for r in 0..self.shape().0 {
             for c in 0..self.shape().1 {
-                let y = other.get((r, c)).unwrap();
-                self.mutate((r, c), |x| *x += y);
+                self[(r, c)] += other[(r, c)];
             }
         }
     }
@@ -129,8 +128,7 @@ where
         }
         for r in 0..self.shape().0 {
             for c in 0..self.shape().1 {
-                let y = other.get((r, c)).unwrap();
-                self.mutate((r, c), |x| *x -= y);
+                self[(r, c)] -= other[(r, c)];
             }
         }
     }

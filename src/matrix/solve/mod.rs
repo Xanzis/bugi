@@ -355,7 +355,6 @@ mod tests {
     fn eigen_determinant_search() {
         use super::eigen::{DeterminantSearcher, EigenSystem};
         use super::System;
-        use crate::matrix::solve::direct;
         use crate::matrix::{LinearMatrix, MatrixLike};
 
         let k = LinearMatrix::from_flat(
