@@ -126,7 +126,10 @@ pub struct PlaneTriangulation {
 
     // map with three entries per triangle for fast lookup
     tris: HashMap<Edge, VId>,
-    full_tris: HashSet<Triangle>,
+
+    // map storing one copy of each triangle
+    // plus the triangle's circumradius for fast lookup
+    full_tris: HashMap<Triangle, f64>,
 
     // record of coappearing vertices in recently added triangles
     recents: HashMap<VId, VId>,
@@ -139,7 +142,7 @@ impl PlaneTriangulation {
             bound,
             vertices: Vec::new(),
             tris: HashMap::new(),
-            full_tris: HashSet::new(),
+            full_tris: HashMap::new(),
             recents: HashMap::new(),
         }
     }
@@ -184,10 +187,6 @@ impl PlaneTriangulation {
             .map(|x| VId::Real(x))
             .chain(self.bound.all_vid().map(|x| VId::Bound(x)))
         //    .chain(iter::once(VId::Ghost))
-    }
-
-    fn all_triangles<'a>(&'a self) -> impl Iterator<Item = Triangle> + 'a {
-        self.full_tris.iter().cloned()
     }
 
     fn get_triangle_points(&self, tri: Triangle) -> Option<(Point, Point, Point)> {
@@ -301,7 +300,8 @@ impl PlaneTriangulation {
         self.tris.insert(edges[1], tri.0);
         self.tris.insert(edges[2], tri.1);
 
-        self.full_tris.insert(tri);
+        let cr = self.circumradius(tri).unwrap();
+        self.full_tris.insert(tri, cr);
 
         // add to the recent co-appearing points map for later adjacent_one use
         // seems reasonable to not insert any ghost pairs for adjacent_one, right?
@@ -326,7 +326,7 @@ impl PlaneTriangulation {
             }
 
             for t in tri.all() {
-                if self.full_tris.remove(&t) {
+                if self.full_tris.remove(&t).is_some() {
                     // only try removing until the triangle was successfully removed
                     break;
                 }
@@ -537,14 +537,10 @@ impl PlaneTriangulation {
     }
 
     fn large_triangle(&self, h: f64) -> Option<Triangle> {
-        // find a triangle with circumradius larger than h if one exists
-        self.all_triangles().find(|&t| {
-            if let Some(rad) = self.circumradius(t) {
-                rad > h
-            } else {
-                false
-            }
-        })
+        self.full_tris
+            .iter()
+            .find(|&(_, &cr)| cr > h)
+            .map(|(&t, _)| t)
     }
 
     pub fn chew_mesh(&mut self, h: f64) {
@@ -631,7 +627,7 @@ impl PlaneTriangulation {
 
         // add all the triangles
 
-        for tri in self.full_tris.into_iter() {
+        for tri in self.full_tris.into_keys() {
             // TODO avoid these heap allocations by using elas' triangle insertion method
             let tri_def = vec![
                 *vertex_lookup.get(&tri.0).unwrap(),
