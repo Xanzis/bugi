@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use crate::matrix::{Inverse, LinearMatrix, MatrixLike};
+use crate::matrix::{ConstMatrix, Inverse};
 
 use super::Point;
 
@@ -30,9 +30,9 @@ pub fn tetrahedron_dir(tet: (Point, Point, Point, Point)) -> Orient {
     // return the orientation of a tetrahedron
     let (a, b, c, d) = tet;
 
-    let mat = LinearMatrix::from_flat(
+    let mat = ConstMatrix::<16>::from_flat_array(
         4,
-        vec![
+        [
             a[0], a[1], a[2], 1.0, b[0], b[1], b[2], 1.0, c[0], c[1], c[2], 1.0, d[0], d[1], d[2],
             1.0,
         ],
@@ -84,9 +84,9 @@ pub fn in_circle(p: Point, tri: (Point, Point, Point)) -> bool {
     let (a, b, c) = tri;
 
     // TODO replace with faster / more accurate 3x3 determinant
-    let mat = LinearMatrix::from_flat(
+    let mat = ConstMatrix::<16>::from_flat_array(
         4,
-        vec![
+        [
             a[0],
             a[1],
             a[0].powi(2) + a[1].powi(2),
@@ -119,9 +119,9 @@ pub fn in_sphere(p: Point, tet: (Point, Point, Point, Point)) -> bool {
     let (a, b, c, d) = tet;
 
     // TODO replace with faster / more accurate 4x4 determinant
-    let mat = LinearMatrix::from_flat(
+    let mat = ConstMatrix::<25>::from_flat_array(
         5,
-        vec![
+        [
             a[0],
             a[1],
             a[2],

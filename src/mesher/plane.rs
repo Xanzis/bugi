@@ -395,12 +395,13 @@ impl PlaneTriangulation {
             // now that only base walls are checked, a spatial predicate is used
             for wall in self.bound.all_base_walls() {
                 if let Some((a, b)) = self.bound.get_segment_points(wall) {
-                    if predicates::lies_on((a, b), m, TOLERANCE)
-                        || predicates::lies_on((a, b), x, TOLERANCE)
-                    {
-                        continue;
-                    } else if predicates::segments_intersect((a, b), (m, x)) {
-                        return false;
+                    if predicates::segments_intersect((a, b), (m, x)) {
+                        // if m or x contact
+                        if !(predicates::lies_on((a, b), m, TOLERANCE)
+                            || predicates::lies_on((a, b), x, TOLERANCE))
+                        {
+                            return false;
+                        }
                     }
                 }
             }
