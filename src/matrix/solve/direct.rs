@@ -66,7 +66,7 @@ impl Solver for CholeskyEnvelopeSolver {
         eprintln!("decomposition computed.\nsolving system...");
 
         let mut x = vec![0.0; dofs];
-        solve_ll(&chol, self.r.as_slice(), x.as_mut_slice());
+        solve_ll(&chol, &self.r, &mut x);
 
         // invert the permutation
         self.perm.permute_slice(x.as_mut_slice());
@@ -114,14 +114,14 @@ pub fn cholesky_envelope(a: &LowerRowEnvelope) -> LowerRowEnvelope {
         w.clear();
         w.resize(nondiag_len, 0.0);
 
-        l.solve_submatrix(u, w.as_mut_slice(), (start_col, i));
+        l.solve_submatrix(u, &mut w, (start_col, i));
 
         // w is computed, fill in the new row of L
         let t = (s - w.iter().map(|x| x * x).sum::<f64>()).sqrt();
 
         // add the row by appending t to w
         w.push(t);
-        l.row_stored_mut(i).1.clone_from_slice(w.as_slice());
+        l.row_stored_mut(i).1.clone_from_slice(&w);
     }
 
     l
@@ -139,8 +139,8 @@ pub fn solve_ll(l: &LowerRowEnvelope, b: &[f64], x: &mut [f64]) {
 
     let mut y = vec![0.0; n];
 
-    l.solve(b, y.as_mut_slice());
-    l.solve_transposed(y.as_slice(), x);
+    l.solve(b, &mut y);
+    l.solve_transposed(&y, x);
 }
 
 pub fn cholesky_envelope_no_root(a: &LowerRowEnvelope) -> (LowerRowEnvelope, Diagonal) {
@@ -199,7 +199,7 @@ pub fn solve_ldl(l: &LowerRowEnvelope, d: &Diagonal, b: &[f64], x: &mut [f64]) {
 
     let mut z = vec![0.0; n];
 
-    l.solve(b, z.as_mut_slice());
-    d.solve(z.as_mut_slice());
-    l.solve_transposed(z.as_slice(), x);
+    l.solve(b, &mut z);
+    d.solve(&mut z);
+    l.solve_transposed(&z, x);
 }
