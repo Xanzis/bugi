@@ -12,8 +12,7 @@ where
         // compute the frobenius norm
         let sum: f64 = self
             .flat()
-            .map(|x| (x.clone(), x.clone()))
-            .map(|(x, y)| x * y)
+            .map(|x| x * x)
             .sum();
         sum.sqrt()
     }
