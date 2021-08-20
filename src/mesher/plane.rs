@@ -21,10 +21,7 @@ enum VId {
 
 impl VId {
     fn is_ghost(&self) -> bool {
-        match self {
-            VId::Ghost => true,
-            _ => false,
-        }
+        matches!(self, VId::Ghost)
     }
 }
 
@@ -184,8 +181,8 @@ impl PlaneTriangulation {
     fn all_vid(&self) -> impl Iterator<Item = VId> {
         // return an iterator over all nonghost VIds
         (0..self.vertices.len())
-            .map(|x| VId::Real(x))
-            .chain(self.bound.all_vid().map(|x| VId::Bound(x)))
+            .map(VId::Real)
+            .chain(self.bound.all_vid().map(VId::Bound))
         //    .chain(iter::once(VId::Ghost))
     }
 
@@ -398,9 +395,9 @@ impl PlaneTriangulation {
             // now that only base walls are checked, a spatial predicate is used
             for wall in self.bound.all_base_walls() {
                 if let Some((a, b)) = self.bound.get_segment_points(wall) {
-                    if predicates::lies_on((a, b), m, TOLERANCE) {
-                        continue;
-                    } else if predicates::lies_on((a, b), x, TOLERANCE) {
+                    if predicates::lies_on((a, b), m, TOLERANCE)
+                        || predicates::lies_on((a, b), x, TOLERANCE)
+                    {
                         continue;
                     } else if predicates::segments_intersect((a, b), (m, x)) {
                         return false;
@@ -554,13 +551,10 @@ impl PlaneTriangulation {
         self.gift_wrap();
         eprintln!("boundary triangulated\ninserting nodes ...");
 
-        //while let Some(tri) = self.all_triangles().find(|&t| if let Some(rad) = self.circumradius(t) { rad > h } else { false }) {
         while let Some(tri) = self.large_triangle(h) {
             // tri is a triangle with a too-high circumradius
             // insert its circumcenter
-            let center = self
-                .circumcenter(tri)
-                .expect("unreachable - tri with circumradius always has circumcenter");
+            let center = self.circumcenter(tri).unwrap();
             let center_id = self.store_vertex(center);
 
             self.bowyer_watson_insert(center_id, tri);

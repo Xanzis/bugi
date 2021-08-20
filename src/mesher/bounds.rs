@@ -79,14 +79,17 @@ impl<'a> Iterator for Wall<'a> {
 #[derive(Clone, Debug)]
 pub struct AllWalls<'a> {
     seg_map: &'a HashMap<VId, VId>,
-    wall_starts: &'a Vec<VId>,
+    wall_starts: &'a [VId],
     wall: Wall<'a>,
     wall_idx: usize,
 }
 
 impl<'a> AllWalls<'a> {
-    fn new(seg_map: &'a HashMap<VId, VId>, wall_starts: &'a Vec<VId>) -> Self {
-        assert!(wall_starts.len() > 0, "cannot iterate over empty wall list");
+    fn new(seg_map: &'a HashMap<VId, VId>, wall_starts: &'a [VId]) -> Self {
+        assert!(
+            !wall_starts.is_empty(),
+            "cannot iterate over empty wall list"
+        );
 
         Self {
             seg_map,
@@ -249,7 +252,7 @@ impl PlaneBoundary {
     }
 
     pub fn all_vid(&self) -> impl Iterator<Item = VId> {
-        (0..self.vertices.len()).map(|x| VId::Real(x))
+        (0..self.vertices.len()).map(VId::Real)
     }
 
     pub fn get_segment_points(&self, seg: Segment) -> Option<(Point, Point)> {
@@ -384,12 +387,12 @@ impl PlaneBoundary {
         }
     }
 
-    pub fn all_walls<'a>(&'a self) -> AllWalls<'a> {
+    pub fn all_walls(&self) -> AllWalls<'_> {
         // an iterator over every boundary segment
         AllWalls::new(&self.seg_map, &self.wall_starts)
     }
 
-    pub fn all_base_walls<'a>(&'a self) -> AllWalls<'a> {
+    pub fn all_base_walls(&self) -> AllWalls<'_> {
         // an iterator over every base boundary segment
         // does not include wall subdivisions, for faster visibility checks
         AllWalls::new(&self.base_seg_map, &self.base_wall_starts)
