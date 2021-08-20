@@ -1,7 +1,7 @@
 use super::predicates::{triangle_dir, Orient};
 use super::Point;
 
-pub fn jarvis_hull(points: &Vec<Point>) -> Vec<usize> {
+pub fn jarvis_hull(points: &[Point]) -> Vec<usize> {
     // find the indices of a counterclockwise hull around the supplied points
     let mut res = Vec::new();
     let n = points.len();
@@ -24,8 +24,7 @@ pub fn jarvis_hull(points: &Vec<Point>) -> Vec<usize> {
             // find the rightmost point
             match triangle_dir((points[p], points[i], points[q])) {
                 Orient::Positive => q = i,
-                Orient::Negative => (),
-                Orient::Zero => (),
+                _ => (),
             };
         }
 

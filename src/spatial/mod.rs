@@ -42,12 +42,8 @@ impl Point {
     pub fn new(vals: &[f64]) -> Self {
         let mut data = [0.0; 3];
         let n = vals.len();
-        if n > 3 {
-            panic!("dimension too high")
-        }
-        for i in 0..n {
-            data[i] = vals[i];
-        }
+        assert!(n <= 3);
+        data[..n].clone_from_slice(vals);
         Point { n, data }
     }
 

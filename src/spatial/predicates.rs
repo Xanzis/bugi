@@ -74,7 +74,8 @@ pub fn bary_coor(p: Point, tri: (Point, Point, Point)) -> (f64, f64, f64) {
 pub fn in_triangle(p: Point, tri: (Point, Point, Point)) -> bool {
     // determine whether p is within the given triangle
     let (a, b, c) = bary_coor(p, tri);
-    0.0 <= a && 1.0 >= a && 0.0 <= b && 1.0 >= b && 0.0 <= c && 1.0 >= c
+    let rng = 0.0..=1.0;
+    rng.contains(&a) && rng.contains(&b) && rng.contains(&c)
 }
 
 pub fn in_circle(p: Point, tri: (Point, Point, Point)) -> bool {
@@ -172,21 +173,11 @@ pub fn segments_intersect(a: (Point, Point), b: (Point, Point)) -> bool {
     let n = triangle_dir((b.0, b.1, a.0));
     let o = triangle_dir((b.0, b.1, a.1));
 
-    if (l != m) && (n != o) {
-        true
-    } else {
-        if l == Orient::Zero && on_segment(a, b.0) {
-            true
-        } else if m == Orient::Zero && on_segment(a, b.1) {
-            true
-        } else if n == Orient::Zero && on_segment(b, a.0) {
-            true
-        } else if o == Orient::Zero && on_segment(b, a.1) {
-            true
-        } else {
-            false
-        }
-    }
+    ((l != m) && (n != o))
+        || (l == Orient::Zero && on_segment(a, b.0))
+        || (m == Orient::Zero && on_segment(a, b.1))
+        || (n == Orient::Zero && on_segment(b, a.0))
+        || (o == Orient::Zero && on_segment(b, a.1))
 }
 
 pub fn lies_on(seg: (Point, Point), r: Point, tol: f64) -> bool {
@@ -200,18 +191,7 @@ pub fn lies_on(seg: (Point, Point), r: Point, tol: f64) -> bool {
 
     let dot = pq_unit.dot(pr_vec);
 
-    if dot < -tol {
-        false
-    } else if dot > (seg_len + tol) {
-        false
-    } else {
-        let projected = pq_unit * dot;
-        if projected.dist(pr_vec) > tol {
-            false
-        } else {
-            true
-        }
-    }
+    (-tol..(seg_len + tol)).contains(&dot) && (pq_unit * dot).dist(pr_vec) <= tol
 }
 
 pub fn circumradius(tri: (Point, Point, Point)) -> f64 {

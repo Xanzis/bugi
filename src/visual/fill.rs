@@ -16,10 +16,10 @@ pub fn dot_points(center_x: u32, center_y: u32) -> Vec<(u32, u32)> {
 
 pub fn triangle_interp(points: [(u32, u32); 3], vals: [f64; 3]) -> Vec<((u32, u32), f64)> {
     // generate a list of pixels within the given triangle, with interpolated node values
-    let x_max = points.iter().map(|(x, _)| x).max().unwrap().clone();
-    let x_min = points.iter().map(|(x, _)| x).min().unwrap().clone();
-    let y_max = points.iter().map(|(_, y)| y).max().unwrap().clone();
-    let y_min = points.iter().map(|(_, y)| y).min().unwrap().clone();
+    let x_max = *points.iter().map(|(x, _)| x).max().unwrap();
+    let x_min = *points.iter().map(|(x, _)| x).min().unwrap();
+    let y_max = *points.iter().map(|(_, y)| y).max().unwrap();
+    let y_min = *points.iter().map(|(_, y)| y).min().unwrap();
 
     let tri: (Point, Point, Point) = (points[0].into(), points[1].into(), points[2].into());
     let mut res = Vec::new();

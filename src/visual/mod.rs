@@ -73,46 +73,37 @@ impl Visualizer {
         self.points.extend(points);
     }
 
-    pub fn set_vals(&mut self, vals: Vec<f64>) {
+    pub fn set_vals(&mut self, mut vals: Vec<f64>) {
         // normalize the values to [0, 1] and set the visualizer field
         // TODO el<->vis interfaces need to be improved, value interpolation + extra point overlay should be ok
         if vals.len() != self.points.len() {
             panic!("node values must have same count as nodes");
         }
 
-        let min = vals
+        let min = *vals
             .iter()
             .min_by(|x, y| x.partial_cmp(y).unwrap())
-            .unwrap()
-            .clone();
-        let max = vals
+            .unwrap();
+        let max = *vals
             .iter()
             .max_by(|x, y| x.partial_cmp(y).unwrap())
-            .unwrap()
-            .clone();
+            .unwrap();
 
         self.val_range = Some((min, max));
 
         let range = max - min;
-        self.node_vals = Some(
-            vals.into_iter()
-                .map(|x| (x - min) / range)
-                .map(|x| x.min(1.0))
-                .map(|x| x.max(0.0))
-                .collect(),
-        );
+
+        vals.iter_mut()
+            .for_each(|x| *x = ((*x - min) / range).clamp(0.0, 1.0));
+        self.node_vals = Some(vals);
     }
 
     pub fn set_edges(&mut self, edges: Vec<(usize, usize)>) {
-        if edges.len() > 0 {
-            self.edges = Some(edges);
-        }
+        self.edges = if !edges.is_empty() { Some(edges) } else { None };
     }
 
     pub fn set_triangles(&mut self, tris: Vec<(usize, usize, usize)>) {
-        if tris.len() > 0 {
-            self.triangles = Some(tris);
-        }
+        self.triangles = if !tris.is_empty() { Some(tris) } else { None };
     }
 
     fn project(&self) -> Vec<(f64, f64)> {
@@ -187,7 +178,7 @@ impl Visualizer {
         if let (Some(triangles), Some(node_vals)) = (self.triangles.clone(), self.node_vals.clone())
         {
             for t in triangles.iter() {
-                let (a, b, c) = t.clone();
+                let (a, b, c) = *t;
                 let tri = [pix_points[a], pix_points[b], pix_points[c]];
                 let vals = [node_vals[a], node_vals[b], node_vals[c]];
                 let to_draw = fill::triangle_interp(tri, vals);
