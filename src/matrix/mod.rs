@@ -202,7 +202,7 @@ where
             panic!("incompatible row length")
         }
         for (c, val) in new.into_iter().enumerate() {
-            self.put((i, c), val);
+            self[(i, c)] = val;
         }
     }
 
@@ -211,20 +211,24 @@ where
             panic!("incompatible column length")
         }
         for (r, val) in new.into_iter().enumerate() {
-            self.put((r, i), val);
+            self[(r, i)] = val;
         }
     }
 
     fn swap_rows(&mut self, i: usize, j: usize) {
-        let temp: Vec<f64> = self.row(j).cloned().collect();
-        self.set_row(j, self.row(i).cloned().collect());
-        self.set_row(i, temp);
+        for c in 0..self.shape().1 {
+            let temp = self[(i, c)];
+            self[(i, c)] = self[(j, c)];
+            self[(j, c)] = temp;
+        }
     }
 
     fn swap_cols(&mut self, i: usize, j: usize) {
-        let temp: Vec<f64> = self.col(j).cloned().collect();
-        self.set_col(j, self.col(i).cloned().collect());
-        self.set_col(i, temp);
+        for r in 0..self.shape().0 {
+            let temp = self[(r, i)];
+            self[(r, i)] = self[(r, j)];
+            self[(r, j)] = temp;
+        }
     }
 
     fn mutate_row<F>(&mut self, i: usize, mut f: F)
