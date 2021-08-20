@@ -27,6 +27,12 @@ pub struct Diagonal {
     data: Vec<f64>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct ConstMatrix<const SIZE: usize> {
+    dims: (usize, usize),
+    data: [f64; SIZE],
+}
+
 impl LinearMatrix {
     fn pos(&self, loc: (usize, usize)) -> Option<usize> {
         // find the location of the desired element in data
@@ -161,6 +167,24 @@ impl Diagonal {
         for i in 0..self.data.len() {
             x[i] /= self.data[i];
         }
+    }
+}
+
+impl<const SIZE: usize> ConstMatrix<SIZE> {
+    fn pos(&self, loc: (usize, usize)) -> Option<usize> {
+        if (loc.1 >= self.dims.1) || (loc.0 >= self.dims.0) {
+            return None;
+        }
+        Some((self.dims.1 * loc.0) + loc.1)
+    }
+
+    pub fn from_flat_array<T: Into<MatrixShape>>(shape: T, data: [f64; SIZE]) -> Self {
+        let shape = shape.into();
+        let dims = (shape.nrow, shape.ncol);
+
+        assert_eq!(dims.0 * dims.1, SIZE, "provided array does not match shape");
+
+        Self { dims, data }
     }
 }
 
@@ -568,5 +592,108 @@ impl IndexMut<usize> for Diagonal {
 impl From<Vec<f64>> for Diagonal {
     fn from(data: Vec<f64>) -> Self {
         Self { data }
+    }
+}
+
+// *****
+// ConstMatrix Implementations
+// *****
+
+impl<const SIZE: usize> MatrixLike for ConstMatrix<SIZE> {
+    fn shape(&self) -> (usize, usize) {
+        self.dims
+    }
+
+    fn get(&self, loc: (usize, usize)) -> Option<&f64> {
+        if let Some(i) = self.pos(loc) {
+            // TODO unsafe pointer math to remove second bounds check
+            Some(&self.data[i])
+        } else {
+            None
+        }
+    }
+
+    fn get_mut(&mut self, loc: (usize, usize)) -> Option<&mut f64> {
+        if let Some(i) = self.pos(loc) {
+            Some(&mut self.data[i])
+        } else {
+            None
+        }
+    }
+
+    fn transpose(&mut self) {
+        // nah
+        unimplemented!()
+    }
+
+    fn zeros<T: Into<MatrixShape>>(shape: T) -> Self {
+        let shape: MatrixShape = shape.into();
+        let dims = (shape.nrow, shape.ncol);
+        assert_eq!(dims.0 * dims.1, SIZE);
+
+        Self {
+            dims,
+            data: [0.0; SIZE],
+        }
+    }
+
+    fn from_flat<T: Into<MatrixShape>, U: IntoIterator<Item = f64>>(shape: T, data: U) -> Self {
+        // turn a row-major vector of values into a matrix
+        let shape: MatrixShape = shape.into();
+        let dims = (shape.nrow, shape.ncol);
+
+        let mut arr_data = [0.0; SIZE];
+        let mut last = 0;
+
+        for (i, x) in data.into_iter().enumerate() {
+            assert!(i < SIZE, "provided iterator too long");
+            arr_data[i] = x;
+            last = i;
+        }
+
+        assert_eq!(last, SIZE - 1, "provided iterator too short");
+
+        Self {
+            dims,
+            data: arr_data,
+        }
+    }
+}
+
+impl<const SIZE: usize> PartialEq for ConstMatrix<SIZE> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.shape() != other.shape() {
+            return false;
+        }
+
+        return self.data == other.data;
+    }
+}
+
+impl<const SIZE: usize> fmt::Display for ConstMatrix<SIZE> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.disp())
+    }
+}
+
+impl<const SIZE: usize> Index<(usize, usize)> for ConstMatrix<SIZE> {
+    type Output = f64;
+    fn index(&self, loc: (usize, usize)) -> &Self::Output {
+        if let Some(i) = self.pos(loc) {
+            // TODO unsafe pointer math to avoid second bounds check
+            &self.data[i]
+        } else {
+            panic!("matrix index out of bounds")
+        }
+    }
+}
+
+impl<const SIZE: usize> IndexMut<(usize, usize)> for ConstMatrix<SIZE> {
+    fn index_mut(&mut self, loc: (usize, usize)) -> &mut Self::Output {
+        if let Some(i) = self.pos(loc) {
+            &mut self.data[i]
+        } else {
+            panic!("matrix index out of bounds")
+        }
     }
 }

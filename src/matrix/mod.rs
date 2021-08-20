@@ -16,7 +16,7 @@ pub use norm::Norm;
 #[cfg(test)]
 mod tests;
 
-pub use buffer::{Diagonal, LinearMatrix, LowerTriangular, UpperTriangular};
+pub use buffer::{ConstMatrix, Diagonal, LinearMatrix, LowerTriangular, UpperTriangular};
 pub use sparse::{BiEnvelope, CompressedRow, Dictionary, LowerRowEnvelope};
 //type Matrix = LinearMatrix; // default implementation
 

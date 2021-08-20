@@ -2,8 +2,8 @@ use super::graph::{Graph, Permutation};
 use super::inverse::Inverse;
 use super::norm::Norm;
 use super::{
-    dot, BiEnvelope, CompressedRow, Dictionary, LinearMatrix, LowerRowEnvelope, LowerTriangular,
-    MatrixLike, UpperTriangular,
+    dot, BiEnvelope, CompressedRow, ConstMatrix, Dictionary, LinearMatrix, LowerRowEnvelope,
+    LowerTriangular, MatrixLike, UpperTriangular,
 };
 
 #[test]
@@ -426,4 +426,15 @@ fn bienvelope() {
     let b = LowerRowEnvelope::from_bienv(&a);
 
     assert_eq!(b, target);
+}
+
+#[test]
+fn constmatrix() {
+    let a = ConstMatrix::<4>::from_flat_array(2, [1.0, 2.0, 3.0, 4.0]);
+
+    assert_eq!(a[(1, 1)], 4.0);
+    assert_eq!(a[(0, 1)], 2.0);
+
+    let det = a.determinant().unwrap();
+    assert!((det + 2.0).abs() <= 1e-9);
 }
