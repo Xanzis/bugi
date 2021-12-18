@@ -195,6 +195,12 @@ where
         MatrixAll::new(&self)
     }
 
+    fn indices(&self) -> Iterator<Item = (usize, usize)> {
+        // visit all valid matrix indices in row-major order
+        let (rows, cols) = self.shape();
+        (0..rows).flat_map(move |r| std::iter::repeat(r).zip(0..cols))
+    }
+
     fn set_row(&mut self, i: usize, new: Vec<f64>) {
         if new.len() != self.shape().1 {
             panic!("incompatible row length")
