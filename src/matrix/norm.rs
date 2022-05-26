@@ -10,10 +10,7 @@ where
 {
     fn frobenius(&self) -> f64 {
         // compute the frobenius norm
-        let sum: f64 = self
-            .flat()
-            .map(|x| x * x)
-            .sum();
+        let sum: f64 = self.flat().map(|x| x * x).sum();
         sum.sqrt()
     }
 }
