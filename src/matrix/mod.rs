@@ -195,10 +195,9 @@ where
         MatrixAll::new(&self)
     }
 
-    fn indices(&self) -> Iterator<Item = (usize, usize)> {
+    fn indices(&self) -> MatrixIndices {
         // visit all valid matrix indices in row-major order
-        let (rows, cols) = self.shape();
-        (0..rows).flat_map(move |r| std::iter::repeat(r).zip(0..cols))
+        MatrixIndices::new(self)
     }
 
     fn set_row(&mut self, i: usize, new: Vec<f64>) {
@@ -361,6 +360,13 @@ where
     col: usize,
 }
 
+pub struct MatrixIndices {
+    rows: usize,
+    cols: usize,
+    r: usize,
+    c: usize,
+}
+
 impl<'a, T> Iterator for MatrixCol<'a, T>
 where
     T: MatrixLike,
@@ -417,6 +423,26 @@ where
     }
 }
 
+impl Iterator for MatrixIndices {
+    type Item = (usize, usize);
+
+    fn next(&mut self) -> Option<(usize, usize)> {
+        if self.r >= self.rows {
+            return None;
+        }
+
+        let res = (self.r, self.c);
+
+        self.c += 1;
+        if self.c >= self.cols {
+            self.c = 0;
+            self.r += 1;
+        }
+
+        Some(res)
+    }
+}
+
 impl<'a, T> MatrixAll<'a, T>
 where
     T: MatrixLike,
@@ -426,6 +452,18 @@ where
             source,
             row: 0,
             col: 0,
+        }
+    }
+}
+
+impl MatrixIndices {
+    fn new<T: MatrixLike>(source: &T) -> Self {
+        let (rows, cols) = source.shape();
+        MatrixIndices {
+            rows,
+            cols,
+            r: 0,
+            c: 0,
         }
     }
 }
