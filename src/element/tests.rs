@@ -1,7 +1,7 @@
 use super::integrate::{gauss_segment_mat, nd_gauss_single, newton_single};
 use super::loading::Constraint;
 use super::material::{AL6061, TEST};
-use super::{ElementAssemblage, ElementType, ElementDescriptor, isopar};
+use super::{isopar, ElementAssemblage, ElementDescriptor, ElementType};
 
 use crate::matrix::solve::direct::DenseGaussSolver;
 use crate::matrix::{LinearMatrix, MatrixLike};
@@ -65,8 +65,12 @@ fn assemblage() {
     elas.set_thickness(0.1);
 
     let nids = elas.add_nodes(vec![(0.0, 1.0), (1.0, 1.0), (0.0, 0.0), (1.0, 0.0)]);
-    elas.add_element(ElementDescriptor::isopar_triangle([nids[0], nids[2], nids[3]]));
-    elas.add_element(ElementDescriptor::isopar_triangle([nids[3], nids[1], nids[0]]));
+    elas.add_element(ElementDescriptor::isopar_triangle([
+        nids[0], nids[2], nids[3],
+    ]));
+    elas.add_element(ElementDescriptor::isopar_triangle([
+        nids[3], nids[1], nids[0],
+    ]));
     elas.add_conc_force(nids[1], Point::new(&[1.0e7, 0.0]));
     // TODO need better constructors for, like, all of this
     elas.add_constraint(nids[2], Constraint::PlainDof(true, true, false));
@@ -135,7 +139,7 @@ fn triangles() {
     }
 
     elas.add_constraint(nids[0], Constraint::PlainDof(true, true, false));
-    elas.add_constraint(nids[29], Constraint::PlainDof(false, true, false));
+    elas.add_constraint(nids[29], Constraint::PlainDof(true, true, false));
 
     elas.add_conc_force(nids[39], Point::new(&[0.0, -1.0e5]));
     let dfm = elas.calc_displacements::<DenseGaussSolver>();
@@ -143,7 +147,7 @@ fn triangles() {
     let mut vis = dfm.visualize(50.0);
     vis.set_vals(dfm.displacement_norms());
 
-    vis.draw("test_generated/triangles.png", ());
+    vis.draw("test_generated/triangles_static.png", ());
 }
 
 #[test]
@@ -159,9 +163,15 @@ fn dist_line() {
         (3.0, 1.0),
     ]);
 
-    elas.add_element(ElementDescriptor::isopar_triangle([nids[0], nids[1], nids[3]]));
-    elas.add_element(ElementDescriptor::isopar_triangle([nids[4], nids[3], nids[1]]));
-    elas.add_element(ElementDescriptor::isopar_triangle([nids[1], nids[2], nids[4]]));
+    elas.add_element(ElementDescriptor::isopar_triangle([
+        nids[0], nids[1], nids[3],
+    ]));
+    elas.add_element(ElementDescriptor::isopar_triangle([
+        nids[4], nids[3], nids[1],
+    ]));
+    elas.add_element(ElementDescriptor::isopar_triangle([
+        nids[1], nids[2], nids[4],
+    ]));
 
     elas.add_constraint(nids[0], Constraint::PlainDof(false, true, false));
     elas.add_constraint(nids[1], Constraint::PlainDof(true, true, false));
@@ -199,7 +209,7 @@ fn dist_line() {
 //     }
 
 //     elas.add_constraint(node_ids[0], Constraint::PlainDof(true, true, false));
-//     elas.add_constraint(node_ids[29], Constraint::PlainDof(false, true, false));
+//     elas.add_constraint(node_ids[29], Constraint::PlainDof(true, true, false));
 
 //     let dfms = elas.calc_modes(3);
 
