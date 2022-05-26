@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::{From, Into, TryInto};
 use std::hash::{Hash, Hasher};
 
-use crate::element::ElementAssemblage;
+use crate::element::{ElementAssemblage, ElementDescriptor, NodeId};
 use crate::spatial::predicates::{self, Orient};
 use crate::spatial::Point;
 use crate::visual::Visualizer;
@@ -608,29 +608,25 @@ impl PlaneTriangulation {
             res.set_thickness(t);
         }
 
-        let mut vertex_list: Vec<(f64, f64)> = Vec::new();
-        let mut vertex_lookup: HashMap<VId, usize> = HashMap::new();
+        // build vertex list and translation to elas node ids
+        let vertex_list: Vec<(f64, f64)>;
+        let vertex_lookup: HashMap<VId, NodeId>;
 
-        // translate vertex ids to indices in a now-frozen vertex list
-
-        for id in self.all_vid() {
-            vertex_lookup.insert(id, vertex_list.len());
-            vertex_list.push(self.get(id).unwrap());
-        }
-
-        res.add_nodes(vertex_list);
+        vertex_list = self.all_vid().map(|vid| self.get(vid).unwrap()).collect();
+        let node_ids = res.add_nodes(vertex_list);
+        vertex_lookup = self.all_vid().zip(node_ids).collect();
 
         // add all the triangles
 
         for tri in self.full_tris.into_keys() {
-            // TODO avoid these heap allocations by using elas' triangle insertion method
-            let tri_def = vec![
+            let tri_nids = [
                 *vertex_lookup.get(&tri.0).unwrap(),
                 *vertex_lookup.get(&tri.1).unwrap(),
                 *vertex_lookup.get(&tri.2).unwrap(),
             ];
 
-            res.add_element(tri_def);
+            let desc = ElementDescriptor::isopar_triangle(tri_nids);
+            res.add_element(desc);
         }
 
         // pull the various boundary conditions through from bound

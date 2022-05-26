@@ -1,9 +1,10 @@
 use std::convert::TryInto;
 
-use crate::element::isopar::ElementType;
+use crate::element::isopar;
 use crate::element::loading::Constraint;
 use crate::element::material::{Material, AL6061};
-use crate::element::ElementAssemblage;
+use crate::element::{ElementAssemblage, NodeId};
+use crate::element::{ElementDescriptor, ElementType};
 use crate::spatial::Point;
 
 use super::FileError;
@@ -28,6 +29,27 @@ enum ReadState {
 fn parse_error(line_no: usize, text: &'static str) -> FileError {
     let s = format!("line {}: {}", line_no, text);
     FileError::BadParse(s)
+}
+
+fn code_to_desc(code: (u8, Vec<NodeId>)) -> ElementDescriptor {
+    let tp = match code.0 {
+        1 => unimplemented!("2-node bars temporarily unimplemented"),
+        2 => ElementType::Isopar(isopar::ElementType::Triangle3),
+        _ => unimplemented!("unimplemented element type"),
+    };
+
+    ElementDescriptor::new(tp, code.1)
+}
+
+fn desc_to_code(desc: ElementDescriptor) -> (u8, Vec<NodeId>) {
+    let desc = desc.into_parts();
+    let tp_code = match desc.0 {
+        ElementType::Isopar(itp) => match itp {
+            isopar::ElementType::Triangle3 => 2,
+        },
+    };
+
+    (tp_code, desc.1)
 }
 
 pub fn lines_to_elas<'a, T: Iterator<Item = &'a str>>(
@@ -292,23 +314,25 @@ pub fn lines_to_elas<'a, T: Iterator<Item = &'a str>>(
         elas.set_area(a);
     }
 
-    elas.add_nodes(nodes);
+    let node_ids = elas.add_nodes(nodes);
 
     // TODO write an elas API to generate an element with the suggested type
-    for (_, ns) in elements.into_iter() {
-        elas.add_element(ns);
+    for (tp, ns) in elements.into_iter() {
+        let nids = ns.into_iter().map(|i| node_ids[i]).collect();
+        let desc = code_to_desc((tp, nids));
+        elas.add_element(desc);
     }
 
     for (n, con) in constraints.into_iter() {
-        elas.add_constraint(n, con);
+        elas.add_constraint(node_ids[n], con);
     }
 
     for (n, frc) in forces.into_iter() {
-        elas.add_conc_force(n, frc);
+        elas.add_conc_force(node_ids[n], frc);
     }
 
     for (na, nb, frc) in dist_forces.into_iter() {
-        elas.add_dist_line_force(na, nb, frc);
+        elas.add_dist_line_force(node_ids[na], node_ids[nb], frc);
     }
 
     Ok(elas)
@@ -343,22 +367,22 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
     }
     res += "\n$EndNodes\n\n$Elements";
 
-    let e_node_idxs = elas.element_node_idxs();
-    let e_types = elas.element_types();
-    res += &format!("\ncount {}", e_types.len());
-    for (i, (en, et)) in e_node_idxs.into_iter().zip(e_types.into_iter()).enumerate() {
-        res += &format!("\n{} ", i);
+    let descs = elas.element_descriptors();
+    res += &format!("\ncount {}", descs.len());
+    for (i, desc) in descs.into_iter().enumerate() {
+        let (type_id, node_ids) = desc_to_code(desc);
+        // element always has at least one node
+        let mut to_write = format!("\n{} {} {}", i, type_id, node_ids[0].into_idx());
 
-        let type_id = match et {
-            ElementType::Bar2Node => 1,
-            ElementType::Triangle3Node => 2,
-            _ => panic!("unsupported element type for bmsh output"),
-        };
+        to_write.extend(
+            node_ids
+                .iter()
+                .skip(1)
+                .map(|nid| format!("/{}", nid.into_idx())),
+        );
 
-        res += &format!("{} {}", type_id, en.get(0).expect("no 0 node elements"));
-        for n in en.into_iter().skip(1) {
-            res += &format!("/{}", n);
-        }
+        to_write.push_str("\n");
+        res += &to_write;
     }
     res += "\n$EndElements\n\n$Constraints";
 
@@ -366,7 +390,11 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
     res += &format!("\ncount {}", cons.len());
     for (n, con) in cons {
         // TODO update the '0' when more constraint types are available
-        res += &format!("\n{} 0 {}", n, if con.plain_dim_struck(0) { 1 } else { 0 });
+        res += &format!(
+            "\n{} 0 {}",
+            n.into_idx(),
+            if con.plain_dim_struck(0) { 1 } else { 0 }
+        );
 
         // TODO fix constraint reader to accept 2 and 1-dim assemblage constraints
         for i in 1..3 {
@@ -378,7 +406,7 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
     let forces = elas.conc_forces();
     res += &format!("\ncount {}", forces.len());
     for (n, frc) in forces {
-        res += &format!("\n{} {:.3}", n, frc[0]);
+        res += &format!("\n{} {:.3}", n.into_idx(), frc[0]);
 
         for i in (0..dim).skip(1) {
             res += &format!("/{:.3}", frc[i]);
@@ -389,7 +417,7 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
     let dist_forces = elas.dist_forces();
     res += &format!("\ncount {}", dist_forces.len());
     for ((na, nb), frc) in dist_forces {
-        res += &format!("\n{} {} {:.3}", na, nb, frc[0]);
+        res += &format!("\n{} {} {:.3}", na.into_idx(), nb.into_idx(), frc[0]);
 
         for i in (0..dim).skip(1) {
             res += &format!("/{:.3}", frc[i]);
