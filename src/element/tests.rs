@@ -155,13 +155,7 @@ fn dist_line() {
     let mut elas = ElementAssemblage::new(2, AL6061);
     elas.set_thickness(0.2);
 
-    let nids = elas.add_nodes(&[
-        (0.0, 0.0),
-        (2.0, 0.0),
-        (4.0, 0.0),
-        (1.0, 1.0),
-        (3.0, 1.0),
-    ]);
+    let nids = elas.add_nodes(&[(0.0, 0.0), (2.0, 0.0), (4.0, 0.0), (1.0, 1.0), (3.0, 1.0)]);
 
     elas.add_element(ElementDescriptor::isopar_triangle([
         nids[0], nids[1], nids[3],
