@@ -10,6 +10,7 @@ edition = "2018"
 image = "0.23.12"
 clap = {version = "~2.27.0", features = ["yaml"]}
 fastrand = "1.5.0"
+nom = "7.1.1"
 
 [profile.release]
 panic = 'abort'

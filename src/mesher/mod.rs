@@ -42,7 +42,7 @@ mod tests {
             (1.0, 1.0),
             (0.0, 1.5),
         ];
-        b.store_polygon(poly.iter().map(|p| p.clone()).collect::<Vec<_>>());
+        b.store_polygon(&poly.iter().map(|p| p.clone()).collect::<Vec<_>>());
 
         b.divide_all_segments(0.45);
 
@@ -57,7 +57,7 @@ mod tests {
         use super::plane;
 
         let mut b = bounds::PlaneBoundary::new();
-        b.store_polygon(vec![(0.0, 0.0), (2.0, 0.3), (2.0, 5.0), (-1.0, 3.5)]);
+        b.store_polygon(&[(0.0, 0.0), (2.0, 0.3), (2.0, 5.0), (-1.0, 3.5)]);
 
         let mut mesh = plane::PlaneTriangulation::new(b);
         mesh.chew_mesh(0.3);
@@ -90,7 +90,7 @@ mod tests {
             (0.0, 5.0),
         ];
 
-        b.store_polygon(poly);
+        b.store_polygon(&poly);
 
         let mut mesh = plane::PlaneTriangulation::new(b);
         mesh.chew_mesh(0.5);

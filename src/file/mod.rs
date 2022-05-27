@@ -33,10 +33,9 @@ pub fn read_to_bound<P: AsRef<Path>>(path: P) -> Result<PlaneBoundary, FileError
     let ext = ext.to_str().ok_or(FileError::NonUniPath)?.to_string();
 
     let file = fs::read_to_string(path).or(Err(FileError::NoOpen))?;
-    let lines = file.split("\n");
 
     match ext.as_str() {
-        "bbnd" => bbnd::lines_to_bounds(lines),
+        "bbnd" => bbnd::bbnd_to_bounds(&file),
         _ => Err(FileError::BadType(ext)),
     }
 }

@@ -6,129 +6,184 @@ use crate::mesher::bounds::{PlaneBoundary, VId};
 
 use super::FileError;
 
+use nom::{
+    self,
+    branch::alt,
+    bytes::complete::tag,
+    character::complete::{self, alphanumeric1},
+    combinator::map,
+    multi::{separated_list0, separated_list1},
+    number::complete::double,
+    sequence::{delimited, preceded, separated_pair, tuple},
+};
+
 // parser for a simple boundary definition file
 
-pub fn lines_to_bounds<'a, T>(mut lines: T) -> Result<PlaneBoundary, FileError>
-where
-    T: Iterator<Item = &'a str>,
-{
-    let mut b = PlaneBoundary::new();
-    let mut named_vertices: HashMap<String, VId> = HashMap::new();
-    let mut no = 0;
+#[derive(Clone, Debug)]
+enum ParseItem<'a> {
+    Polygon(Vec<ParseVertex<'a>>),
+    Thickness(f64),
+    Material(Material),
+    DistForce(&'a str, &'a str, f64, f64),
+    DistConstraint(&'a str, &'a str, Constraint),
+}
 
-    while let Some(line) = lines.next() {
-        no += 1;
-        if line.is_empty() || line.starts_with("#") {
-            continue;
+impl<'a> ParseItem<'a> {
+    fn polygon(&'a self) -> Option<&'a [ParseVertex]> {
+        match *self {
+            ParseItem::Polygon(ref x) => Some(x),
+            _ => None,
         }
+    }
+}
 
-        let words: Vec<&str> = line.split(" ").collect();
+#[derive(Clone, Copy, Debug)]
+enum ParseVertex<'a> {
+    Plain(f64, f64),
+    Labeled(f64, f64, &'a str),
+}
 
-        match words[0] {
-            "polygon" => {
-                // read a sequence of lines, with a point on each line
-                if words.len() != 1 {
-                    return Err(FileError::parse("unexpected word after polygon"));
-                }
+impl<'a> ParseVertex<'a> {
+    fn with_label(&self) -> (f64, f64, Option<&'a str>) {
+        match *self {
+            ParseVertex::Plain(a, b) => (a, b, None),
+            ParseVertex::Labeled(a, b, c) => (a, b, Some(c)),
+        }
+    }
+}
 
-                let mut ended = false;
-                let mut poly: Vec<(f64, f64)> = Vec::new();
-                let mut labels: Vec<Option<String>> = Vec::new();
-                while let Some(ln) = lines.next() {
-                    no += 1;
+pub fn bbnd_to_bounds(file: &str) -> Result<PlaneBoundary, FileError> {
+    let items = parse_file(file)?;
+    let mut label_map: HashMap<&str, VId> = HashMap::new();
+    let mut res = PlaneBoundary::new();
 
-                    if ln == "end" {
-                        ended = true;
-                        break;
-                    }
-                    let wds: Vec<&str> = ln.split(" ").collect();
-                    if wds.len() == 2 || wds.len() == 3 {
-                        if let (Ok(a), Ok(b)) = (wds[0].parse::<f64>(), wds[1].parse::<f64>()) {
-                            poly.push((a, b));
+    // two passes, first one gets nodes and gets labels / vids
+    let mut vertex_points: Vec<(f64, f64)> = Vec::new();
+    let mut vertex_labels: Vec<Option<&str>> = Vec::new();
+    for item in items.iter() {
+        if let Some(vs) = item.polygon() {
+            vertex_points.clear();
+            vertex_labels.clear();
+            for v in vs {
+                let (x, y, l) = v.with_label();
+                vertex_points.push((x, y));
+                vertex_labels.push(l);
+            }
 
-                            labels.push(if wds.len() == 2 {
-                                None
-                            } else {
-                                Some(wds[2].to_string())
-                            });
-                        } else {
-                            return Err(FileError::parse("could not parse point values"));
-                        }
-                    } else {
-                        return Err(FileError::parse(format!(
-                            "expected two or three words on polygon line (line {})",
-                            no
-                        )));
-                    }
-                }
-
-                if !ended {
-                    return Err(FileError::parse("ran out of lines before polygon end"));
-                }
-
-                let ids = b.store_polygon(poly);
-
-                for (id, l) in ids.into_iter().zip(labels.into_iter()) {
-                    if let Some(label) = l {
-                        named_vertices.insert(label, id);
-                    }
+            let vids = res.store_polygon(&vertex_points);
+            for (&l, vid) in vertex_labels.iter().zip(vids) {
+                if let Some(label) = l {
+                    label_map.insert(label, vid);
                 }
             }
-            "thickness" => {
-                if words.len() != 2 {
-                    return Err(FileError::parse("expected thickness value"));
-                }
-                let val: f64 = words[1]
-                    .parse()
-                    .or_else(|_| Err(FileError::parse("invalid thickness value")))?;
-                b.set_thickness(val);
-            }
-            "material" => {
-                if words.len() != 2 {
-                    return Err(FileError::parse("expected material type"));
-                }
-                let mat: Material = words[1]
-                    .parse()
-                    .or_else(|_| Err(FileError::parse("invalid material specifier")))?;
-                b.set_material(mat);
-            }
-            "distributed_force" => {
-                if words.len() != 5 {
-                    return Err(FileError::parse("expected vertex labels, force vector"));
-                }
-                if let (Some(ida), Some(idb)) = (
-                    named_vertices.get(&words[1].to_string()).cloned(),
-                    named_vertices.get(&words[2].to_string()).cloned(),
-                ) {
-                    if let (Ok(x), Ok(y)) = (words[3].parse::<f64>(), words[4].parse::<f64>()) {
-                        b.store_distributed_force(ida, idb, (x, y).into());
-                    } else {
-                        return Err(FileError::parse("invalid force value"));
-                    }
-                } else {
-                    return Err(FileError::parse("invalid vertex labels"));
-                }
-            }
-            "distributed_constraint" => {
-                if words.len() != 4 {
-                    return Err(FileError::parse("expected vertex labels, constraint"));
-                }
-                if let (Some(ida), Some(idb)) = (
-                    named_vertices.get(&words[1].to_string()).cloned(),
-                    named_vertices.get(&words[2].to_string()).cloned(),
-                ) {
-                    if let Ok(c) = words[3].parse::<Constraint>() {
-                        b.store_distributed_constraint(ida, idb, c);
-                    } else {
-                        return Err(FileError::parse("invalid constraint value"));
-                    }
-                } else {
-                    return Err(FileError::parse("invalid vertex labels"));
-                }
-            }
-            s => return Err(FileError::parse(format!("unsupported specifier: {:?}", s))),
         }
     }
 
-    Ok(b)
+    // second pass to fill in the details
+    for item in items.iter() {
+        match *item {
+            ParseItem::Polygon(_) => {}
+            ParseItem::Thickness(x) => {
+                res.set_thickness(x);
+            }
+            ParseItem::Material(x) => {
+                res.set_material(x);
+            }
+            ParseItem::DistForce(a, b, x, y) => {
+                let a_vid = label_map
+                    .get(&a)
+                    .ok_or_else(|| FileError::parse("invalid vertex label"))?;
+                let b_vid = label_map
+                    .get(&b)
+                    .ok_or_else(|| FileError::parse("invalid vertex label"))?;
+                res.store_distributed_force(*a_vid, *b_vid, (x, y).into());
+            }
+            ParseItem::DistConstraint(a, b, c) => {
+                let a_vid = label_map
+                    .get(&a)
+                    .ok_or_else(|| FileError::parse("invalid vertex label"))?;
+                let b_vid = label_map
+                    .get(&b)
+                    .ok_or_else(|| FileError::parse("invalid vertex label"))?;
+                res.store_distributed_constraint(*a_vid, *b_vid, c);
+            }
+        }
+    }
+
+    Ok(res)
+}
+
+fn parse_file<'a>(file: &'a str) -> Result<Vec<ParseItem<'a>>, FileError> {
+    let thickness = map(preceded(tag("thickness "), double), |t: f64| {
+        ParseItem::Thickness(t)
+    });
+    // TODO fix material error handling
+    let material = map(preceded(tag("material "), alphanumeric1), |m: &str| {
+        ParseItem::Material(m.parse::<Material>().unwrap())
+    });
+
+    let dist_force = map(
+        preceded(
+            tag("distributed_force "),
+            tuple((
+                alphanumeric1,
+                preceded(complete::char(' '), alphanumeric1),
+                preceded(complete::char(' '), double),
+                preceded(complete::char(' '), double),
+            )),
+        ),
+        |f: (&str, &str, f64, f64)| ParseItem::DistForce(f.0, f.1, f.2, f.3),
+    );
+
+    let dist_constraint = map(
+        preceded(
+            tag("distributed_constraint "),
+            tuple((
+                alphanumeric1,
+                preceded(complete::char(' '), alphanumeric1),
+                preceded(complete::char(' '), alphanumeric1),
+            )),
+        ),
+        |f: (&str, &str, &str)| {
+            ParseItem::DistConstraint(f.0, f.1, f.2.parse::<Constraint>().unwrap())
+        },
+    );
+
+    let vertex = alt((
+        map(
+            tuple((
+                double,
+                preceded(complete::char(' '), double),
+                preceded(complete::char(' '), alphanumeric1),
+            )),
+            |v: (f64, f64, &str)| ParseVertex::Labeled(v.0, v.1, v.2),
+        ),
+        map(
+            separated_pair(double, complete::char(' '), double),
+            |v: (f64, f64)| ParseVertex::Plain(v.0, v.1),
+        ),
+    ));
+
+    let polygon = delimited(
+        tag("polygon\n"),
+        map(separated_list1(complete::char('\n'), vertex), |v_list| {
+            ParseItem::Polygon(v_list)
+        }),
+        tag("\nend"),
+    );
+
+    let mut parser = separated_list0(
+        tag("\n"),
+        alt((polygon, thickness, material, dist_force, dist_constraint)),
+    );
+    let (rem, parsed) = parser(file)
+        .map_err(|_e: nom::Err<nom::error::Error<_>>| FileError::parse("parse error"))?;
+    if !rem.is_empty() {
+        Err(FileError::parse(format!(
+            "parser did not consume entire file\n{}",
+            rem
+        )))
+    } else {
+        Ok(parsed)
+    }
 }
