@@ -64,7 +64,7 @@ fn assemblage() {
     let mut elas = ElementAssemblage::new(2, AL6061);
     elas.set_thickness(0.1);
 
-    let nids = elas.add_nodes(vec![(0.0, 1.0), (1.0, 1.0), (0.0, 0.0), (1.0, 0.0)]);
+    let nids = elas.add_nodes(&[(0.0, 1.0), (1.0, 1.0), (0.0, 0.0), (1.0, 0.0)]);
     elas.add_element(ElementDescriptor::isopar_triangle([
         nids[0], nids[2], nids[3],
     ]));
@@ -126,7 +126,7 @@ fn triangles() {
     let mut nids = Vec::new();
     for i in 0..20 {
         let x = i as f64 * 0.2;
-        nids.extend(elas.add_nodes(vec![(x, 0.0), (x + 0.1, 0.2)]));
+        nids.extend(elas.add_nodes(&[(x, 0.0), (x + 0.1, 0.2)]));
     }
 
     for i in 0..19 {
@@ -155,7 +155,7 @@ fn dist_line() {
     let mut elas = ElementAssemblage::new(2, AL6061);
     elas.set_thickness(0.2);
 
-    let nids = elas.add_nodes(vec![
+    let nids = elas.add_nodes(&[
         (0.0, 0.0),
         (2.0, 0.0),
         (4.0, 0.0),

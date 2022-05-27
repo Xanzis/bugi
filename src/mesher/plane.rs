@@ -613,7 +613,7 @@ impl PlaneTriangulation {
         let vertex_lookup: HashMap<VId, NodeId>;
 
         vertex_list = self.all_vid().map(|vid| self.get(vid).unwrap()).collect();
-        let node_ids = res.add_nodes(vertex_list);
+        let node_ids = res.add_nodes(&vertex_list);
         vertex_lookup = self.all_vid().zip(node_ids).collect();
 
         // add all the triangles

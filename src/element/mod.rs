@@ -174,11 +174,11 @@ impl ElementAssemblage {
     }
 
     #[must_use = "nodes can only be referenced by their assigned NodeId"]
-    pub fn add_nodes<T: Into<Point>>(&mut self, ns: Vec<T>) -> Vec<NodeId> {
+    pub fn add_nodes<T: Into<Point> + Clone>(&mut self, ns: &[T]) -> Vec<NodeId> {
         let first_idx = self.nodes.len();
 
-        for n in ns.into_iter() {
-            let p: Point = n.into();
+        for n in ns.iter() {
+            let p: Point = n.clone().into();
             if p.dim() != self.dim {
                 panic!("bad node dimension")
             }

@@ -314,7 +314,7 @@ pub fn lines_to_elas<'a, T: Iterator<Item = &'a str>>(
         elas.set_area(a);
     }
 
-    let node_ids = elas.add_nodes(nodes);
+    let node_ids = elas.add_nodes(&nodes);
 
     // TODO write an elas API to generate an element with the suggested type
     for (tp, ns) in elements.into_iter() {
