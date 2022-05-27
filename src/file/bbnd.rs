@@ -179,10 +179,7 @@ fn parse_file<'a>(file: &'a str) -> Result<Vec<ParseItem<'a>>, FileError> {
     let (rem, parsed) = parser(file)
         .map_err(|_e: nom::Err<nom::error::Error<_>>| FileError::parse("parse error"))?;
     if !rem.is_empty() {
-        Err(FileError::parse(format!(
-            "parser did not consume entire file\n{}",
-            rem
-        )))
+        Err(FileError::parse("parser did not consume entire file\n{}"))
     } else {
         Ok(parsed)
     }
