@@ -1,5 +1,6 @@
 use crate::element::ElementAssemblage;
 use crate::mesher::bounds::PlaneBoundary;
+use nom;
 use std::error;
 use std::fmt;
 use std::fs;
@@ -17,10 +18,11 @@ pub fn read_to_elas<P: AsRef<Path>>(path: P) -> Result<ElementAssemblage, FileEr
     let ext = ext.to_string(); // cannot be bothered to deal with non-unicode paths
 
     let file = fs::read_to_string(path).or(Err(FileError::NoOpen))?;
-    let lines = file.split("\n");
+    //    let lines = file.split("\n");
 
     match ext.as_str() {
-        "bmsh" => bmsh::lines_to_elas(lines),
+        //        "bmsh" => bmsh::lines_to_elas(lines),
+        "bmsh" => bmsh::bmsh_to_elas(&file),
         _ => Err(FileError::BadType(ext)),
     }
 }
@@ -80,6 +82,12 @@ impl fmt::Display for FileError {
     }
 }
 
+impl From<nom::Err<nom::error::Error<&str>>> for FileError {
+    fn from(e: nom::Err<nom::error::Error<&str>>) -> Self {
+        Self::parse(format!("nom error: {}", e.to_string()))
+    }
+}
+
 impl FileError {
     pub fn parse<T: ToString>(msg: T) -> Self {
         Self::BadParse(msg.to_string())
@@ -93,6 +101,7 @@ mod tests {
         use crate::matrix::solve::direct::DenseGaussSolver;
 
         let elas_out = super::read_to_elas("example_files/square.bmsh");
+        println!("{:?}", elas_out);
         assert!(elas_out.is_ok());
         let mut elas = elas_out.unwrap();
         let dfm = elas.calc_displacements::<DenseGaussSolver>();

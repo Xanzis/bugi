@@ -7,24 +7,11 @@ use crate::element::{ElementAssemblage, NodeId};
 use crate::element::{ElementDescriptor, ElementType};
 use crate::spatial::Point;
 
+use nom::{self, IResult, Parser};
+
 use super::FileError;
 
-#[derive(Debug, Clone)]
-enum ReadState {
-    Start,
-    Header { idx: usize },
-    NodeStart,
-    Nodes { in_body: bool },
-    ElementStart,
-    Elements { in_body: bool },
-    ConstraintStart,
-    Constraints { in_body: bool },
-    ForceStart,
-    Forces { in_body: bool },
-    DistForceStart,
-    DistForces { in_body: bool },
-    End,
-}
+type NomStrErr<'a> = nom::error::Error<&'a str>;
 
 fn parse_error(line_no: usize, text: &'static str) -> FileError {
     let s = format!("line {}: {}", line_no, text);
@@ -35,6 +22,7 @@ fn code_to_desc(code: (u8, Vec<NodeId>)) -> ElementDescriptor {
     let tp = match code.0 {
         1 => unimplemented!("2-node bars temporarily unimplemented"),
         2 => ElementType::Isopar(isopar::ElementType::Triangle3),
+        3 => unimplemented!("rectangles temporarily unimplemented"),
         _ => unimplemented!("unimplemented element type"),
     };
 
@@ -52,267 +40,266 @@ fn desc_to_code(desc: ElementDescriptor) -> (u8, Vec<NodeId>) {
     (tp_code, desc.1)
 }
 
-pub fn lines_to_elas<'a, T: Iterator<Item = &'a str>>(
-    mut lines: T,
-) -> Result<ElementAssemblage, FileError> {
-    let mut no = 0;
+fn monotonic_list<'a, O, F>(mut f: F) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<O>>
+where
+    F: Parser<&'a str, O, NomStrErr<'a>>,
+    //    E: nom::error::ParseError<&'static str>
+{
+    // helper function for sequences of lines that should look like
+    // count <x>\n0 <f>\n1 <f>\n...
+    // finds 0 or more lines
+    use nom::{bytes::complete::tag, character, error::ErrorKind, sequence::delimited};
 
-    let mut version: Option<u8> = None;
-    let mut dim: Option<usize> = None;
-    let mut material: Option<Material> = None;
-    let mut thickness: Option<f64> = None;
-    let mut area: Option<f64> = None;
-    let mut node_count = 0;
-    let mut nodes: Vec<Point> = Vec::new();
-    let mut el_count = 0;
-    let mut elements: Vec<(u8, Vec<usize>)> = Vec::new();
-    let mut cons_count = 0;
-    let mut constraints: Vec<(usize, Constraint)> = Vec::new();
-    let mut force_count = 0;
-    let mut forces: Vec<(usize, Point)> = Vec::new();
-    let mut dist_force_count = 0;
-    let mut dist_forces: Vec<(usize, usize, Point)> = Vec::new();
+    move |init_input| {
+        let mut items = Vec::new();
+        let (mut input, total_exp) =
+            delimited(tag("count "), character::complete::u64, tag("\n"))(init_input.clone())?;
+        let total_exp = total_exp as usize;
 
-    let mut state = ReadState::Start;
+        // need any returned errors to contain the initial slice
+        let error = nom::Err::Error(nom::error::Error::new(init_input, ErrorKind::Verify));
 
-    while let Some(line) = lines.next() {
-        no += 1;
-        if line.is_empty() || line.starts_with("#") {
-            continue;
+        for i in 0..total_exp {
+            let (rem, num) = character::complete::u64(input)?;
+            input = rem;
+
+            if i != num as usize {
+                return Err(error);
+            }
+
+            let (rem, _) = tag(" ")(input).map_err(|_: nom::Err<NomStrErr<'a>>| {
+                nom::Err::Error(nom::error::Error::new(init_input, ErrorKind::Verify))
+            })?;
+            input = rem;
+            let (rem, value) = f.parse(input).map_err(|_| {
+                nom::Err::Error(nom::error::Error::new(init_input, ErrorKind::Verify))
+            })?;
+            input = rem;
+            let (rem, _) = tag("\n")(input).map_err(|_: nom::Err<NomStrErr<'a>>| {
+                nom::Err::Error(nom::error::Error::new(init_input, ErrorKind::Verify))
+            })?;
+            input = rem;
+
+            items.push(value)
         }
-        state = match state {
-            ReadState::Start => {
-                if line == "$Header" {
-                    ReadState::Header { idx: 0 }
-                } else {
-                    return Err(parse_error(no, "expected $Header"));
-                }
-            }
-            ReadState::Header { idx } => match idx {
-                0 => {
-                    let (n, v) = name_and_num(no, line)?;
-                    if n != "version" {
-                        return Err(parse_error(no, "expected version"));
-                    }
-                    version = Some(v as u8);
-                    ReadState::Header { idx: 1 }
-                }
-                1 => {
-                    let (n, v) = name_and_num(no, line)?;
-                    if n != "dim" {
-                        return Err(parse_error(no, "expected dimension"));
-                    }
-                    dim = Some(v);
-                    ReadState::Header { idx: 2 }
-                }
-                2 => {
-                    let (n, m) = name_and_name(no, line)?;
-                    if n != "material" {
-                        return Err(parse_error(no, "expected material"));
-                    }
-                    material = Some(make_material(no, m)?);
-                    ReadState::Header { idx: 3 }
-                }
-                _ => {
-                    if line == "$EndHeader" {
-                        ReadState::NodeStart
-                    } else {
-                        if line.starts_with("thickness") {
-                            thickness = Some(name_and_float(no, line)?.1);
-                        } else if line.starts_with("area") {
-                            area = Some(name_and_float(no, line)?.1);
-                        } else {
-                            return Err(parse_error(no, "unrecognized header field"));
-                        }
-                        ReadState::Header { idx: 3 }
-                    }
-                }
+
+        if items.len() == total_exp {
+            Ok((input, items))
+        } else {
+            Err(error)
+        }
+    }
+}
+
+fn free_list<'a, O, F>(mut f: F) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<O>>
+where
+    F: Parser<&'a str, O, NomStrErr<'a>>,
+{
+    // helper function for sequences of lines without item indices
+    use nom::{bytes::complete::tag, character, error::ErrorKind, sequence::delimited};
+
+    move |init_input| {
+        let mut items = Vec::new();
+        let (mut input, total_exp) =
+            delimited(tag("count "), character::complete::u64, tag("\n"))(init_input.clone())?;
+        let total_exp = total_exp as usize;
+
+        // need any returned errors to contain the initial slice
+        let error = nom::Err::Error(nom::error::Error::new(init_input, ErrorKind::Verify));
+
+        for _ in 0..total_exp {
+            // TODO mayyybe wrap an f.parse err in a new error
+            let (rem, value) = f.parse(input).map_err(|_| {
+                nom::Err::Error(nom::error::Error::new(init_input, ErrorKind::Verify))
+            })?;
+            input = rem;
+            items.push(value);
+
+            let (rem, _) = tag("\n")(input).map_err(|_: nom::Err<NomStrErr<'a>>| {
+                nom::Err::Error(nom::error::Error::new(init_input, ErrorKind::Verify))
+            })?;
+            input = rem;
+        }
+
+        if items.len() == total_exp {
+            Ok((input, items))
+        } else {
+            Err(error)
+        }
+    }
+}
+
+fn section_parse<'a, O, F>(
+    sec_name: &'static str,
+    f: F,
+) -> impl FnMut(&'a str) -> IResult<&'a str, O>
+where
+    F: Parser<&'a str, O, NomStrErr<'a>>,
+{
+    // helper for the bmsh section delimiters
+    use nom::{bytes::complete::tag, sequence::delimited};
+
+    delimited(
+        delimited(tag("$"), tag(sec_name), tag("\n")),
+        f,
+        delimited(tag("$End"), tag(sec_name), tag("\n")),
+    )
+}
+
+fn named_value<'a, O, F>(name: &'static str, f: F) -> impl FnMut(&'a str) -> IResult<&'a str, O>
+where
+    F: Parser<&'a str, O, NomStrErr<'a>>,
+    //    E: nom::error::ParseError<&'static str>
+{
+    // helper for single line named values
+    use nom::{
+        bytes::complete::tag,
+        sequence::{delimited, terminated},
+    };
+
+    delimited(terminated(tag(name), tag(" ")), f, tag("\n"))
+}
+
+struct ParseHeader {
+    version: u8,
+    dim: usize,
+    material: Material,
+    thickness: Option<f64>,
+    area: Option<f64>,
+}
+
+impl ParseHeader {
+    fn into_elas(self) -> ElementAssemblage {
+        let mut res = ElementAssemblage::new(self.dim, self.material);
+        if let Some(t) = self.thickness {
+            res.set_thickness(t);
+        }
+        if let Some(a) = self.area {
+            res.set_area(a);
+        }
+        res
+    }
+}
+
+pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
+    use nom::{
+        bytes::complete::tag,
+        character::complete::{self, alphanumeric1},
+        combinator::{map, opt},
+        multi::separated_list0,
+        number::complete::double,
+        sequence::{separated_pair, terminated, tuple},
+    };
+
+    // preprocess to remove comment and empty lines
+    // could replace with comment / blank aware parser
+    let clean_file: String = file
+        .split("\n")
+        .filter(|l| !l.is_empty() && !l.starts_with("#"))
+        .fold(String::new(), |mut s, x| {
+            s.push_str(x);
+            s.push_str("\n");
+            s
+        });
+    println!("{:?}", clean_file);
+    let input = clean_file.as_str();
+
+    // parse the header
+    let version = named_value("version", complete::u8);
+    let dim = named_value("dim", complete::u64);
+    let material = named_value("material", alphanumeric1);
+    let thickness = named_value("thickness", double);
+    let area = named_value("area", double);
+
+    let (input, header) = section_parse(
+        "Header",
+        map(
+            tuple((version, dim, material, opt(thickness), opt(area))),
+            |(v, d, m, t, a)| ParseHeader {
+                version: v,
+                dim: d as usize,
+                material: m.parse().expect("bad material"),
+                thickness: t,
+                area: a,
             },
-            ReadState::NodeStart => {
-                if line != "$Nodes" {
-                    return Err(parse_error(no, "expected $Nodes"));
-                }
-                ReadState::Nodes { in_body: false }
-            }
-            ReadState::Nodes { in_body } => match in_body {
-                false => {
-                    let (n, v) = name_and_num(no, line)?;
-                    if n != "count" {
-                        return Err(parse_error(no, "expected count"));
-                    }
-                    node_count = v;
-                    ReadState::Nodes { in_body: true }
-                }
-                true => {
-                    if line == "$EndNodes" {
-                        if nodes.len() != node_count {
-                            return Err(parse_error(no, "did not read specified node count"));
-                        }
-                        ReadState::ElementStart
-                    } else {
-                        let (id, p) = id_and_point(no, line)?;
-                        if id != nodes.len() {
-                            return Err(parse_error(no, "out-of-order node id"));
-                        }
-                        nodes.push(p);
-                        ReadState::Nodes { in_body: true }
-                    }
-                }
-            },
-            ReadState::ElementStart => {
-                if line != "$Elements" {
-                    return Err(parse_error(no, "expected $Elements"));
-                }
-                ReadState::Elements { in_body: false }
-            }
-            ReadState::Elements { in_body } => match in_body {
-                false => {
-                    let (n, v) = name_and_num(no, line)?;
-                    if n != "count" {
-                        return Err(parse_error(no, "expected count"));
-                    }
-                    el_count = v;
-                    ReadState::Elements { in_body: true }
-                }
-                true => {
-                    if line == "$EndElements" {
-                        if elements.len() != el_count {
-                            return Err(parse_error(no, "did not read specified element count"));
-                        }
-                        ReadState::ConstraintStart
-                    } else {
-                        let (id, tp, ns) = id_type_and_list(no, line)?;
-                        if id != elements.len() {
-                            return Err(parse_error(no, "out-of-order element id"));
-                        }
-                        elements.push((tp, ns));
-                        ReadState::Elements { in_body: true }
-                    }
-                }
-            },
-            ReadState::ConstraintStart => {
-                if line != "$Constraints" {
-                    return Err(parse_error(no, "expected $Constraints"));
-                }
-                ReadState::Constraints { in_body: false }
-            }
-            ReadState::Constraints { in_body } => match in_body {
-                false => {
-                    let (n, v) = name_and_num(no, line)?;
-                    if n != "count" {
-                        return Err(parse_error(no, "expected count"));
-                    }
-                    cons_count = v;
-                    ReadState::Constraints { in_body: true }
-                }
-                true => {
-                    if line == "$EndConstraints" {
-                        if constraints.len() != cons_count {
-                            return Err(parse_error(no, "did not read specified constraint count"));
-                        }
-                        ReadState::ForceStart
-                    } else {
-                        let (id, tp, ds) = id_type_and_list(no, line)?;
-                        if id >= nodes.len() {
-                            return Err(parse_error(
-                                no,
-                                "constraint refers to out-of-bounds node index",
-                            ));
-                        }
-                        constraints.push((id, make_constraint(no, tp, ds)?));
-                        ReadState::Constraints { in_body: true }
-                    }
-                }
-            },
-            ReadState::ForceStart => {
-                if line != "$Forces" {
-                    return Err(parse_error(no, "expected $Forces"));
-                }
-                ReadState::Forces { in_body: false }
-            }
-            ReadState::Forces { in_body } => match in_body {
-                false => {
-                    let (n, v) = name_and_num(no, line)?;
-                    if n != "count" {
-                        return Err(parse_error(no, "expected count"));
-                    }
-                    force_count = v;
-                    ReadState::Forces { in_body: true }
-                }
-                true => {
-                    if line == "$EndForces" {
-                        if forces.len() != force_count {
-                            return Err(parse_error(no, "did not read specified force count"));
-                        }
-                        ReadState::DistForceStart
-                    } else {
-                        let (id, p) = id_and_point(no, line)?;
-                        if id >= nodes.len() {
-                            return Err(parse_error(
-                                no,
-                                "force refers to out-of-bounds node index",
-                            ));
-                        }
-                        forces.push((id, p));
-                        ReadState::Forces { in_body: true }
-                    }
-                }
-            },
-            ReadState::DistForceStart => {
-                if line != "$DistForces" {
-                    return Err(parse_error(no, "expected $DistForces"));
-                }
-                ReadState::DistForces { in_body: false }
-            }
-            ReadState::DistForces { in_body } => match in_body {
-                false => {
-                    let (n, v) = name_and_num(no, line)?;
-                    if n != "count" {
-                        return Err(parse_error(no, "expected count"));
-                    }
-                    dist_force_count = v;
-                    ReadState::DistForces { in_body: true }
-                }
-                true => {
-                    if line == "$EndDistForces" {
-                        if dist_forces.len() != dist_force_count {
-                            return Err(parse_error(
-                                no,
-                                "did not read specified distributed force count",
-                            ));
-                        }
-                        ReadState::End
-                    } else {
-                        let (ida, idb, p) = id_id_and_point(no, line)?;
-                        if ida >= nodes.len() || idb >= nodes.len() {
-                            return Err(parse_error(
-                                no,
-                                "force refers to out-of-bounds node index",
-                            ));
-                        }
-                        dist_forces.push((ida, idb, p));
-                        ReadState::DistForces { in_body: true }
-                    }
-                }
-            },
-            ReadState::End => return Err(parse_error(no, "unexpected line at end of file")),
-        };
+        ),
+    )(input)?;
+
+    if header.version != 1 {
+        return Err(FileError::parse(format!(
+            "Unsupported version: {}",
+            header.version
+        )));
     }
 
-    if version != Some(1) {
-        return Err(parse_error(no, "unsupported version"));
-    }
+    println!("parsed header. input:\n{:?}", input);
+
+    // parse the remaining segments
+    let (input, nodes): (_, Vec<Point>) = section_parse(
+        "Nodes",
+        monotonic_list(map(separated_list0(tag("/"), double), |x| {
+            x.try_into().expect("bad node position string")
+        })),
+    )(input)?;
+
+    println!("parsed nodes. input:\n{:?}", input);
+
+    let (input, elements): (_, Vec<(u8, Vec<usize>)>) = section_parse(
+        "Elements",
+        monotonic_list(separated_pair(
+            complete::u8,
+            tag(" "),
+            separated_list0(tag("/"), map(complete::u64, |x| x as usize)),
+        )),
+    )(input)?;
+
+    println!("parsed elements. input:\n{:?}", input);
+
+    let (input, constraints): (_, Vec<(usize, Constraint)>) = section_parse(
+        "Constraints",
+        free_list(separated_pair(
+            map(complete::u64, |x| x as usize),
+            tag(" "),
+            map(
+                separated_pair(
+                    complete::u8,
+                    tag(" "),
+                    separated_list0(tag("/"), map(complete::u64, |x| x as usize)),
+                ),
+                // TODO: remove redundant info from make_constraint
+                |(tp, dims)| make_constraint(0, tp, dims).expect("bad constraint"),
+            ),
+        )),
+    )(input)?;
+
+    println!("parsed constraints. input:\n{:?}", input);
+
+    let (input, forces): (_, Vec<(usize, Point)>) = section_parse(
+        "Forces",
+        free_list(separated_pair(
+            map(complete::u64, |x| x as usize),
+            tag(" "),
+            map(separated_list0(tag("/"), double), |x| {
+                x.try_into().expect("bad force vector string")
+            }),
+        )),
+    )(input)?;
+
+    println!("parsed forces. input:\n{:?}", input);
+
+    let (_input, dist_forces): (_, Vec<(usize, usize, Point)>) = section_parse(
+        "DistForces",
+        free_list(tuple((
+            terminated(map(complete::u64, |x| x as usize), tag(" ")),
+            terminated(map(complete::u64, |x| x as usize), tag(" ")),
+            map(separated_list0(tag("/"), double), |x| {
+                x.try_into().expect("bad force vector string")
+            }),
+        ))),
+    )(input)?;
 
     // done with parsing, time to assemble the output
-    // unwraps should be ok here - failures to set should all be caught earlier
-    let mut elas = ElementAssemblage::new(dim.unwrap(), material.unwrap());
-
-    if let Some(t) = thickness {
-        elas.set_thickness(t);
-    }
-    if let Some(a) = area {
-        elas.set_area(a);
-    }
+    let mut elas = header.into_elas();
 
     let node_ids = elas.add_nodes(&nodes);
 
@@ -428,140 +415,6 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
     res
 }
 
-fn name_and_num<'a>(no: usize, line: &'a str) -> Result<(&'a str, usize), FileError> {
-    //convert <name x> to (name, x)
-    let mut l_split = line.split(" ");
-    let name = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "no name on line"))?;
-    let num_str = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "expected uint with label"))?;
-    let num = num_str
-        .parse::<usize>()
-        .or_else(|_| Err(parse_error(no, "bad uint with label")))?;
-    Ok((name, num))
-}
-
-fn name_and_name<'a>(no: usize, line: &'a str) -> Result<(&'a str, &'a str), FileError> {
-    let mut l_split = line.split(" ");
-    let n = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "no name on line"))?;
-    let m = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "expected second name on line"))?;
-
-    Ok((n, m))
-}
-
-fn name_and_float<'a>(no: usize, line: &'a str) -> Result<(&'a str, f64), FileError> {
-    //convert <name x> to (name, x)
-    let mut l_split = line.split(" ");
-    let name = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "no name on line"))?;
-    let num_str = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "expected float with label"))?;
-    let num = num_str
-        .parse::<f64>()
-        .or_else(|_| Err(parse_error(no, "bad float with label")))?;
-    Ok((name, num))
-}
-
-fn id_and_point(no: usize, line: &str) -> Result<(usize, Point), FileError> {
-    // convert <id x/y/z> to (id, Point)
-    let mut l_split = line.split(" ");
-    let id = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "expected id"))?
-        .parse::<usize>()
-        .or_else(|_| Err(parse_error(no, "bad uint")))?;
-
-    let vals_str = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "expected float series"))?;
-    let mut vals: Vec<f64> = Vec::new();
-    for val_str in vals_str.split("/") {
-        vals.push(
-            val_str
-                .parse::<f64>()
-                .or_else(|_| Err(parse_error(no, "bad float")))?,
-        );
-    }
-
-    let p: Point = vals
-        .try_into()
-        .or_else(|_| Err(parse_error(no, "couldn't assemble Point")))?;
-
-    Ok((id, p))
-}
-
-fn id_id_and_point(no: usize, line: &str) -> Result<(usize, usize, Point), FileError> {
-    // convert <id x/y/z> to (id, Point)
-    let mut l_split = line.split(" ");
-    let ida = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "expected id"))?
-        .parse::<usize>()
-        .or_else(|_| Err(parse_error(no, "bad uint")))?;
-
-    let idb = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "expected id"))?
-        .parse::<usize>()
-        .or_else(|_| Err(parse_error(no, "bad uint")))?;
-
-    let vals_str = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "expected float series"))?;
-    let mut vals: Vec<f64> = Vec::new();
-    for val_str in vals_str.split("/") {
-        vals.push(
-            val_str
-                .parse::<f64>()
-                .or_else(|_| Err(parse_error(no, "bad float")))?,
-        );
-    }
-
-    let p: Point = vals
-        .try_into()
-        .or_else(|_| Err(parse_error(no, "couldn't assemble Point")))?;
-
-    Ok((ida, idb, p))
-}
-
-fn id_type_and_list(no: usize, line: &str) -> Result<(usize, u8, Vec<usize>), FileError> {
-    // convert <id t a/b/c...> to (id, type, Vec<nodes>) for element definition lines
-    let mut l_split = line.split(" ");
-    let id = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "expected id"))?
-        .parse::<usize>()
-        .or_else(|_| Err(parse_error(no, "bad uint")))?;
-
-    let tp = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "expected type"))?
-        .parse::<u8>()
-        .or_else(|_| Err(parse_error(no, "bad uint")))?;
-
-    let ns_str = l_split
-        .next()
-        .ok_or_else(|| parse_error(no, "expected id series"))?;
-    let mut ns: Vec<usize> = Vec::new();
-    for n_str in ns_str.split("/") {
-        ns.push(
-            n_str
-                .parse::<usize>()
-                .or_else(|_| Err(parse_error(no, "bad uint")))?,
-        );
-    }
-
-    Ok((id, tp, ns))
-}
-
 fn make_constraint(no: usize, tp: u8, dims: Vec<usize>) -> Result<Constraint, FileError> {
     // simple for now
     match tp {
@@ -577,13 +430,6 @@ fn make_constraint(no: usize, tp: u8, dims: Vec<usize>) -> Result<Constraint, Fi
             }
         }
         _ => Err(parse_error(no, "unsupported constraint type")),
-    }
-}
-
-fn make_material(no: usize, mat: &str) -> Result<Material, FileError> {
-    match mat {
-        "AL6061" => Ok(AL6061),
-        _ => Err(parse_error(no, "unsupported material name")),
     }
 }
 
