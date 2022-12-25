@@ -201,7 +201,6 @@ pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
             s.push_str("\n");
             s
         });
-    println!("{:?}", clean_file);
     let input = clean_file.as_str();
 
     // parse the header
@@ -232,8 +231,6 @@ pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
         )));
     }
 
-    println!("parsed header. input:\n{:?}", input);
-
     // parse the remaining segments
     let (input, nodes): (_, Vec<Point>) = section_parse(
         "Nodes",
@@ -241,8 +238,6 @@ pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
             x.try_into().expect("bad node position string")
         })),
     )(input)?;
-
-    println!("parsed nodes. input:\n{:?}", input);
 
     let (input, elements): (_, Vec<(u8, Vec<usize>)>) = section_parse(
         "Elements",
@@ -252,8 +247,6 @@ pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
             separated_list0(tag("/"), map(complete::u64, |x| x as usize)),
         )),
     )(input)?;
-
-    println!("parsed elements. input:\n{:?}", input);
 
     let (input, constraints): (_, Vec<(usize, Constraint)>) = section_parse(
         "Constraints",
@@ -272,8 +265,6 @@ pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
         )),
     )(input)?;
 
-    println!("parsed constraints. input:\n{:?}", input);
-
     let (input, forces): (_, Vec<(usize, Point)>) = section_parse(
         "Forces",
         free_list(separated_pair(
@@ -284,8 +275,6 @@ pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
             }),
         )),
     )(input)?;
-
-    println!("parsed forces. input:\n{:?}", input);
 
     let (_input, dist_forces): (_, Vec<(usize, usize, Point)>) = section_parse(
         "DistForces",
