@@ -357,7 +357,6 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
                 .map(|nid| format!("/{}", nid.into_idx())),
         );
 
-        to_write.push_str("\n");
         res += &to_write;
     }
     res += "\n$EndElements\n\n$Constraints";
