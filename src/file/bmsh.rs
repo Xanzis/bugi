@@ -1,10 +1,9 @@
 use std::convert::TryInto;
 
-use crate::element::isopar;
 use crate::element::loading::Constraint;
-use crate::element::material::{Material, AL6061};
+use crate::element::material::Material;
+use crate::element::ElementDescriptor;
 use crate::element::{ElementAssemblage, NodeId};
-use crate::element::{ElementDescriptor, ElementType};
 use crate::spatial::Point;
 
 use nom::{self, IResult, Parser};
@@ -18,26 +17,14 @@ fn parse_error(line_no: usize, text: &'static str) -> FileError {
     FileError::BadParse(s)
 }
 
-fn code_to_desc(code: (u8, Vec<NodeId>)) -> ElementDescriptor {
-    let tp = match code.0 {
-        1 => unimplemented!("2-node bars temporarily unimplemented"),
-        2 => ElementType::Isopar(isopar::ElementType::Triangle3),
-        3 => unimplemented!("rectangles temporarily unimplemented"),
-        _ => unimplemented!("unimplemented element type"),
-    };
+fn code_to_desc(code: Vec<NodeId>) -> ElementDescriptor {
+    assert!(code.len() == 3);
 
-    ElementDescriptor::new(tp, code.1)
+    ElementDescriptor::new([code[0], code[1], code[2]])
 }
 
-fn desc_to_code(desc: ElementDescriptor) -> (u8, Vec<NodeId>) {
-    let desc = desc.into_parts();
-    let tp_code = match desc.0 {
-        ElementType::Isopar(itp) => match itp {
-            isopar::ElementType::Triangle3 => 2,
-        },
-    };
-
-    (tp_code, desc.1)
+fn desc_to_code(desc: ElementDescriptor) -> [NodeId; 3] {
+    desc.into_parts()
 }
 
 fn monotonic_list<'a, O, F>(mut f: F) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<O>>
@@ -239,12 +226,11 @@ pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
         })),
     )(input)?;
 
-    let (input, elements): (_, Vec<(u8, Vec<usize>)>) = section_parse(
+    let (input, elements): (_, Vec<Vec<usize>>) = section_parse(
         "Elements",
-        monotonic_list(separated_pair(
-            complete::u8,
-            tag(" "),
-            separated_list0(tag("/"), map(complete::u64, |x| x as usize)),
+        monotonic_list(separated_list0(
+            tag("/"),
+            map(complete::u64, |x| x as usize),
         )),
     )(input)?;
 
@@ -293,9 +279,9 @@ pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
     let node_ids = elas.add_nodes(&nodes);
 
     // TODO write an elas API to generate an element with the suggested type
-    for (tp, ns) in elements.into_iter() {
+    for ns in elements.into_iter() {
         let nids = ns.into_iter().map(|i| node_ids[i]).collect();
-        let desc = code_to_desc((tp, nids));
+        let desc = code_to_desc(nids);
         elas.add_element(desc);
     }
 
@@ -346,9 +332,9 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
     let descs = elas.element_descriptors();
     res += &format!("\ncount {}", descs.len());
     for (i, desc) in descs.into_iter().enumerate() {
-        let (type_id, node_ids) = desc_to_code(desc);
+        let node_ids = desc_to_code(desc);
         // element always has at least one node
-        let mut to_write = format!("\n{} {} {}", i, type_id, node_ids[0].into_idx());
+        let mut to_write = format!("\n{} {}", i, node_ids[0].into_idx());
 
         to_write.extend(
             node_ids

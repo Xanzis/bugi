@@ -18,8 +18,8 @@ $EndNodes
 
 $Elements
 count 2
-0 2 0/2/3
-1 2 0/3/1
+0 0/2/3
+1 0/3/1
 $EndElements
 $Constraints
 count 2

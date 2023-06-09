@@ -1,5 +1,5 @@
+pub mod element;
 pub mod integrate;
-pub mod isopar;
 pub mod loading;
 pub mod material;
 pub mod strain;
@@ -11,6 +11,7 @@ use crate::matrix::Average;
 use crate::spatial::Point;
 use crate::visual::Visualizer;
 
+use element::Element;
 use loading::Constraint;
 use material::Material;
 use stress::StressState;
@@ -40,63 +41,23 @@ pub struct Dof(usize);
 #[derive(Debug, Clone, Copy)]
 pub struct NodeDof(NodeId, usize);
 
-#[derive(Debug, Clone, Copy)]
-pub enum ElementType {
-    Isopar(isopar::ElementType),
-}
-
 #[derive(Debug, Clone)]
 pub struct ElementDescriptor {
-    tp: ElementType,
-    nodes: Vec<NodeId>,
+    nodes: [NodeId; 3],
 }
 
 impl ElementDescriptor {
-    pub fn new(tp: ElementType, nodes: Vec<NodeId>) -> Self {
-        Self { tp, nodes }
+    pub fn new(nodes: [NodeId; 3]) -> Self {
+        Self { nodes }
     }
 
-    pub fn into_parts(self) -> (ElementType, Vec<NodeId>) {
-        (self.tp, self.nodes)
-    }
-
-    pub fn isopar_triangle(ns: [NodeId; 3]) -> Self {
-        // shortcut
-        Self {
-            tp: ElementType::Isopar(isopar::ElementType::Triangle3),
-            nodes: ns.to_vec(),
-        }
+    pub fn into_parts(self) -> [NodeId; 3] {
+        self.nodes
     }
 }
 
-fn build_element(elas: &ElementAssemblage, desc: ElementDescriptor) -> Box<dyn Element> {
-    match desc.tp {
-        ElementType::Isopar(tp) => isopar::build_element(elas, tp, desc.nodes),
-    }
-}
-
-pub trait Element: std::fmt::Debug {
-    fn describe(&self) -> ElementDescriptor;
-
-    fn calc_k(&self) -> Vec<(NodeDof, NodeDof, f64)>;
-
-    fn calc_m(&self) -> Vec<(NodeDof, NodeDof, f64)>;
-
-    fn int_f_l(&self, edge: (NodeId, NodeId), f: Point) -> Option<Vec<(NodeDof, f64)>>;
-
-    fn stresses<'a>(
-        &'a self,
-        disps: Box<dyn Fn(NodeId) -> Point + 'a>,
-    ) -> Vec<(NodeId, StressState)>;
-
-    fn edges(&self) -> Vec<(NodeId, NodeId)>;
-
-    fn triangles(&self) -> Vec<(NodeId, NodeId, NodeId)>;
-
-    fn nodes_connect(&self, a: NodeId, b: NodeId) -> bool;
-
-    // ratio of largest jacobian to smallest (diagnostic tool)
-    fn jacobian_ratio(&self) -> f64;
+fn build_element(elas: &ElementAssemblage, desc: ElementDescriptor) -> Element {
+    Element::new(elas, desc.nodes)
 }
 
 // the big one - primary puclic-facing API for this crate
@@ -110,7 +71,7 @@ pub struct ElementAssemblage {
     thickness: Option<f64>,
     material: Material,
 
-    elements: Vec<Box<dyn Element>>,
+    elements: Vec<Element>,
     constraints: HashMap<NodeId, Constraint>,
     concentrated_forces: HashMap<NodeId, Point>,
     line_forces: HashMap<(NodeId, NodeId), Point>,
@@ -190,7 +151,10 @@ impl ElementAssemblage {
     }
 
     pub fn element_descriptors(&self) -> Vec<ElementDescriptor> {
-        self.elements.iter().map(|e| e.describe()).collect()
+        self.elements
+            .iter()
+            .map(|e| ElementDescriptor::new(e.node_ids()))
+            .collect()
     }
 
     pub fn add_element(&mut self, desc: ElementDescriptor) {

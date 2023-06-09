@@ -625,7 +625,7 @@ impl PlaneTriangulation {
                 *vertex_lookup.get(&tri.2).unwrap(),
             ];
 
-            let desc = ElementDescriptor::isopar_triangle(tri_nids);
+            let desc = ElementDescriptor::new(tri_nids);
             res.add_element(desc);
         }
 
