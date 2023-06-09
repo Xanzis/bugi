@@ -7,3 +7,4 @@ perf.data.old
 performance.txt
 out*
 flamegraph.svg
+*.DS_Store
