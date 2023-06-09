@@ -7,7 +7,7 @@ pub const STDCOL: [Rgb<u8>; 4] = [
     Rgb([255, 0, 255]),
 ];
 
-pub const BACK: Rgb<u8> = Rgb([10, 10, 10]);
+pub const BACK: Rgb<u8> = Rgb([50, 50, 50]);
 
 pub fn hot_map(val: f64) -> Rgb<u8> {
     let val = val.min(1.0).max(0.0);
