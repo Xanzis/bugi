@@ -134,3 +134,7 @@ count 6
 35 1e3/0.0
 43 1e3/0.0
 $EndForces
+
+$DistForces
+count 0
+$EndDistForces
