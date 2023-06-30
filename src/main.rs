@@ -5,6 +5,7 @@ use std::convert::From;
 use std::error::Error;
 use std::fmt;
 use std::path;
+use std::time::Instant;
 
 use bugi::element;
 use bugi::file;
@@ -35,15 +36,22 @@ fn main() -> Result<(), BugiError> {
 fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     // compute a linear study with the given mesh/setup file
     eprintln!("computing linear study ...");
+    let t_all = Instant::now();
 
     let file_path = args.value_of("INPUT").unwrap();
     let file_path = path::Path::new(file_path);
 
     eprintln!("reading mesh file ...");
+    let t = Instant::now();
     let mut elas = file::read_to_elas(file_path)?;
-    eprintln!("file read (node count: {})", elas.node_count());
+    eprintln!(
+        "file read in {}ms (node count: {})",
+        t.elapsed().as_millis(),
+        elas.node_count()
+    );
 
     eprintln!("solving ...");
+    let t = Instant::now();
 
     // compute deformation given load parameters
     let dfm = match args.value_of("solver") {
@@ -53,7 +61,11 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
         Some("gaussseidel") => elas.calc_displacements::<GaussSeidelSolver>(),
         _ => return Err(BugiError::arg_error("unimplemented solver name")),
     };
-    eprintln!("solution complete\npost processing solution ...");
+    eprintln!(
+        "solution complete in {}ms\npost processing solution ...",
+        t.elapsed().as_millis()
+    );
+    let t = Instant::now();
 
     let max_von_mises = dfm
         .von_mises()
@@ -110,7 +122,11 @@ fn linear<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
     vis.draw(out_path.as_str(), vis_options);
 
-    eprintln!("processing complete\n---------------");
+    eprintln!(
+        "processing complete in {}ms\ntotal time {}ms\n---------------",
+        t.elapsed().as_millis(),
+        t_all.elapsed().as_millis()
+    );
 
     println!(
         "max von mises: {}\nmax displacement: {}",
@@ -124,6 +140,7 @@ fn mesh<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
     // compute a mesh from a boundary definition
     // save a mesh definition file and a mesh visualization
     eprintln!("computing mesh ...");
+    let t_all = Instant::now();
 
     let file_path = args.value_of("INPUT").unwrap();
     let file_path = path::Path::new(file_path);
@@ -176,7 +193,10 @@ fn mesh<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
     file::save_elas(mesh_out_path.as_str(), elas);
 
-    eprintln!("mesh generation complete");
+    eprintln!(
+        "mesh generation complete\ntotal time {}ms",
+        t_all.elapsed().as_millis()
+    );
 
     Ok(())
 }

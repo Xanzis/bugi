@@ -175,11 +175,6 @@ impl ElementAssemblage {
         self.elements.push(el);
     }
 
-    // TODO add streamlined add_element alternative for already-created elements
-    // (to be more efficient for elements where the node ordering is already known)
-    // also allow specification of element subtypes (eg triangular/rectangular)
-    // for when it is difficult to infer (six-node triangle or 6-node rectangle?)
-
     pub fn conc_forces(&self) -> Vec<(NodeId, Point)> {
         self.concentrated_forces
             .iter()

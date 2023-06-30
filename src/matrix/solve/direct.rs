@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::matrix::graph::Permutation;
 use crate::matrix::{Diagonal, Inverse, LinearMatrix, LowerRowEnvelope, MatrixLike};
 
@@ -34,21 +36,26 @@ pub struct CholeskyEnvelopeSolver {
 
 impl Solver for CholeskyEnvelopeSolver {
     fn new(mut sys: System) -> Self {
-        eprintln!("beginning envelope cholesky solution ...");
-
         eprintln!(
-            "computing reordering (initial total envelope: {}) ...",
-            sys.k_envelope().sum::<usize>()
+            "beginning envelope cholesky solution ... ({} degrees of freedom)",
+            sys.dofs()
         );
+
+        let init_envelope = sys.k_envelope().sum::<usize>();
+        eprintln!("computing reordering ...");
+        let t = Instant::now();
 
         let dofs = sys.dofs();
         sys.reduce_envelope();
 
         let (k, r, perm): (LowerRowEnvelope, _, _) = sys.into_krp();
 
+        let final_envelope = k.non_zero_count();
+        let reduction = 1.0 - (final_envelope as f64 / init_envelope as f64);
         eprintln!(
-            "reordering computed (total envelope: {})",
-            k.non_zero_count()
+            "reordering computed in {}ms (envelope reduction: {:3.3}%)",
+            t.elapsed().as_millis(),
+            reduction * 100.0
         );
 
         let perm = perm.unwrap();
@@ -60,10 +67,15 @@ impl Solver for CholeskyEnvelopeSolver {
         let dofs = self.dofs;
 
         eprintln!("computing cholesky decomposition ...");
+        let t = Instant::now();
 
         let chol = cholesky_envelope(&self.k);
 
-        eprintln!("decomposition computed.\nsolving system...");
+        eprintln!(
+            "decomposition computed in {}ms\nsubstituting system...",
+            t.elapsed().as_millis()
+        );
+        let t = Instant::now();
 
         let mut x = vec![0.0; dofs];
         solve_ll(&chol, &self.r, &mut x);
@@ -71,7 +83,7 @@ impl Solver for CholeskyEnvelopeSolver {
         // invert the permutation
         self.perm.permute_slice(x.as_mut_slice());
 
-        eprintln!("envelope cholesky solution complete");
+        eprintln!("substitution complete in {}ms", t.elapsed().as_millis());
 
         Ok(x)
     }
@@ -121,7 +133,7 @@ pub fn cholesky_envelope(a: &LowerRowEnvelope) -> LowerRowEnvelope {
 
         // add the row by appending t to w
         w.push(t);
-        l.row_stored_mut(i).1.clone_from_slice(&w);
+        l.row_stored_mut(i).1.copy_from_slice(&w);
     }
 
     l
