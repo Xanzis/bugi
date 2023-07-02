@@ -11,18 +11,11 @@ use crate::visual::Visualizer;
 use super::bounds::{self, PlaneBoundary, Segment};
 use super::MeshError;
 
-// enum for vertex indices in the ghost vertex scheme
+// enum for vertex indices
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum VId {
     Real(usize),
     Bound(bounds::VId),
-    Ghost,
-}
-
-impl VId {
-    fn is_ghost(&self) -> bool {
-        matches!(self, VId::Ghost)
-    }
 }
 
 impl From<bounds::VId> for VId {
@@ -44,24 +37,6 @@ impl Triangle {
             Edge(self.1, self.2),
             Edge(self.2, self.0),
         ]
-    }
-
-    fn is_ghost(self) -> bool {
-        self.0.is_ghost() || self.1.is_ghost() || self.2.is_ghost()
-    }
-
-    fn ghost_count(self) -> usize {
-        let mut res = 0;
-        if self.0.is_ghost() {
-            res += 1;
-        }
-        if self.1.is_ghost() {
-            res += 1;
-        }
-        if self.2.is_ghost() {
-            res += 1;
-        }
-        res
     }
 
     fn rot(self) -> Self {
@@ -94,10 +69,6 @@ impl From<(VId, VId, VId)> for Triangle {
 impl Edge {
     fn rev(self) -> Edge {
         Edge(self.1, self.0)
-    }
-
-    fn is_ghost(self) -> bool {
-        self.0.is_ghost() || self.1.is_ghost()
     }
 }
 
@@ -163,7 +134,6 @@ impl PlaneTriangulation {
         match v {
             VId::Real(i) => self.vertices.get(i).cloned(),
             VId::Bound(i) => self.bound.get(i),
-            VId::Ghost => None,
         }
     }
 
@@ -179,18 +149,14 @@ impl PlaneTriangulation {
     }
 
     fn all_vid(&self) -> impl Iterator<Item = VId> {
-        // return an iterator over all nonghost VIds
+        // return an iterator over all VIds
         (0..self.vertices.len())
             .map(VId::Real)
             .chain(self.bound.all_vid().map(VId::Bound))
-        //    .chain(iter::once(VId::Ghost))
     }
 
     fn get_triangle_points(&self, tri: Triangle) -> Option<(Point, Point, Point)> {
         // retrieve a triangle as a tuple of Points
-        if tri.is_ghost() {
-            return None;
-        }
         let Triangle(u, v, w) = tri;
         Some((
             self.get(u).unwrap().into(),
@@ -200,9 +166,6 @@ impl PlaneTriangulation {
     }
 
     fn get_triangle_points_perturbed(&self, tri: Triangle) -> Option<(Point, Point, Point)> {
-        if tri.is_ghost() {
-            return None;
-        }
         let Triangle(u, v, w) = tri;
         Some((
             self.get_perturbed(u).unwrap().into(),
@@ -215,28 +178,6 @@ impl PlaneTriangulation {
         // determine whether x lies in the oriented triangle tri's circumcircle
         // perturb determines whether or not to perturb the inputs (which helps avoid chew edge cases)
         let tri = tri.into();
-
-        // end immediately for doubly-ghost edge cases
-        if tri.ghost_count() > 1 {
-            return false;
-        }
-
-        // first, if tri is a ghost triangle, only check if x is to the left of the non-ghost segment
-        let ghosts = (tri.0.is_ghost(), tri.1.is_ghost(), tri.2.is_ghost());
-        if ghosts.0 {
-            return self.triangle_dir((tri.1, tri.2, x)).unwrap() != Orient::Negative;
-        }
-        if ghosts.1 {
-            return self.triangle_dir((tri.2, tri.0, x)).unwrap() != Orient::Negative;
-        }
-        if ghosts.2 {
-            return self.triangle_dir((tri.0, tri.1, x)).unwrap() != Orient::Negative;
-        }
-
-        // a ghost vertex is never inside a real triangle
-        if x.is_ghost() {
-            return false;
-        }
 
         // don't check tri for positivity, important that negative triangles return inverse results
         if perturb {
@@ -263,11 +204,7 @@ impl PlaneTriangulation {
         // in constrast to triangle_dir, this properly handles ghost points
         // TODO make sure this is in fact the right ghost handling
         let e = e.into();
-        if p.is_ghost() || e.is_ghost() {
-            true
-        } else {
-            self.triangle_dir((e.0, e.1, p)) == Some(Orient::Positive)
-        }
+        self.triangle_dir((e.0, e.1, p)) == Some(Orient::Positive)
     }
 
     fn add_triangle<T: Into<Triangle>>(&mut self, tri: T) -> Result<(), MeshError> {
@@ -275,15 +212,8 @@ impl PlaneTriangulation {
         // only one of the vertices may be a ghost vertex
         // if no vertices are ghosts, as a sanity check ensure the triangle is positive
         let tri = tri.into();
-        match tri.ghost_count() {
-            2 | 3 => return Err(MeshError::triangle("doubly / triply ghost triangle")),
-            0 => {
-                if self.triangle_dir(tri) != Some(Orient::Positive) {
-                    return Err(MeshError::triangle("negative triangle addition requested"));
-                }
-            }
-            1 => (),
-            _ => unreachable!(),
+        if self.triangle_dir(tri) != Some(Orient::Positive) {
+            return Err(MeshError::triangle("negative triangle addition requested"));
         }
 
         // a new triangle may not share an (oriented) edge with an old triangle
@@ -301,12 +231,9 @@ impl PlaneTriangulation {
         self.full_tris.insert(tri, cr);
 
         // add to the recent co-appearing points map for later adjacent_one use
-        // seems reasonable to not insert any ghost pairs for adjacent_one, right?
         for e in edges.iter().cloned() {
-            if !e.is_ghost() {
-                self.recents.insert(e.0, e.1);
-                self.recents.insert(e.1, e.0);
-            }
+            self.recents.insert(e.0, e.1);
+            self.recents.insert(e.1, e.0);
         }
 
         Ok(())
@@ -344,7 +271,6 @@ impl PlaneTriangulation {
     fn adjacent_one(&self, u: VId) -> Option<Edge> {
         // return an arbitrary triangle including u, if one exists
         // if u has been part of a recent triangle, return it
-        // warning, may return a ghost triangle
         if let Some(v) = self.recents.get(&u).cloned() {
             let e = Edge(u, v);
             if let Some(w) = self.tris.get(&e).cloned() {
@@ -365,14 +291,6 @@ impl PlaneTriangulation {
             if let Some(w) = self.tris.get(&e.rev()).cloned() {
                 return Some((w, v).into());
             }
-        }
-
-        // check if there's a ghost triangle
-        if let Some(w) = self.tris.get(&(u, VId::Ghost).into()).cloned() {
-            return Some((VId::Ghost, w).into());
-        }
-        if let Some(w) = self.tris.get(&(VId::Ghost, u).into()).cloned() {
-            return Some((w, VId::Ghost).into());
         }
 
         None
@@ -486,10 +404,6 @@ impl PlaneTriangulation {
 
         let mut tri: Option<Triangle> = None;
         for v in self.all_vid() {
-            // do not construct doubly-ghost triangles
-            if e.is_ghost() && v.is_ghost() {
-                continue;
-            }
             // proceed if v is in front of e and tri is either None or encircling
             if self.to_left(e, v) && tri.map_or(true, |t| self.in_circle(t, v, true)) {
                 if self.midpoint_visible(e, v) {
@@ -564,7 +478,7 @@ impl PlaneTriangulation {
     }
 
     pub fn visualize(&self) -> Visualizer {
-        let vids: Vec<VId> = self.all_vid().filter(|x| !x.is_ghost()).collect();
+        let vids: Vec<VId> = self.all_vid().collect();
 
         let nodes: Vec<Point> = vids.iter().map(|x| self.get(*x).unwrap().into()).collect();
 
@@ -584,7 +498,6 @@ impl PlaneTriangulation {
 
         let edges: Vec<(usize, usize)> = edge_set
             .drain()
-            .filter(|e| !e.is_ghost())
             .map(|e| {
                 (
                     idx_map.get(&e.0).cloned().unwrap(),
