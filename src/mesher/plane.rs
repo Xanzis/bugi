@@ -1,13 +1,11 @@
-use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
-use std::convert::{From, Into, TryInto};
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 
 use crate::element::{ElementAssemblage, ElementDescriptor, NodeId};
 use crate::spatial::predicates::{self};
 use crate::visual::Visualizer;
 
-use super::bounds::{self, PlaneBoundary, Segment};
+use super::bounds::{PlaneBoundary, Segment};
 use super::{MeshError, Vertex};
 
 use spacemath::two::Point;

@@ -1,7 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::convert::TryInto;
 
-use crate::spatial::predicates;
 use crate::visual::Visualizer;
 
 use crate::element::loading::Constraint;

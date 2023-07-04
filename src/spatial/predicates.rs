@@ -194,15 +194,6 @@ pub fn lies_on(seg: (Point, Point), r: Point, tol: f64) -> bool {
     (-tol..(seg_len + tol)).contains(&dot) && (pq_unit * dot).dist(pr_vec) <= tol
 }
 
-pub fn circumradius(tri: (Point, Point, Point)) -> f64 {
-    // compute a triangle circumradius
-    let a = tri.0.dist(tri.1);
-    let b = tri.1.dist(tri.2);
-    let c = tri.2.dist(tri.0);
-
-    (a * b * c) / ((a + b + c) * (b + c - a) * (c + a - b) * (a + b - c)).sqrt()
-}
-
 // a line, represented as ax + by = c
 #[derive(Clone, Copy, Debug)]
 struct Line {
