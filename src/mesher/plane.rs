@@ -8,7 +8,7 @@ use crate::visual::Visualizer;
 use super::bounds::{PlaneBoundary, Segment};
 use super::{MeshError, Vertex};
 
-use spacemath::two::Point;
+use spacemath::two::{dist::Dist, Point};
 use spacemath::Orient;
 
 // structs for ordered pairs / triplets of vertex indices
@@ -243,12 +243,12 @@ impl PlaneTriangulation {
         None
     }
 
-    fn midpoint_visible<E: Into<Edge>>(&self, e: E, v: Vertex) -> bool {
+    fn midpoint_visible<E: Into<Edge>>(&self, e: E, x: Vertex) -> bool {
         // determine whether the midpoint of e is visible from v
         const TOLERANCE: f64 = 1e-6;
 
         let e = e.into();
-        let (p, q, x) = (e.0.get(), e.1.get(), v.get());
+        let (p, q) = (e.0.get(), e.1.get());
         let m = p.mid(q); // midpoint
 
         // check if any wall obstructs mx
@@ -258,7 +258,7 @@ impl PlaneTriangulation {
         for wall in self.bound.all_base_walls() {
             let (a, b) = wall.get();
             let (a, b) = (a.into(), b.into()); // TODO remove the predicate stuff
-            let (m, x) = (m.into(), x.into()); // here too
+            let (m, x) = (m.into(), x.get().into()); // here too
 
             if predicates::segments_intersect((a, b), (m, x)) {
                 // if m or x contact
@@ -324,6 +324,7 @@ impl PlaneTriangulation {
         let Triangle(v, w, x) = tri.into();
         self.delete_triangle((v, w, x))
             .expect("could not delete triangle");
+
         self.bowyer_watson_dig(u, v, w);
         self.bowyer_watson_dig(u, w, x);
         self.bowyer_watson_dig(u, x, v);
@@ -386,6 +387,18 @@ impl PlaneTriangulation {
             .map(|(&t, _)| t)
     }
 
+    fn skinny_triangle(&self, b: f64, h: f64) -> Option<Triangle> {
+        // finds both skinny triangles (wrt b) and large triangles (wrt h)
+        self.full_tris
+            .iter()
+            .find(|&(t, &cr)| {
+                let (u, v, w) = t.get();
+                let min_leg = u.dist(v).min(v.dist(w)).min(w.dist(u));
+                ((cr / min_leg) > b) || (cr > h)
+            })
+            .map(|(&t, _)| t)
+    }
+
     pub fn chew_mesh(&mut self, h: f64) {
         // starting from a rough boundary
         // refine first boundary then interior via chew's 1st method
@@ -408,20 +421,100 @@ impl PlaneTriangulation {
         eprintln!("chew mesh generation complete");
     }
 
-    pub fn ruppert_encroached(&self, p: Point, segments: &mut Vec<Segment>) -> bool {
-        // oof this is going to be tough with the current API
-        // adding potentially-invalid nodes to the index is a no go
-        // switch api to: an arena for nodes that returns references, replace Vertex with &Point
-        // then just generate trial Point and pass a &Point along
+    // maybe move some of these methods to bounds
+    fn ruppert_encroaches(&self, p: Vertex, s: Segment) -> bool {
+        if !self.midpoint_visible((s.0, s.1), p) {
+            // TODO clean up conversions to make this prettier
+            return false;
+        }
 
-        segments.clear();
-        // put encroached segments in a Vec to keep allocations light
+        if s.has(p) {
+            return false; // a segment is not encroached by its own end points
+        }
 
-        false
+        // check if p is in the diametral circle
+        let (a, b) = (s.0.get(), s.1.get());
+        let mid = a.mid(b);
+        let rad = mid.dist(a);
+
+        mid.dist(p.get()) <= rad
     }
 
-    pub fn ruppert_mesh(&mut self) {
+    fn ruppert_split_segment(&mut self, s: Segment) -> (Segment, Segment) {
+        // split a bounding segment, using the bowyer-watson algorithm to maintain the delauney property
+        // return the child segments
+
+        let x = self
+            .adjacent(s)
+            .expect("this should exist if self was triangulated");
+        let Segment(v, w) = s;
+        self.delete_triangle((v, w, x));
+
+        let (child_a, child_b) = self.bound.split_segment(s);
+        let u = child_a.1;
+
+        // now it's just like the bowyer_watson insert, but we don't dig through the segment we split
+        self.bowyer_watson_dig(u, w, x);
+        self.bowyer_watson_dig(u, x, v);
+
+        (child_a, child_b)
+    }
+
+    fn split_while_encroached(&mut self, p: Vertex, mut to_split: Vec<Segment>) {
+        // split the provided segments while their children are still encroached
+        // the initial split list is assumed to be known to be encroached
+
+        while let Some(s) = to_split.pop() {
+            let (child_a, child_b) = self.ruppert_split_segment(s);
+
+            if self.ruppert_encroaches(p, child_a) {
+                to_split.push(child_a);
+            }
+            if self.ruppert_encroaches(p, child_b) {
+                to_split.push(child_b);
+            }
+        }
+    }
+
+    fn segments_encroached_by(&self, p: Vertex) -> Option<Vec<Segment>> {
+        // find segments which would be encroached by the addition of a trial point
+        // returns None if the vector would otherwise be empty
+        let segs: Vec<Segment> = self
+            .bound
+            .all_walls()
+            .filter(|&s| self.ruppert_encroaches(p, s))
+            .collect();
+        if segs.is_empty() {
+            None
+        } else {
+            Some(segs)
+        }
+    }
+
+    pub fn ruppert_mesh(&mut self, max_size: f64) {
         self.gift_wrap();
+
+        // first, split all the walls that are already encroached by boundary vertices
+        loop {
+            let Some((p, to_split)) = self.bound.all_vertices().find_map(|&p| self.segments_encroached_by(p).map(|segs| (p, segs))) else {
+                break
+            };
+            self.split_while_encroached(p, to_split);
+        }
+
+        // now, perform the ruppert refinement steps
+        let b = 1.415; // minimum skinny triangle ratio for proof of termination
+        while let Some(tri) = self.skinny_triangle(b, max_size) {
+            let center = self.circumcenter(tri).unwrap(); // todo get rid of wrapping method
+            let center = Vertex::new(center); // ok to do this outside of storage
+
+            if let Some(segs) = self.segments_encroached_by(center) {
+                self.split_while_encroached(center, segs);
+            } else {
+                let center_id = self.store_vertex(center.get()); // this'll spin a new id, but that doesn't matter
+                self.bowyer_watson_insert(center_id, tri);
+            }
+        }
     }
 
     pub fn visualize(&self) -> Visualizer {

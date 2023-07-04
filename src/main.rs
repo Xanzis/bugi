@@ -160,7 +160,8 @@ fn mesh<'a>(args: &clap::ArgMatches<'a>) -> Result<(), BugiError> {
 
     eprintln!("meshing ...");
     match args.value_of("mesher") {
-        None | Some("chew") => msh.chew_mesh(size),
+        None | Some("chew") => msh.chew_mesh(size), // chew_mesh(size)
+        Some("ruppert") => msh.ruppert_mesh(size),
         _ => {
             return Err(BugiError::arg_error(
                 "unrecognised mesh algorithm specified",

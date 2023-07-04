@@ -242,6 +242,7 @@ impl PlaneBoundary {
         let s = s.into();
 
         self.seg_map.insert(s.0, s.1);
+        self.seg_set.insert(s);
     }
 
     pub fn all_vertices(&self) -> impl Iterator<Item = &'_ Vertex> {
@@ -302,6 +303,7 @@ impl PlaneBoundary {
 
     pub fn divide_segment(&mut self, s: Segment, h: f64) {
         // divide a segment into chunks with length on the interval [h, sqrt(3)*h]
+        assert!(self.is_segment(s));
         let (a, b) = s.get();
 
         let dist = a.dist(b);
@@ -375,6 +377,44 @@ impl PlaneBoundary {
         if let Some(f) = dist_f {
             self.distributed_forces.insert((cur, end).into(), f);
         }
+    }
+
+    pub fn split_segment(&mut self, s: Segment) -> (Segment, Segment) {
+        // split a segment in two, storing the result and also returning it for later use
+        assert!(self.is_segment(s));
+        let Segment(a, b) = s; // points
+
+        let m = a.get().mid(b.get());
+        let m = self.store_vertex(m);
+
+        // find whether there are distributed forces or constraints on the segment
+        let dist_f = self
+            .distributed_forces
+            .remove(&s)
+            .or_else(|| self.distributed_forces.remove(&s.rev()));
+
+        let dist_c = self
+            .distributed_constraints
+            .remove(&s)
+            .or_else(|| self.distributed_constraints.remove(&s.rev()));
+
+        self.remove_segment(s);
+
+        self.store_segment_unchecked((a, m));
+        self.store_segment_unchecked((m, b));
+
+        if let Some(c) = dist_c {
+            self.constraints.insert(a, c);
+            self.constraints.insert(m, c);
+            self.constraints.insert(b, c);
+        }
+
+        if let Some(f) = dist_f {
+            self.distributed_forces.insert((a, m).into(), f);
+            self.distributed_forces.insert((m, b).into(), f);
+        }
+
+        ((a, m).into(), (m, b).into())
     }
 
     pub fn divide_all_segments(&mut self, h: f64) {
