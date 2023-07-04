@@ -241,6 +241,13 @@ impl From<Vec<Point>> for Visualizer {
     }
 }
 
+impl From<Vec<spacemath::two::Point>> for Visualizer {
+    fn from(points: Vec<spacemath::two::Point>) -> Self {
+        let new_points: Vec<Point> = points.into_iter().map(|x| x.into()).collect();
+        new_points.into()
+    }
+}
+
 fn rotation_matrix(x_ang: f64, y_ang: f64) -> LinearMatrix {
     let sin_xa = x_ang.sin();
     let cos_xa = x_ang.cos();

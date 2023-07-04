@@ -1,49 +1,53 @@
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 
-use crate::spatial::{predicates, Point};
+use crate::spatial::predicates;
 use crate::visual::Visualizer;
 
 use crate::element::loading::Constraint;
 use crate::element::material::Material;
 
-// a bounds vertex id
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum VId {
-    Real(usize),
-}
+use super::Vertex;
+
+use spacemath::two::dist::Dist;
+use spacemath::two::intersect::Intersect;
+use spacemath::two::Point;
 
 // a directed boundary segment
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Segment(pub VId, pub VId);
+pub struct Segment(pub Vertex, pub Vertex);
 
-impl From<(VId, VId)> for Segment {
-    fn from(s: (VId, VId)) -> Segment {
+impl From<(Vertex, Vertex)> for Segment {
+    fn from(s: (Vertex, Vertex)) -> Segment {
         Segment(s.0, s.1)
     }
 }
 
 impl Segment {
-    fn rev(self) -> Segment {
+    pub fn rev(self) -> Segment {
         Segment(self.1, self.0)
     }
 
-    fn has(self, v: VId) -> bool {
+    pub fn has(self, v: Vertex) -> bool {
         self.0 == v || self.1 == v
+    }
+
+    pub fn get(self) -> (Point, Point) {
+        (self.0.get(), self.1.get())
     }
 }
 
 // Wall is an iterator over connecting segments
 #[derive(Clone, Debug)]
 pub struct Wall<'a> {
-    seg_map: &'a HashMap<VId, VId>,
-    start: VId,
-    prev: VId,
+    seg_map: &'a HashMap<Vertex, Vertex>,
+    start: Vertex,
+    prev: Vertex,
     done: bool,
 }
 
 impl<'a> Wall<'a> {
-    fn new(seg_map: &'a HashMap<VId, VId>, start: VId) -> Self {
+    fn new(seg_map: &'a HashMap<Vertex, Vertex>, start: Vertex) -> Self {
         Self {
             seg_map,
             start,
@@ -78,14 +82,14 @@ impl<'a> Iterator for Wall<'a> {
 
 #[derive(Clone, Debug)]
 pub struct AllWalls<'a> {
-    seg_map: &'a HashMap<VId, VId>,
-    wall_starts: &'a [VId],
+    seg_map: &'a HashMap<Vertex, Vertex>,
+    wall_starts: &'a [Vertex],
     wall: Wall<'a>,
     wall_idx: usize,
 }
 
 impl<'a> AllWalls<'a> {
-    fn new(seg_map: &'a HashMap<VId, VId>, wall_starts: &'a [VId]) -> Self {
+    fn new(seg_map: &'a HashMap<Vertex, Vertex>, wall_starts: &'a [Vertex]) -> Self {
         assert!(
             !wall_starts.is_empty(),
             "cannot iterate over empty wall list"
@@ -120,19 +124,20 @@ impl<'a> Iterator for AllWalls<'a> {
 
 #[derive(Clone, Debug)]
 pub struct PlaneBoundary {
-    vertices: Vec<(f64, f64)>,
-    wall_starts: Vec<VId>,
-    seg_map: HashMap<VId, VId>,
+    vertices: Vec<Vertex>,
+
+    wall_starts: Vec<Vertex>,
+    seg_map: HashMap<Vertex, Vertex>,
     seg_set: HashSet<Segment>,
 
     // storage for undivided walls (for cheaper visibility tests)
-    base_wall_starts: Vec<VId>,
-    base_seg_map: HashMap<VId, VId>,
+    base_wall_starts: Vec<Vertex>,
+    base_seg_map: HashMap<Vertex, Vertex>,
 
     // also store some BC / material information
     thickness: Option<f64>,
     material: Option<Material>,
-    constraints: HashMap<VId, Constraint>,
+    constraints: HashMap<Vertex, Constraint>,
     distributed_forces: HashMap<Segment, Point>,
     distributed_constraints: HashMap<Segment, Constraint>,
 }
@@ -141,6 +146,7 @@ impl PlaneBoundary {
     pub fn new() -> Self {
         PlaneBoundary {
             vertices: Vec::new(),
+
             wall_starts: Vec::new(),
             seg_map: HashMap::new(),
             seg_set: HashSet::new(),
@@ -156,20 +162,16 @@ impl PlaneBoundary {
         }
     }
 
-    pub fn store_vertex<T: TryInto<(f64, f64)>>(&mut self, p: T) -> VId {
-        if let Ok((x, y)) = p.try_into() {
-            self.vertices.push((x, y));
-            VId::Real(self.vertices.len() - 1)
-        } else {
-            panic!("bad vertex input");
-        }
+    pub fn store_vertex<T: Into<Point>>(&mut self, p: T) -> Vertex {
+        let res = Vertex::new(p.into());
+        self.vertices.push(res);
+        res
     }
 
     pub fn store_segment<S: Into<Segment>>(&mut self, s: S) {
         let s = s.into();
 
-        let a = self.get(s.0).expect("bad index");
-        let b = self.get(s.1).expect("bad index");
+        let (a, b) = s.get();
 
         // possibly avoid this O(n) check for at-scale work
         if self.intersects(a, b, Some(s)) {
@@ -184,8 +186,7 @@ impl PlaneBoundary {
         // store a segment into both the main and base maps
         let s = s.into();
 
-        let a = self.get(s.0).expect("bad index");
-        let b = self.get(s.1).expect("bad index");
+        let (a, b) = s.get();
 
         // possibly avoid this O(n) check for at-scale work
         if self.intersects(a, b, Some(s)) {
@@ -213,15 +214,15 @@ impl PlaneBoundary {
         self.material
     }
 
-    pub fn store_constraint(&mut self, v: VId, c: Constraint) {
+    pub fn store_constraint(&mut self, v: Vertex, c: Constraint) {
         self.constraints.insert(v, c);
     }
 
-    pub fn store_distributed_force(&mut self, v: VId, w: VId, f: Point) {
+    pub fn store_distributed_force(&mut self, v: Vertex, w: Vertex, f: Point) {
         self.distributed_forces.insert((v, w).into(), f);
     }
 
-    pub fn store_distributed_constraint(&mut self, v: VId, w: VId, c: Constraint) {
+    pub fn store_distributed_constraint(&mut self, v: Vertex, w: Vertex, c: Constraint) {
         self.distributed_constraints.insert((v, w).into(), c);
     }
 
@@ -245,19 +246,8 @@ impl PlaneBoundary {
         self.seg_map.insert(s.0, s.1);
     }
 
-    pub fn get(&self, id: VId) -> Option<(f64, f64)> {
-        match id {
-            VId::Real(i) => self.vertices.get(i).cloned(),
-        }
-    }
-
-    pub fn all_vid(&self) -> impl Iterator<Item = VId> {
-        (0..self.vertices.len()).map(VId::Real)
-    }
-
-    pub fn get_segment_points(&self, seg: Segment) -> Option<(Point, Point)> {
-        let Segment(u, v) = seg;
-        Some((self.get(u)?.into(), self.get(v)?.into()))
+    pub fn all_vertices(&self) -> impl Iterator<Item = &'_ Vertex> {
+        self.vertices.iter()
     }
 
     fn intersects<T: Into<Point> + Copy>(&self, p: T, q: T, ignore: Option<Segment>) -> bool {
@@ -270,23 +260,30 @@ impl PlaneBoundary {
                 }
             }
 
-            let a = self.get(s.0).unwrap();
-            let b = self.get(s.1).unwrap();
-            if predicates::segments_intersect((a.into(), b.into()), (p.into(), q.into())) {
+            let (a, b) = s.get();
+
+            // TODO find a better way to deal with namespace
+            // TODO further integrate spacemath into function signatures
+            let ab = spacemath::two::Segment::new(a, b);
+            let pq = spacemath::two::Segment::new(p.into(), q.into());
+            if ab.intersects(&pq).is_nonzero() {
                 return true;
             }
         }
         false
     }
 
-    pub fn store_polygon(&mut self, poly: &[(f64, f64)]) -> Vec<VId> {
+    pub fn store_polygon<T>(&mut self, poly: &[T]) -> Vec<Vertex>
+    where
+        T: Into<Point> + Copy,
+    {
         // store an ordered set of points as a polygon
         // the polygon should be oriented so positive triangles off the edges are inside the body
-        // TODO enforce this
-        let mut poly = poly.into_iter();
+
+        let mut poly = poly.into_iter().copied().map(|p| p.into());
         let mut ids = Vec::new();
-        let start = poly.next().unwrap();
-        let start_idx = self.store_vertex(*start);
+        let start: Point = poly.next().unwrap();
+        let start_idx = self.store_vertex(start);
         ids.push(start_idx);
 
         self.wall_starts.push(start_idx);
@@ -294,7 +291,7 @@ impl PlaneBoundary {
 
         let mut prev_idx = start_idx;
         for p in poly {
-            let p_idx = self.store_vertex(*p);
+            let p_idx = self.store_vertex(p);
             ids.push(p_idx);
             self.store_base_segment((prev_idx, p_idx));
 
@@ -307,25 +304,27 @@ impl PlaneBoundary {
 
     pub fn divide_segment(&mut self, s: Segment, h: f64) {
         // divide a segment into chunks with length on the interval [h, sqrt(3)*h]
-        let a: Point = self.get(s.0).expect("bad index").into();
-        let b: Point = self.get(s.1).expect("bad index").into();
+        let (a, b) = s.get();
 
         let dist = a.dist(b);
         let lower_bound = h;
         let upper_bound = h * (3.0_f64).sqrt();
 
         // find number of segments to split into
-        let lower_num = dist / upper_bound;
-        let upper_num = dist / lower_bound;
+        let lower_num = (dist / upper_bound).floor();
+        let upper_num = (dist / lower_bound).floor();
 
-        if lower_num.floor() == upper_num.floor() {
-            panic!("cannot find valid segment division");
+        if lower_num == upper_num {
+            panic!(
+                "cannot find valid segment division for segment of length {}",
+                dist
+            );
         }
 
         // define new segment interval
-        let num = upper_num.floor();
+        let num = upper_num;
         let segment_length = dist / num;
-        let leg = (b - a).unit() * segment_length;
+        let leg = (b - a).to_unit() * segment_length;
 
         // find whether there are distributed forces or constraints on the segment
         let dist_f = self
@@ -405,21 +404,24 @@ impl PlaneBoundary {
             .collect()
     }
 
-    pub fn all_constraints(&self) -> Vec<(VId, Constraint)> {
+    pub fn all_constraints(&self) -> Vec<(Vertex, Constraint)> {
         self.constraints.iter().map(|(&v, &c)| (v, c)).collect()
     }
 
     pub fn visualize(&self) -> Visualizer {
-        let nodes: Vec<Point> = self
-            .all_vid()
-            .map(|x| self.get(x).unwrap().into())
+        let nodes: Vec<Point> = self.all_vertices().map(|x| x.get()).collect();
+
+        // for visualizer plumbing
+        let indices: HashMap<Vertex, usize> = self
+            .all_vertices()
+            .copied()
+            .enumerate()
+            .map(|(x, y)| (y, x))
             .collect();
 
         let mut edges = Vec::new();
         for s in self.seg_set.iter() {
-            match s {
-                Segment(VId::Real(i), VId::Real(j)) => edges.push((*i, *j)),
-            }
+            edges.push((indices[&s.0], indices[&s.1]));
         }
 
         let mut vis: Visualizer = nodes.into();

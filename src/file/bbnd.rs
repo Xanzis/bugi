@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use crate::element::loading::Constraint;
 use crate::element::material::Material;
-use crate::mesher::bounds::{PlaneBoundary, VId};
+use crate::mesher::bounds::PlaneBoundary;
+use crate::mesher::Vertex;
 
 use super::FileError;
 
@@ -54,7 +55,7 @@ impl<'a> ParseVertex<'a> {
 
 pub fn bbnd_to_bounds(file: &str) -> Result<PlaneBoundary, FileError> {
     let items = parse_file(file)?;
-    let mut label_map: HashMap<&str, VId> = HashMap::new();
+    let mut label_map: HashMap<&str, Vertex> = HashMap::new();
     let mut res = PlaneBoundary::new();
 
     // two passes, first one gets nodes and gets labels / vids
@@ -70,10 +71,10 @@ pub fn bbnd_to_bounds(file: &str) -> Result<PlaneBoundary, FileError> {
                 vertex_labels.push(l);
             }
 
-            let vids = res.store_polygon(&vertex_points);
-            for (&l, vid) in vertex_labels.iter().zip(vids) {
+            let vertices = res.store_polygon(&vertex_points);
+            for (&l, vertex) in vertex_labels.iter().zip(vertices) {
                 if let Some(label) = l {
-                    label_map.insert(label, vid);
+                    label_map.insert(label, vertex);
                 }
             }
         }
@@ -90,22 +91,22 @@ pub fn bbnd_to_bounds(file: &str) -> Result<PlaneBoundary, FileError> {
                 res.set_material(x);
             }
             ParseItem::DistForce(a, b, x, y) => {
-                let a_vid = label_map
+                let a_vertex = label_map
                     .get(&a)
                     .ok_or_else(|| FileError::parse("invalid vertex label"))?;
-                let b_vid = label_map
+                let b_vertex = label_map
                     .get(&b)
                     .ok_or_else(|| FileError::parse("invalid vertex label"))?;
-                res.store_distributed_force(*a_vid, *b_vid, (x, y).into());
+                res.store_distributed_force(*a_vertex, *b_vertex, (x, y).into());
             }
             ParseItem::DistConstraint(a, b, c) => {
-                let a_vid = label_map
+                let a_vertex = label_map
                     .get(&a)
                     .ok_or_else(|| FileError::parse("invalid vertex label"))?;
-                let b_vid = label_map
+                let b_vertex = label_map
                     .get(&b)
                     .ok_or_else(|| FileError::parse("invalid vertex label"))?;
-                res.store_distributed_constraint(*a_vid, *b_vid, c);
+                res.store_distributed_constraint(*a_vertex, *b_vertex, c);
             }
         }
     }

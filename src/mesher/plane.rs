@@ -4,33 +4,30 @@ use std::convert::{From, Into, TryInto};
 use std::hash::{Hash, Hasher};
 
 use crate::element::{ElementAssemblage, ElementDescriptor, NodeId};
-use crate::spatial::predicates::{self, Orient};
-use crate::spatial::Point;
+use crate::spatial::predicates::{self};
 use crate::visual::Visualizer;
 
 use super::bounds::{self, PlaneBoundary, Segment};
-use super::MeshError;
+use super::{MeshError, Vertex};
 
-// enum for vertex indices
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum VId {
-    Real(usize),
-    Bound(bounds::VId),
-}
-
-impl From<bounds::VId> for VId {
-    fn from(id: bounds::VId) -> Self {
-        VId::Bound(id)
-    }
-}
+use spacemath::two::Point;
+use spacemath::Orient;
 
 // structs for ordered pairs / triplets of vertex indices
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct Triangle(VId, VId, VId);
+struct Triangle(Vertex, Vertex, Vertex);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct Edge(VId, VId);
+struct Edge(Vertex, Vertex);
 
 impl Triangle {
+    fn get(self) -> (Point, Point, Point) {
+        (self.0.get(), self.1.get(), self.2.get())
+    }
+
+    fn perturbed(self) -> (Point, Point, Point) {
+        (self.0.perturbed(), self.1.perturbed(), self.2.perturbed())
+    }
+
     fn edges(self) -> [Edge; 3] {
         [
             Edge(self.0, self.1),
@@ -60,8 +57,8 @@ impl Triangle {
     }
 }
 
-impl From<(VId, VId, VId)> for Triangle {
-    fn from(t: (VId, VId, VId)) -> Triangle {
+impl From<(Vertex, Vertex, Vertex)> for Triangle {
+    fn from(t: (Vertex, Vertex, Vertex)) -> Triangle {
         Triangle(t.0, t.1, t.2)
     }
 }
@@ -72,8 +69,8 @@ impl Edge {
     }
 }
 
-impl From<(VId, VId)> for Edge {
-    fn from(e: (VId, VId)) -> Edge {
+impl From<(Vertex, Vertex)> for Edge {
+    fn from(e: (Vertex, Vertex)) -> Edge {
         Edge(e.0, e.1)
     }
 }
@@ -84,23 +81,22 @@ impl From<Segment> for Edge {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct PlaneTriangulation {
     // mesh bounds structure
     pub bound: PlaneBoundary,
 
-    // vector of vertex locations
-    vertices: Vec<(f64, f64)>,
+    vertices: Vec<Vertex>,
 
     // map with three entries per triangle for fast lookup
-    tris: HashMap<Edge, VId>,
+    tris: HashMap<Edge, Vertex>,
 
     // map storing one copy of each triangle
     // plus the triangle's circumradius for fast lookup
     full_tris: HashMap<Triangle, f64>,
 
     // record of coappearing vertices in recently added triangles
-    recents: HashMap<VId, VId>,
+    recents: HashMap<Vertex, Vertex>,
 }
 
 impl PlaneTriangulation {
@@ -115,96 +111,49 @@ impl PlaneTriangulation {
         }
     }
 
-    fn store_vertex<T: TryInto<(f64, f64)>>(&mut self, p: T) -> VId {
-        // store a new vertex, returning its index
-        if let Ok((x, y)) = p.try_into() {
-            self.vertices.push((x, y));
-            VId::Real(self.vertices.len() - 1)
-        } else {
-            panic!("bad vertex input");
-        }
+    fn store_vertex<T: Into<Point>>(&mut self, p: T) -> Vertex {
+        let res = Vertex::new(p.into());
+        self.vertices.push(res);
+        res
     }
 
     fn vertex_count(&self) -> usize {
         self.vertices.len()
     }
 
-    fn get(&self, v: VId) -> Option<(f64, f64)> {
-        // retrieve a vertex
-        match v {
-            VId::Real(i) => self.vertices.get(i).cloned(),
-            VId::Bound(i) => self.bound.get(i),
-        }
+    fn all_vertices(&self) -> impl Iterator<Item = &'_ Vertex> {
+        self.vertices.iter().chain(self.bound.all_vertices())
     }
 
-    fn get_perturbed(&self, v: VId) -> Option<(f64, f64)> {
-        // retrieve a vertex, perturbing it slightly using a hash of the VId
-        // TODO confirm this is sound
-        const MAX_PERTURB: f64 = 1e-9;
-        let mut hasher = DefaultHasher::new();
-        v.hash(&mut hasher);
-        let perturb = (hasher.finish() as f64 / u64::MAX as f64) * MAX_PERTURB;
-
-        self.get(v).map(|(x, y)| (x + perturb, y + perturb))
-    }
-
-    fn all_vid(&self) -> impl Iterator<Item = VId> {
-        // return an iterator over all VIds
-        (0..self.vertices.len())
-            .map(VId::Real)
-            .chain(self.bound.all_vid().map(VId::Bound))
-    }
-
-    fn get_triangle_points(&self, tri: Triangle) -> Option<(Point, Point, Point)> {
-        // retrieve a triangle as a tuple of Points
-        let Triangle(u, v, w) = tri;
-        Some((
-            self.get(u).unwrap().into(),
-            self.get(v).unwrap().into(),
-            self.get(w).unwrap().into(),
-        ))
-    }
-
-    fn get_triangle_points_perturbed(&self, tri: Triangle) -> Option<(Point, Point, Point)> {
-        let Triangle(u, v, w) = tri;
-        Some((
-            self.get_perturbed(u).unwrap().into(),
-            self.get_perturbed(v).unwrap().into(),
-            self.get_perturbed(w).unwrap().into(),
-        ))
-    }
-
-    fn in_circle<T: Into<Triangle>>(&self, tri: T, x: VId, perturb: bool) -> bool {
+    fn in_circle<T: Into<Triangle>>(&self, tri: T, x: Vertex, perturb: bool) -> bool {
         // determine whether x lies in the oriented triangle tri's circumcircle
         // perturb determines whether or not to perturb the inputs (which helps avoid chew edge cases)
-        let tri = tri.into();
-
-        // don't check tri for positivity, important that negative triangles return inverse results
-        if perturb {
-            predicates::in_circle(
-                self.get_perturbed(x).expect("nonexistent vid").into(),
-                self.get_triangle_points_perturbed(tri).unwrap(),
-            )
+        let (x, tri) = if perturb {
+            (x.perturbed(), tri.into().perturbed())
         } else {
-            predicates::in_circle(
-                self.get(x).expect("nonexistent vid").into(),
-                self.get_triangle_points(tri).unwrap(),
-            )
-        }
+            (x.get(), tri.into().get())
+        };
+
+        let x = x.into();
+        let (a, b, c) = tri;
+        let abc = (a.into(), b.into(), c.into()); // conversion spacemath->spatial TODO remove this
+
+        predicates::in_circle(x, abc)
     }
 
-    fn triangle_dir<T: Into<Triangle>>(&self, tri: T) -> Option<Orient> {
+    fn triangle_dir<T: Into<Triangle>>(&self, tri: T) -> Orient {
         // determine the orientation of a triangle
-        self.get_triangle_points(tri.into())
-            .map(predicates::triangle_dir)
+        // TODO pull out of this method
+        let tri: spacemath::two::Triangle = tri.into().get().into();
+        tri.dir()
     }
 
-    fn to_left<E: Into<Edge>>(&self, e: E, p: VId) -> bool {
+    fn to_left<E: Into<Edge>>(&self, e: E, p: Vertex) -> bool {
         // determine whether p is to the left of ('in front of') e
         // in constrast to triangle_dir, this properly handles ghost points
         // TODO make sure this is in fact the right ghost handling
         let e = e.into();
-        self.triangle_dir((e.0, e.1, p)) == Some(Orient::Positive)
+        self.triangle_dir((e.0, e.1, p)) == Orient::Positive
     }
 
     fn add_triangle<T: Into<Triangle>>(&mut self, tri: T) -> Result<(), MeshError> {
@@ -212,7 +161,7 @@ impl PlaneTriangulation {
         // only one of the vertices may be a ghost vertex
         // if no vertices are ghosts, as a sanity check ensure the triangle is positive
         let tri = tri.into();
-        if self.triangle_dir(tri) != Some(Orient::Positive) {
+        if self.triangle_dir(tri) != Orient::Positive {
             return Err(MeshError::triangle("negative triangle addition requested"));
         }
 
@@ -227,7 +176,8 @@ impl PlaneTriangulation {
         self.tris.insert(edges[1], tri.0);
         self.tris.insert(edges[2], tri.1);
 
-        let cr = self.circumradius(tri).unwrap();
+        let tri_temp: spacemath::two::Triangle = tri.get().into(); // TODO clean up this path
+        let cr = tri_temp.circumradius();
         self.full_tris.insert(tri, cr);
 
         // add to the recent co-appearing points map for later adjacent_one use
@@ -262,13 +212,13 @@ impl PlaneTriangulation {
         }
     }
 
-    fn adjacent<E: Into<Edge>>(&self, e: E) -> Option<VId> {
+    fn adjacent<E: Into<Edge>>(&self, e: E) -> Option<Vertex> {
         // return Some(w) if the positively oriented uvw exists
         self.tris.get(&e.into()).cloned()
     }
 
     #[allow(dead_code)]
-    fn adjacent_one(&self, u: VId) -> Option<Edge> {
+    fn adjacent_one(&self, u: Vertex) -> Option<Edge> {
         // return an arbitrary triangle including u, if one exists
         // if u has been part of a recent triangle, return it
         if let Some(v) = self.recents.get(&u).cloned() {
@@ -282,8 +232,7 @@ impl PlaneTriangulation {
         }
 
         // otherwise, search everything
-        for i in 0..self.vertex_count() {
-            let v = VId::Real(i);
+        for v in self.all_vertices().cloned() {
             let e = Edge(u, v);
             if let Some(w) = self.tris.get(&e).cloned() {
                 return Some((v, w).into());
@@ -296,74 +245,58 @@ impl PlaneTriangulation {
         None
     }
 
-    fn midpoint_visible<E: Into<Edge>>(&self, e: E, v: VId) -> bool {
+    fn midpoint_visible<E: Into<Edge>>(&self, e: E, v: Vertex) -> bool {
         // determine whether the midpoint of e is visible from v
         const TOLERANCE: f64 = 1e-6;
 
         let e = e.into();
-        if let (Some(p), Some(q), Some(x)) = (self.get(e.0), self.get(e.1), self.get(v)) {
-            let p: Point = p.into();
-            let q: Point = q.into();
-            let m = p.mid(q); // midpoint
-            let x: Point = x.into();
+        let (p, q, x) = (e.0.get(), e.1.get(), v.get());
+        let m = p.mid(q); // midpoint
 
-            // check if any wall obstructs mx
-            // make sure to skip walls which m or x contact
-            // this was previously done by checking if e.0 or e.1 are wall endpoints
-            // now that only base walls are checked, a spatial predicate is used
-            for wall in self.bound.all_base_walls() {
-                if let Some((a, b)) = self.bound.get_segment_points(wall) {
-                    if predicates::segments_intersect((a, b), (m, x)) {
-                        // if m or x contact
-                        if !(predicates::lies_on((a, b), m, TOLERANCE)
-                            || predicates::lies_on((a, b), x, TOLERANCE))
-                        {
-                            return false;
-                        }
-                    }
+        // check if any wall obstructs mx
+        // make sure to skip walls which m or x contact
+        // this was previously done by checking if e.0 or e.1 are wall endpoints
+        // now that only base walls are checked, a spatial predicate is used
+        for wall in self.bound.all_base_walls() {
+            let (a, b) = wall.get();
+            let (a, b) = (a.into(), b.into()); // TODO remove the predicate stuff
+            let (m, x) = (m.into(), x.into()); // here too
+
+            if predicates::segments_intersect((a, b), (m, x)) {
+                // if m or x contact
+                if !(predicates::lies_on((a, b), m, TOLERANCE)
+                    || predicates::lies_on((a, b), x, TOLERANCE))
+                {
+                    return false;
                 }
             }
-
-            true
-        } else {
-            // default false, TODO make sure this makes sense
-            false
         }
-    }
 
-    fn circumradius<T: Into<Triangle>>(&self, tri: T) -> Option<f64> {
-        // determine the circumradius of the given triangle
-        // if triangle is a ghost etc. returns None
-        let tri = tri.into();
-        self.get_triangle_points(tri).map(predicates::circumradius)
+        true
     }
 
     fn circumcenter<T: Into<Triangle>>(&self, tri: T) -> Option<Point> {
         // find the circumcenter of a given triangle
         // if the triangle is a ghost or degenerate, returns None
-        let tri = tri.into();
-        if let Some(tri_points) = self.get_triangle_points(tri) {
-            predicates::circumcenter(tri_points)
-        } else {
-            None
-        }
+        let tri = tri.into().get();
+        predicates::circumcenter((tri.0.into(), tri.1.into(), tri.2.into())).map(Into::into)
     }
 
-    fn bowyer_watson_dig(&mut self, u: VId, v: VId, w: VId) {
+    fn bowyer_watson_dig(&mut self, u: Vertex, v: Vertex, w: Vertex) {
         // u is a new vertex
 
         // if wv or vw is a segment, do not cross it; add uvw
-        if let (VId::Bound(a), VId::Bound(b)) = (w, v) {
-            if self.bound.is_segment((a, b)) || self.bound.is_segment((b, a)) {
-                self.add_triangle((u, v, w))
-                    .expect("could not add triangle");
-                return;
-            }
+        // TODO not super efficient check, used to have info on whether v or w was in the bound
+        // now vertices are no longer an enum - worth reimplementing?
+        if self.bound.is_segment((w, v)) || self.bound.is_segment((v, w)) {
+            self.add_triangle((u, v, w))
+                .expect("could not add triangle");
+            return;
         }
 
         // check if uvw is constrained delaunay
         if let Some(x) = self.adjacent((w, v)) {
-            if self.triangle_dir((u, v, w)) == Some(Orient::Negative) {
+            if self.triangle_dir((u, v, w)) == Orient::Negative {
                 // if u is past vw, uvw isn't delaunay - dig further
                 self.delete_triangle((w, v, x))
                     .expect("unreachable - adjacent always returns valid triangles");
@@ -387,7 +320,7 @@ impl PlaneTriangulation {
         }
     }
 
-    fn bowyer_watson_insert<T: Into<Triangle>>(&mut self, u: VId, tri: T) {
+    fn bowyer_watson_insert<T: Into<Triangle>>(&mut self, u: Vertex, tri: T) {
         // insert a vertex into a delaunay triangulation, maintaining the delaunay property
         // tri is a triangle whose cirmcumcircle encloses u
         let Triangle(v, w, x) = tri.into();
@@ -403,7 +336,7 @@ impl PlaneTriangulation {
         // return the triangle and the two new directed edges
 
         let mut tri: Option<Triangle> = None;
-        for v in self.all_vid() {
+        for v in self.all_vertices().copied() {
             // proceed if v is in front of e and tri is either None or encircling
             if self.to_left(e, v) && tri.map_or(true, |t| self.in_circle(t, v, true)) {
                 if self.midpoint_visible(e, v) {
@@ -431,9 +364,9 @@ impl PlaneTriangulation {
             if let Some((tri, a, b)) = self.gift_wrap_finish(e) {
                 if let Err(e) = self.add_triangle(tri) {
                     let mut vis = self.visualize();
-                    if let Some(tp) = self.get_triangle_points(tri) {
-                        vis.add_points(vec![tp.0, tp.1, tp.2], 1);
-                    }
+                    let tp = tri.get();
+                    vis.add_points(vec![tp.0.into(), tp.1.into(), tp.2.into()], 1); // TODO switch visual to spacemath
+
                     vis.draw("err_state.png", ());
                     panic!("error gift-wrapping boundary: {}", e);
                 }
@@ -477,14 +410,28 @@ impl PlaneTriangulation {
         eprintln!("chew mesh generation complete");
     }
 
+    pub fn ruppert_encroached(&self, p: Point, segments: &mut Vec<Segment>) -> bool {
+        // oof this is going to be tough with the current API
+        // adding potentially-invalid nodes to the index is a no go
+        // switch api to: an arena for nodes that returns references, replace Vertex with &Point
+        // then just generate trial Point and pass a &Point along
+
+        segments.clear();
+        // put encroached segments in a Vec to keep allocations light
+
+        false
+    }
+
+    pub fn ruppert_mesh(&mut self) {
+        self.gift_wrap();
+    }
+
     pub fn visualize(&self) -> Visualizer {
-        let vids: Vec<VId> = self.all_vid().collect();
+        let nodes: Vec<Point> = self.all_vertices().map(|x| x.get()).collect();
 
-        let nodes: Vec<Point> = vids.iter().map(|x| self.get(*x).unwrap().into()).collect();
-
-        let idx_map: HashMap<VId, usize> = vids
-            .iter()
-            .cloned()
+        let idx_map: HashMap<Vertex, usize> = self
+            .all_vertices()
+            .copied()
             .enumerate()
             .map(|(x, y)| (y, x))
             .collect();
@@ -523,11 +470,11 @@ impl PlaneTriangulation {
 
         // build vertex list and translation to elas node ids
         let vertex_list: Vec<(f64, f64)>;
-        let vertex_lookup: HashMap<VId, NodeId>;
+        let vertex_lookup: HashMap<Vertex, NodeId>;
 
-        vertex_list = self.all_vid().map(|vid| self.get(vid).unwrap()).collect();
+        vertex_list = self.all_vertices().map(|v| v.get().into()).collect();
         let node_ids = res.add_nodes(&vertex_list);
-        vertex_lookup = self.all_vid().zip(node_ids).collect();
+        vertex_lookup = self.all_vertices().copied().zip(node_ids).collect();
 
         // add all the triangles
 
@@ -545,8 +492,8 @@ impl PlaneTriangulation {
         // pull the various boundary conditions through from bound
 
         for (id, con) in self.bound.all_constraints() {
-            // upgrade the bounds::VId to a VId
-            let id: VId = id.into();
+            // upgrade the bounds::Vertex to a Vertex
+            let id: Vertex = id.into();
             res.add_constraint(*vertex_lookup.get(&id).unwrap(), con);
         }
 
@@ -557,7 +504,7 @@ impl PlaneTriangulation {
             let a = *vertex_lookup.get(&edg.0).unwrap();
             let b = *vertex_lookup.get(&edg.1).unwrap();
 
-            res.add_dist_line_force(a, b, force);
+            res.add_dist_line_force(a, b, force.into());
         }
 
         Ok(res)

@@ -1,5 +1,10 @@
+use std::collections::hash_map::DefaultHasher;
 use std::error;
 use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use spacemath::two::Point;
 
 pub mod bounds;
 pub mod plane;
@@ -24,6 +29,54 @@ impl fmt::Display for MeshError {
 }
 
 impl error::Error for MeshError {}
+
+// plumbing for a vertex with a unique id
+
+static GLOBAL_VERTEX_ID: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Clone, Copy, Debug)]
+pub struct Vertex(usize, Point);
+
+impl PartialEq for Vertex {
+    fn eq(&self, other: &Vertex) -> bool {
+        // just compare the id
+        self.0 == other.0
+    }
+}
+
+impl Eq for Vertex {}
+
+impl Hash for Vertex {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+impl Vertex {
+    fn new(p: Point) -> Self {
+        let id = GLOBAL_VERTEX_ID.fetch_add(1, Ordering::SeqCst); // is this the right ordering? too strict?
+        Self(id, p)
+    }
+
+    fn perturbed(self) -> Point {
+        // apply a perturbation unique to this vertex
+        // for use in avoiding cocircular edge cases in meshing
+
+        const MAX_PERTURB: f64 = 1e-9;
+
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+
+        let perturb = (hasher.finish() as f64 / u64::MAX as f64) * MAX_PERTURB;
+
+        let (x, y) = self.1.into();
+        (x + perturb, y + perturb).into()
+    }
+
+    fn get(self) -> Point {
+        self.1
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -129,21 +182,21 @@ mod tests {
         let has_con = bound
             .all_constraints()
             .into_iter()
-            .map(|(vid, _)| bound.get(vid).unwrap())
-            .any(|x| x == (0.5, 0.0));
+            .map(|(vertex, _)| vertex.get())
+            .any(|x| x == (0.5, 0.0).into());
         assert!(has_con);
 
         // check that a new segment from c to a point at (0.5, 1.0) exists and has a force
         let fwd = bound
             .all_distributed_forces()
             .into_iter()
-            .map(|(s, _)| (s.0, bound.get(s.1).unwrap()))
-            .any(|(sa, sb_val)| sa == c && sb_val == (0.5, 1.0));
+            .map(|(s, _)| (s.0, s.1.get()))
+            .any(|(sa, sb_val)| sa == c && sb_val == (0.5, 1.0).into());
         let rev = bound
             .all_distributed_forces()
             .into_iter()
-            .map(|(s, _)| (s.1, bound.get(s.0).unwrap()))
-            .any(|(sa, sb_val)| sa == c && sb_val == (0.5, 1.0));
+            .map(|(s, _)| (s.1, s.0.get()))
+            .any(|(sa, sb_val)| sa == c && sb_val == (0.5, 1.0).into());
         assert!(fwd || rev);
     }
 }

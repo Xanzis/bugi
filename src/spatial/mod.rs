@@ -188,6 +188,20 @@ impl From<Point> for Vec<f64> {
     }
 }
 
+impl From<spacemath::two::Point> for Point {
+    fn from(x: spacemath::two::Point) -> Self {
+        let x: (f64, f64) = x.into();
+        x.into()
+    }
+}
+
+impl From<Point> for spacemath::two::Point {
+    // should be super temporary
+    fn from(x: Point) -> spacemath::two::Point {
+        (x[0], x[1]).into()
+    }
+}
+
 impl Index<usize> for Point {
     type Output = f64;
     fn index(&self, i: usize) -> &Self::Output {
