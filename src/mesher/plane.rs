@@ -9,7 +9,7 @@ use crate::visual::Visualizer;
 use super::bounds::{PlaneBoundary, Segment};
 use super::{MeshError, Vertex};
 
-use spacemath::two::{dist::Dist, intersect::Intersect, Point};
+use spacemath::two::{dist::Dist, Point};
 use spacemath::Orient;
 
 // structs for ordered pairs / triplets of vertex indices
@@ -120,10 +120,6 @@ impl PlaneTriangulation {
         let res = Vertex::new(p.into());
         self.vertices.push(res);
         res
-    }
-
-    fn vertex_count(&self) -> usize {
-        self.vertices.len()
     }
 
     fn all_vertices(&self) -> impl Iterator<Item = &'_ Vertex> {

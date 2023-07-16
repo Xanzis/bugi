@@ -11,20 +11,6 @@ pub enum Orient {
     Zero,
 }
 
-pub fn triangle_dir(tri: (Point, Point, Point)) -> Orient {
-    // return whether the triangle (p, q, r) turns counterclockwise
-    // postive is natural (ccw), negative is cw
-    let (p, q, r) = tri;
-    let val = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1]);
-    if val == 0.0 {
-        Orient::Zero
-    } else if val > 0.0 {
-        Orient::Negative
-    } else {
-        Orient::Positive
-    }
-}
-
 #[allow(dead_code)]
 pub fn tetrahedron_dir(tet: (Point, Point, Point, Point)) -> Orient {
     // return the orientation of a tetrahedron
@@ -155,43 +141,6 @@ pub fn in_sphere(p: Point, tet: (Point, Point, Point, Point)) -> bool {
     } else {
         false
     }
-}
-
-fn on_segment(seg: (Point, Point), q: Point) -> bool {
-    // given colinear, 2D p q and r, find if q lies on pr (seg)
-    let (p, r) = seg;
-    q[0] <= p[0].max(r[0])
-        && q[0] >= p[0].min(r[0])
-        && q[1] <= p[1].max(r[1])
-        && q[1] >= p[1].min(r[1])
-}
-
-pub fn segments_intersect(a: (Point, Point), b: (Point, Point)) -> bool {
-    // test whether line segments a and b intersect
-    let l = triangle_dir((a.0, a.1, b.0));
-    let m = triangle_dir((a.0, a.1, b.1));
-    let n = triangle_dir((b.0, b.1, a.0));
-    let o = triangle_dir((b.0, b.1, a.1));
-
-    ((l != m) && (n != o))
-        || (l == Orient::Zero && on_segment(a, b.0))
-        || (m == Orient::Zero && on_segment(a, b.1))
-        || (n == Orient::Zero && on_segment(b, a.0))
-        || (o == Orient::Zero && on_segment(b, a.1))
-}
-
-pub fn lies_on(seg: (Point, Point), r: Point, tol: f64) -> bool {
-    // test whether r lies on seg (pq) to within tol
-    let (p, q) = seg;
-
-    let seg_len = p.dist(q);
-
-    let pq_unit = (q - p).unit();
-    let pr_vec = r - p;
-
-    let dot = pq_unit.dot(pr_vec);
-
-    (-tol..(seg_len + tol)).contains(&dot) && (pq_unit * dot).dist(pr_vec) <= tol
 }
 
 // a line, represented as ax + by = c

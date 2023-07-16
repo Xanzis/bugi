@@ -4,7 +4,6 @@ use std::error;
 use std::fmt;
 use std::ops::{Add, Index, IndexMut, Mul, Sub};
 
-pub mod hull;
 pub mod predicates;
 
 #[derive(Debug)]
@@ -308,31 +307,6 @@ mod tests {
     }
 
     #[test]
-    fn orientation() {
-        use super::predicates;
-        use super::predicates::Orient;
-        let a = Point::new(&[-1.0, -0.3]);
-        let b = Point::new(&[-0.5, 3.0]);
-        let c = Point::new(&[10.0, -0.2]);
-        assert_eq!(predicates::triangle_dir((a, b, c)), Orient::Negative);
-        assert_eq!(predicates::triangle_dir((b, a, c)), Orient::Positive);
-        assert_eq!(predicates::triangle_dir((c, b, a)), Orient::Positive);
-    }
-
-    #[test]
-    fn simple_hull() {
-        use super::hull;
-        let points = vec![
-            Point::new(&[0.0, 2.0]),
-            Point::new(&[3.0, 3.0]),
-            Point::new(&[2.0, 1.0]),
-            Point::new(&[1.0, 0.0]),
-            Point::new(&[5.0, 0.0]),
-        ];
-        assert_eq!(hull::jarvis_hull(&points), vec![0, 3, 4, 1]);
-    }
-
-    #[test]
     fn point_arithmetic() {
         let p = Point::new(&[-1.0, 5.0]);
         assert_eq!(p - Point::new(&[1.0, 2.0]), Point::new(&[-2.0, 3.0]));
@@ -370,24 +344,6 @@ mod tests {
     }
 
     #[test]
-    fn intersections() {
-        use super::predicates;
-
-        let p = (1.0, 1.0).into();
-        let q = (4.0, 1.0).into();
-        let r = (2.5, 0.2).into();
-        let s = (1.5, 5.0).into();
-
-        assert!(predicates::segments_intersect((p, q), (r, s)));
-
-        let t = (3.0, 1.0).into();
-        let u = (2.5, 4.0).into();
-
-        assert!(predicates::segments_intersect((p, q), (t, u)));
-        assert!(!predicates::segments_intersect((r, s), (t, u)))
-    }
-
-    #[test]
     fn unit() {
         let p: Point = (5.0, 0.0).into();
         assert_eq!(p.unit(), Point::new(&[1.0, 0.0]));
@@ -406,18 +362,5 @@ mod tests {
                 .dist((1.5, 2.0).into())
                 < 1e-10
         )
-    }
-
-    #[test]
-    fn lies_on() {
-        use super::predicates;
-
-        let seg = ((2.0, 3.0).into(), (4.0, 6.0).into());
-
-        assert!(!predicates::lies_on(seg, (1.0, 1.5).into(), 0.001));
-        assert!(!predicates::lies_on(seg, (5.0, 7.5).into(), 0.001));
-        assert!(!predicates::lies_on(seg, (3.0, 4.6).into(), 0.001));
-
-        assert!(predicates::lies_on(seg, (3.0, 4.5001).into(), 0.001));
     }
 }
