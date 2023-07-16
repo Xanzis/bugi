@@ -9,7 +9,7 @@ use super::Vertex;
 
 use spacemath::two::dist::Dist;
 use spacemath::two::intersect::Intersect;
-use spacemath::two::Point;
+use spacemath::two::{Circle, Point};
 
 // a directed boundary segment
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -32,6 +32,18 @@ impl Segment {
 
     pub fn get(self) -> (Point, Point) {
         (self.0.get(), self.1.get())
+    }
+
+    pub fn mid(self) -> Point {
+        self.0.get().mid(self.1.get())
+    }
+
+    pub fn len(self) -> f64 {
+        self.0.get().dist(self.1.get())
+    }
+
+    pub fn diametral(self) -> Circle {
+        Circle::new(self.mid(), self.len() / 2.0)
     }
 }
 
@@ -131,6 +143,8 @@ pub struct PlaneBoundary {
     // storage for undivided walls (for cheaper visibility tests)
     base_wall_starts: Vec<Vertex>,
     base_seg_map: HashMap<Vertex, Vertex>,
+
+    // in_diametral_map: HashMap<Segment, >
 
     // also store some BC / material information
     thickness: Option<f64>,
@@ -272,6 +286,33 @@ impl PlaneBoundary {
         false
     }
 
+    pub fn midpoint_visible(&self, s: Segment, x: Vertex) -> bool {
+        // determine whether the midpoint of s is visible from v
+        const TOLERANCE: f64 = 1e-6;
+
+        let (p, q) = s.get();
+        let m = p.mid(q); // midpoint
+
+        // check if any wall obstructs mx
+        // make sure to skip walls which m or x contact
+        // this was previously done by checking if e.0 or e.1 are wall endpoints
+        // now that only base walls are checked, a spatial predicate is used
+        for wall in self.all_base_walls() {
+            let (a, b) = wall.get();
+            let x = x.get();
+            let ab = spacemath::two::Segment::new(a, b);
+            let mx = spacemath::two::Segment::new(m, x);
+            if ab.intersects(&mx).is_nonzero() {
+                if !((ab.dist(m) < TOLERANCE) || (ab.dist(x) < TOLERANCE)) {
+                    // if they intersect and neither m nor x lie on ab
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
     pub fn store_polygon<T>(&mut self, poly: &[T]) -> Vec<Vertex>
     where
         T: Into<Point> + Copy,
@@ -379,7 +420,7 @@ impl PlaneBoundary {
         }
     }
 
-    pub fn split_segment(&mut self, s: Segment) -> (Segment, Segment) {
+    pub fn split_segment(&mut self, s: Segment) -> (Segment, Segment, Vertex) {
         // split a segment in two, storing the result and also returning it for later use
         assert!(self.is_segment(s));
         let Segment(a, b) = s; // points
@@ -414,7 +455,7 @@ impl PlaneBoundary {
             self.distributed_forces.insert((m, b).into(), f);
         }
 
-        ((a, m).into(), (m, b).into())
+        ((a, m).into(), (m, b).into(), m)
     }
 
     pub fn divide_all_segments(&mut self, h: f64) {

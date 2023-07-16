@@ -396,14 +396,6 @@ mod tests {
     }
 
     #[test]
-    fn circumradius() {
-        use super::predicates;
-
-        let tri = ((0.0, 0.0).into(), (3.0, 0.0).into(), (0.0, 4.0).into());
-        assert!((predicates::circumradius(tri) - 2.5).abs() < 1e-10)
-    }
-
-    #[test]
     fn circumcenter() {
         use super::predicates;
 

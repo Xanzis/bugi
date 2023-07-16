@@ -2,7 +2,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::error;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use spacemath::two::Point;
 
@@ -32,10 +32,10 @@ impl error::Error for MeshError {}
 
 // plumbing for a vertex with a unique id
 
-static GLOBAL_VERTEX_ID: AtomicUsize = AtomicUsize::new(0);
+static GLOBAL_VERTEX_ID: AtomicU32 = AtomicU32::new(0);
 
 #[derive(Clone, Copy, Debug)]
-pub struct Vertex(usize, Point);
+pub struct Vertex(u32, Point);
 
 impl PartialEq for Vertex {
     fn eq(&self, other: &Vertex) -> bool {

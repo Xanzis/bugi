@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
+use std::time::Instant;
 
 use crate::element::{ElementAssemblage, ElementDescriptor, NodeId};
 use crate::spatial::predicates::{self};
@@ -8,7 +9,7 @@ use crate::visual::Visualizer;
 use super::bounds::{PlaneBoundary, Segment};
 use super::{MeshError, Vertex};
 
-use spacemath::two::{dist::Dist, Point};
+use spacemath::two::{dist::Dist, intersect::Intersect, Point};
 use spacemath::Orient;
 
 // structs for ordered pairs / triplets of vertex indices
@@ -75,7 +76,13 @@ impl From<(Vertex, Vertex)> for Edge {
 
 impl From<Segment> for Edge {
     fn from(s: Segment) -> Edge {
-        Edge(s.0.into(), s.1.into())
+        Edge(s.0, s.1)
+    }
+}
+
+impl From<Edge> for Segment {
+    fn from(e: Edge) -> Segment {
+        Segment(e.0, e.1) // TODO, clear up this namespace and consolidate
     }
 }
 
@@ -243,36 +250,6 @@ impl PlaneTriangulation {
         None
     }
 
-    fn midpoint_visible<E: Into<Edge>>(&self, e: E, x: Vertex) -> bool {
-        // determine whether the midpoint of e is visible from v
-        const TOLERANCE: f64 = 1e-6;
-
-        let e = e.into();
-        let (p, q) = (e.0.get(), e.1.get());
-        let m = p.mid(q); // midpoint
-
-        // check if any wall obstructs mx
-        // make sure to skip walls which m or x contact
-        // this was previously done by checking if e.0 or e.1 are wall endpoints
-        // now that only base walls are checked, a spatial predicate is used
-        for wall in self.bound.all_base_walls() {
-            let (a, b) = wall.get();
-            let (a, b) = (a.into(), b.into()); // TODO remove the predicate stuff
-            let (m, x) = (m.into(), x.get().into()); // here too
-
-            if predicates::segments_intersect((a, b), (m, x)) {
-                // if m or x contact
-                if !(predicates::lies_on((a, b), m, TOLERANCE)
-                    || predicates::lies_on((a, b), x, TOLERANCE))
-                {
-                    return false;
-                }
-            }
-        }
-
-        true
-    }
-
     fn circumcenter<T: Into<Triangle>>(&self, tri: T) -> Option<Point> {
         // find the circumcenter of a given triangle
         // if the triangle is a ghost or degenerate, returns None
@@ -338,7 +315,7 @@ impl PlaneTriangulation {
         for v in self.all_vertices().copied() {
             // proceed if v is in front of e and tri is either None or encircling
             if self.to_left(e, v) && tri.map_or(true, |t| self.in_circle(t, v, true)) {
-                if self.midpoint_visible(e, v) {
+                if self.bound.midpoint_visible(e.into(), v) {
                     tri = Some((e.0, e.1, v).into());
                 }
             }
@@ -423,10 +400,9 @@ impl PlaneTriangulation {
 
     // maybe move some of these methods to bounds
     fn ruppert_encroaches(&self, p: Vertex, s: Segment) -> bool {
-        if !self.midpoint_visible((s.0, s.1), p) {
-            // TODO clean up conversions to make this prettier
-            return false;
-        }
+        // check if s is encroached by p by the rules of ruppert meshing
+        // putting the visibility check (expensive) after the distance check (cheap)
+        // made this way faster, if still too slow implement better visibility check
 
         if s.has(p) {
             return false; // a segment is not encroached by its own end points
@@ -437,12 +413,16 @@ impl PlaneTriangulation {
         let mid = a.mid(b);
         let rad = mid.dist(a);
 
-        mid.dist(p.get()) <= rad
+        if mid.dist(p.get()) > rad {
+            return false;
+        }
+
+        self.bound.midpoint_visible(s, p)
     }
 
-    fn ruppert_split_segment(&mut self, s: Segment) -> (Segment, Segment) {
+    fn ruppert_split_segment(&mut self, s: Segment) -> (Segment, Segment, Vertex) {
         // split a bounding segment, using the bowyer-watson algorithm to maintain the delauney property
-        // return the child segments
+        // return the child segments and the newly created vertex
 
         let x = self
             .adjacent(s)
@@ -450,30 +430,43 @@ impl PlaneTriangulation {
         let Segment(v, w) = s;
         self.delete_triangle((v, w, x));
 
-        let (child_a, child_b) = self.bound.split_segment(s);
+        let (child_a, child_b, new_v) = self.bound.split_segment(s);
         let u = child_a.1;
 
         // now it's just like the bowyer_watson insert, but we don't dig through the segment we split
         self.bowyer_watson_dig(u, w, x);
         self.bowyer_watson_dig(u, x, v);
 
-        (child_a, child_b)
+        (child_a, child_b, new_v)
     }
 
-    fn split_while_encroached(&mut self, p: Vertex, mut to_split: Vec<Segment>) {
+    fn ruppert_split_many(
+        &mut self,
+        p: Vertex,
+        mut to_split: Vec<Segment>,
+        recursive: bool,
+    ) -> Vec<Vertex> {
         // split the provided segments while their children are still encroached
-        // the initial split list is assumed to be known to be encroached
+        // if recursive flag is set, split the children too
+        // return the newly generated vertices
+        let mut res = Vec::new();
 
         while let Some(s) = to_split.pop() {
-            let (child_a, child_b) = self.ruppert_split_segment(s);
+            let (child_a, child_b, new_v) = self.ruppert_split_segment(s);
 
-            if self.ruppert_encroaches(p, child_a) {
-                to_split.push(child_a);
+            if recursive {
+                if self.ruppert_encroaches(p, child_a) {
+                    to_split.push(child_a);
+                }
+                if self.ruppert_encroaches(p, child_b) {
+                    to_split.push(child_b);
+                }
             }
-            if self.ruppert_encroaches(p, child_b) {
-                to_split.push(child_b);
-            }
+
+            res.push(new_v);
         }
+
+        res
     }
 
     fn segments_encroached_by(&self, p: Vertex) -> Option<Vec<Segment>> {
@@ -492,16 +485,26 @@ impl PlaneTriangulation {
     }
 
     pub fn ruppert_mesh(&mut self, max_size: f64) {
+        eprintln!("beginning ruppert mesh generation ...");
+        eprint!("triangulating initial boundary ... ");
+        let ti = Instant::now();
         self.gift_wrap();
+        eprintln!("done in {}ms", ti.elapsed().as_millis());
 
         // first, split all the walls that are already encroached by boundary vertices
-        loop {
-            let Some((p, to_split)) = self.bound.all_vertices().find_map(|&p| self.segments_encroached_by(p).map(|segs| (p, segs))) else {
-                break
-            };
-            self.split_while_encroached(p, to_split);
+        eprint!("splitting walls ... ");
+        let ti = Instant::now();
+        let mut to_check: Vec<Vertex> = self.bound.all_vertices().copied().collect();
+        while let Some(v) = to_check.pop() {
+            if let Some(segs) = self.segments_encroached_by(v) {
+                let new_vs = self.ruppert_split_many(v, segs, true);
+                to_check.extend(new_vs);
+            }
         }
+        eprintln!("done in {}ms", ti.elapsed().as_millis());
 
+        eprint!("refining mesh ... ");
+        let ti = Instant::now();
         // now, perform the ruppert refinement steps
         let b = 1.415; // minimum skinny triangle ratio for proof of termination
         while let Some(tri) = self.skinny_triangle(b, max_size) {
@@ -509,12 +512,13 @@ impl PlaneTriangulation {
             let center = Vertex::new(center); // ok to do this outside of storage
 
             if let Some(segs) = self.segments_encroached_by(center) {
-                self.split_while_encroached(center, segs);
+                self.ruppert_split_many(center, segs, false);
             } else {
                 let center_id = self.store_vertex(center.get()); // this'll spin a new id, but that doesn't matter
                 self.bowyer_watson_insert(center_id, tri);
             }
         }
+        eprintln!("done in {}ms", ti.elapsed().as_millis());
     }
 
     pub fn visualize(&self) -> Visualizer {
