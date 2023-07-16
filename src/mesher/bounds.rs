@@ -484,7 +484,20 @@ impl PlaneBoundary {
     }
 
     pub fn all_constraints(&self) -> Vec<(Vertex, Constraint)> {
-        self.constraints.iter().map(|(&v, &c)| (v, c)).collect()
+        // include the vertices of distributed constraints
+
+        let mut res: HashMap<Vertex, Constraint> = HashMap::new();
+
+        for (v, c) in self.constraints.iter() {
+            res.insert(*v, *c);
+        }
+
+        for (s, c) in self.distributed_constraints.iter() {
+            res.insert(s.0, *c);
+            res.insert(s.1, *c); // will just overwrite any duplicates
+        }
+
+        res.into_iter().collect()
     }
 
     pub fn visualize(&self) -> Visualizer {
