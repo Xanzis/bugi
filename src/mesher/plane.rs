@@ -307,12 +307,28 @@ impl PlaneTriangulation {
         // finish a triangle from a directed edge
         // return the triangle and the two new directed edges
 
+        // gift wrapping almost never crosses segments, so it's much cheaper to run the
+        // search without visibility checks and just run again if a segment is crossed
         let mut tri: Option<Triangle> = None;
         for v in self.all_vertices().copied() {
             // proceed if v is in front of e and tri is either None or encircling
             if self.to_left(e, v) && tri.map_or(true, |t| self.in_circle(t, v, true)) {
-                if self.bound.midpoint_visible(e.into(), v) {
-                    tri = Some((e.0, e.1, v).into());
+                tri = Some((e.0, e.1, v).into());
+            }
+        }
+
+        let candidate_node = tri?.2; // return if no triangle was found
+
+        // check if the candidate node is occluded; if so rerun with visibility checks
+        if !self.bound.midpoint_visible(e.into(), candidate_node) {
+            // run the whole thing again, but with visibility checks
+            tri = None;
+            for v in self.all_vertices().copied() {
+                // proceed if v is in front of e and tri is either None or encircling
+                if self.to_left(e, v) && tri.map_or(true, |t| self.in_circle(t, v, true)) {
+                    if self.bound.midpoint_visible(e.into(), v) {
+                        tri = Some((e.0, e.1, v).into());
+                    }
                 }
             }
         }
