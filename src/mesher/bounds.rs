@@ -248,6 +248,10 @@ impl PlaneBoundary {
 
         self.seg_map.remove(&s.0);
         self.seg_set.remove(&s);
+
+        // should probably also remove any associated forces / constraints
+        self.distributed_forces.remove(&s);
+        self.distributed_constraints.remove(&s);
     }
 
     fn store_segment_unchecked<S: Into<Segment>>(&mut self, s: S) {
@@ -445,9 +449,8 @@ impl PlaneBoundary {
         self.store_segment_unchecked((m, b));
 
         if let Some(c) = dist_c {
-            self.constraints.insert(a, c);
-            self.constraints.insert(m, c);
-            self.constraints.insert(b, c);
+            self.distributed_constraints.insert((a, m).into(), c);
+            self.distributed_constraints.insert((m, b).into(), c);
         }
 
         if let Some(f) = dist_f {
