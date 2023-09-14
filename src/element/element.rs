@@ -287,12 +287,10 @@ impl Element {
         // divide by natural segment length, multiply by real length
 
         let nat_len = a.dist(b);
-        dbg!(nat_len);
 
         let a_real = self.node(edge.0).unwrap();
         let b_real = self.node(edge.1).unwrap();
         let real_len = a_real.dist(b_real);
-        dbg!(real_len);
 
         res *= real_len / nat_len;
         // TODO dumb allocation
