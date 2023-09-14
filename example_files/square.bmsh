@@ -28,8 +28,9 @@ count 2
 # ew this is kind of gross should fix
 $EndConstraints
 $Forces
-count 1
-1 1e7/0.0
+count 2
+0 0.0/0.5e7
+1 0.0/0.5e7
 $EndForces
 $DistForces
 count 0
