@@ -300,6 +300,23 @@ impl AddAssign<f64> for LinearMatrix {
     }
 }
 
+impl AddAssign<Self> for LinearMatrix {
+    fn add_assign(&mut self, other: Self) {
+        if self.dims != other.dims {
+            panic!("incompatible shapes")
+        }
+
+        if self.row_maj == other.row_maj {
+            self.data
+                .iter_mut()
+                .zip(other.data)
+                .for_each(|(x, y)| x.add_assign(y));
+        } else {
+            self.add_ass(&other);
+        }
+    }
+}
+
 impl MulAssign<f64> for LinearMatrix {
     fn mul_assign(&mut self, other: f64) {
         self.data.iter_mut().for_each(|x| *x *= other);
