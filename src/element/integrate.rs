@@ -61,7 +61,7 @@ where
     res += func((GAUSS_TRI_R_2, GAUSS_TRI_S_2).into());
     res += func((GAUSS_TRI_R_3, GAUSS_TRI_S_3).into());
 
-    res *= 1.0 / 3.0;
+    res *= 1.0 / 6.0; // weight for a triangular integration region
     res
 }
 
