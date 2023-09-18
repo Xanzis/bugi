@@ -14,12 +14,15 @@ use crate::visual::Visualizer;
 use element::Element;
 use loading::Constraint;
 use material::Material;
+use strain::Condition;
 use stress::StressState;
 
 use std::collections::HashMap;
 
 #[cfg(test)]
 mod tests;
+
+const NODE_DIM: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NodeId(usize);
@@ -63,12 +66,10 @@ fn build_element(elas: &ElementAssemblage, desc: ElementDescriptor) -> Element {
 // the big one - primary puclic-facing API for this crate
 #[derive(Debug)]
 pub struct ElementAssemblage {
-    dim: usize,
     nodes: Vec<Point>,
     dofs: usize,
 
-    area: Option<f64>,
-    thickness: Option<f64>,
+    condition: Condition,
     material: Material,
 
     elements: Vec<Element>,
@@ -80,9 +81,8 @@ pub struct ElementAssemblage {
 }
 
 impl ElementAssemblage {
-    pub fn new(dim: usize, mat: Material) -> Self {
+    pub fn new(material: Material, condition: Condition) -> Self {
         ElementAssemblage {
-            dim,
             nodes: Vec::new(),
             elements: Vec::new(),
             constraints: HashMap::new(),
@@ -90,30 +90,13 @@ impl ElementAssemblage {
             line_forces: HashMap::new(),
             dof_lookup: None,
             dofs: 0,
-            area: None,
-            thickness: None,
-            material: mat,
+            condition,
+            material,
         }
     }
 
-    pub fn dim(&self) -> usize {
-        self.dim
-    }
-
-    pub fn thickness(&self) -> Option<f64> {
-        self.thickness
-    }
-
-    pub fn set_thickness(&mut self, thickness: f64) {
-        self.thickness = Some(thickness);
-    }
-
-    pub fn area(&self) -> Option<f64> {
-        self.area
-    }
-
-    pub fn set_area(&mut self, area: f64) {
-        self.area = Some(area)
+    pub fn condition(&self) -> Condition {
+        self.condition
     }
 
     pub fn material(&self) -> Material {
@@ -140,9 +123,6 @@ impl ElementAssemblage {
 
         for n in ns.iter() {
             let p: Point = n.clone().into();
-            if p.dim() != self.dim {
-                panic!("bad node dimension")
-            }
             self.nodes.push(p);
         }
 
@@ -229,7 +209,7 @@ impl ElementAssemblage {
                 // there is a constraint on node p
                 if constraint.is_plain() {
                     let mut node_lookup = [None, None, None];
-                    for d in 0..self.dim {
+                    for d in 0..NODE_DIM {
                         if constraint.plain_dim_struck(d) {
                             continue;
                         }
@@ -243,7 +223,7 @@ impl ElementAssemblage {
             } else {
                 // node p is unconstrained
                 let mut node_lookup = [None, None, None];
-                for d in 0..self.dim {
+                for d in 0..NODE_DIM {
                     node_lookup[d] = Some(Dof(i));
                     i += 1;
                 }
@@ -286,7 +266,7 @@ impl ElementAssemblage {
 
         for (&n, &f) in self.concentrated_forces.iter() {
             // check if each node dof still exists and if so apply that part of force
-            for d in 0..self.dim() {
+            for d in 0..NODE_DIM {
                 if let Some(dof) = self.find_dof(NodeDof(n, d)) {
                     sys.add_rhs_val(dof.0, f[d]);
                 }
@@ -317,8 +297,8 @@ impl ElementAssemblage {
         let mut node_disp = Vec::new();
 
         for n in self.node_ids() {
-            let mut disp = Point::zero(self.dim);
-            for d in 0..self.dim {
+            let mut disp = Point::zero(NODE_DIM);
+            for d in 0..NODE_DIM {
                 if let Some(i) = self.find_dof(NodeDof(n, d)) {
                     disp[d] = raw_disp[i.0];
                 }

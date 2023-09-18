@@ -1,6 +1,6 @@
 use super::integrate::{self, GAUSS_TRI_SAMPLES};
 use super::material::{Material, ProblemType};
-use super::strain::StrainRule;
+use super::strain::Condition;
 use super::stress::StressState;
 use super::{ElementAssemblage, NodeDof, NodeId};
 
@@ -27,12 +27,11 @@ pub struct Element {
     node_ids: [NodeId; EL_NODES],
     node_points: [Point; EL_NODES],
     material: Material,
-    thickness: f64,
+    condition: Condition,
 }
 
 impl Element {
     const INT_ORDER: usize = 2;
-    const STRAIN_RULE: StrainRule = StrainRule::PlaneStress;
 
     pub fn new(elas: &ElementAssemblage, node_ids: [NodeId; EL_NODES]) -> Self {
         let node_points = [
@@ -41,14 +40,12 @@ impl Element {
             elas.node(node_ids[2]),
         ];
         let material = elas.material();
-        let thickness = elas
-            .thickness()
-            .expect("element assemblage has no thickness");
+        let condition = elas.condition();
         Self {
             node_ids,
             node_points,
             material,
-            thickness,
+            condition,
         }
     }
 
@@ -164,12 +161,14 @@ impl Element {
         let coords: LinearMatrix = LinearMatrix::row_vec(h.to_vec()).mul(&node_points_mat);
         let coords = (coords[(0, 0)], coords[(0, 1)]);
 
+        let thickness = self.condition.thickness(coords.into());
+
         // construct B, first finding the gradient of h in the global coordinate system
         let h_grads_global: LinearMatrix = j_inv.mul(&h_grads);
         // h_grads_global is now [dh1/dx dh2/dx dh3/dx]
         //                       [dh1/dy dh2/dy dh3/dy]
 
-        let b_mat = Self::STRAIN_RULE.build_b(&h_grads_global, coords.into()); // todo switch away from constant strain rule
+        let b_mat = self.condition.build_b(&h, &h_grads_global, coords.into()); // todo switch away from constant strain rule
 
         ElementMats {
             b: b_mat,
@@ -177,6 +176,7 @@ impl Element {
             j,
             j_inv,
             det_j,
+            thickness,
         }
     }
 
@@ -210,7 +210,7 @@ impl Element {
     // former impl of Element for IsoparElement
 
     pub fn calc_k(&self) -> Vec<(NodeDof, NodeDof, f64)> {
-        let c = self.material().get_c(self.material_problem());
+        let c = self.condition.build_c(self.material());
 
         let integrand = |nat_coor| {
             let mut mats = self.get_isopar_mats(NaturalCoor(nat_coor));
@@ -219,13 +219,13 @@ impl Element {
             mats.b.transpose(); // transpose in place is cheap
             let mut inter: LinearMatrix = mats.b.mul(&c);
             inter *= mats.det_j;
+            inter *= mats.thickness;
             mats.b.transpose();
 
             inter.mul(&mats.b)
         };
 
-        let mut el_k: LinearMatrix = integrate::gauss_tri(integrand);
-        el_k *= self.thickness;
+        let el_k: LinearMatrix = integrate::gauss_tri(integrand);
 
         // process the result for handoff to the element assemblage
         self.map_matrix(&el_k)
@@ -239,7 +239,7 @@ impl Element {
             let h = mats.h;
             let mut ht = h.clone();
             ht.transpose();
-            ht *= self.material().density() * self.thickness;
+            ht *= self.material().density * mats.thickness;
 
             ht.mul(&h)
         };
@@ -316,12 +316,12 @@ impl Element {
 
         let u = LinearMatrix::col_vec(u);
 
+        let c = self.condition.build_c(self.material());
+
         // compute a stress at each node
         for &nid in self.node_ids().iter() {
             let nat_coor = self.node_natural(nid).unwrap(); // guaranteed to be valid
             let mats = self.get_isopar_mats(NaturalCoor(nat_coor));
-
-            let c = self.material().get_c(self.material_problem());
 
             // compute CBU
             let mut st: LinearMatrix = c.mul(&mats.b);
@@ -370,6 +370,7 @@ pub struct ElementMats {
     j: LinearMatrix,
     j_inv: LinearMatrix,
     det_j: f64,
+    thickness: f64,
 }
 
 impl ElementMats {

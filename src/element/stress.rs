@@ -113,7 +113,15 @@ impl StressState {
                 let shears = self.data[3].powi(2) + self.data[4].powi(2) + self.data[5].powi(2);
                 (0.5 * normals + 3.0 * shears).sqrt()
             }
-            StressType::AxiSym => unimplemented!(),
+            StressType::AxiSym => {
+                // stress is [txx tyy txy tzz]
+
+                let normals = (self.data[0] - self.data[1]).powi(2)
+                    + (self.data[1] - self.data[3]).powi(2)
+                    + (self.data[0] - self.data[3]).powi(2);
+                let shear = self.data[2].powi(2);
+                (0.5 * normals + 3.0 * shear).sqrt()
+            }
         }
     }
 }

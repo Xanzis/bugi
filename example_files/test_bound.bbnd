@@ -4,7 +4,7 @@ polygon
 1 1 c
 0 1 d
 end
-thickness 0.2
+condition planestress 0.2
 material AL6061
 distributed_constraint a b xy
 distributed_force c d 1000000 0

@@ -2,9 +2,8 @@
 # Uses two triangular elements, as rectangular elements are unimplemented in the new isopar
 $Header
 version 1
-dim 2
 material AL6061
-thickness 0.1
+condition planestress 0.1
 $EndHeader
 
 $Nodes

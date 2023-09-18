@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::element::loading::Constraint;
 use crate::element::material::Material;
+use crate::element::strain::Condition;
 use crate::mesher::bounds::PlaneBoundary;
 use crate::mesher::Vertex;
 
@@ -23,7 +24,7 @@ use nom::{
 #[derive(Clone, Debug)]
 enum ParseItem<'a> {
     Polygon(Vec<ParseVertex<'a>>),
-    Thickness(f64),
+    Condition(Condition),
     Material(Material),
     DistForce(&'a str, &'a str, f64, f64),
     DistConstraint(&'a str, &'a str, Constraint),
@@ -84,8 +85,8 @@ pub fn bbnd_to_bounds(file: &str) -> Result<PlaneBoundary, FileError> {
     for item in items.iter() {
         match *item {
             ParseItem::Polygon(_) => {}
-            ParseItem::Thickness(x) => {
-                res.set_thickness(x);
+            ParseItem::Condition(x) => {
+                res.set_condition(x);
             }
             ParseItem::Material(x) => {
                 res.set_material(x);
@@ -115,9 +116,17 @@ pub fn bbnd_to_bounds(file: &str) -> Result<PlaneBoundary, FileError> {
 }
 
 fn parse_file<'a>(file: &'a str) -> Result<Vec<ParseItem<'a>>, FileError> {
-    let thickness = map(preceded(tag("thickness "), double), |t: f64| {
-        ParseItem::Thickness(t)
-    });
+    let condition = alt((
+        map(preceded(tag("condition planestrain "), double), |t: f64| {
+            ParseItem::Condition(Condition::PlaneStrain(t))
+        }),
+        map(preceded(tag("condition planestress "), double), |t: f64| {
+            ParseItem::Condition(Condition::PlaneStress(t))
+        }),
+        map(tag("condition axisymmetric"), |_| {
+            ParseItem::Condition(Condition::Axisymmetric)
+        }),
+    ));
     // TODO fix material error handling
     let material = map(preceded(tag("material "), alphanumeric1), |m: &str| {
         ParseItem::Material(m.parse::<Material>().unwrap())
@@ -175,7 +184,7 @@ fn parse_file<'a>(file: &'a str) -> Result<Vec<ParseItem<'a>>, FileError> {
 
     let mut parser = separated_list0(
         tag("\n"),
-        alt((polygon, thickness, material, dist_force, dist_constraint)),
+        alt((polygon, condition, material, dist_force, dist_constraint)),
     );
     let (rem, parsed) = parser(file)
         .map_err(|_e: nom::Err<nom::error::Error<_>>| FileError::parse("parse error"))?;

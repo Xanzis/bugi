@@ -1,6 +1,7 @@
 use super::integrate::gauss_segment_mat;
 use super::loading::Constraint;
 use super::material::{AL6061, TEST};
+use super::strain::Condition;
 use super::{ElementAssemblage, ElementDescriptor};
 
 use crate::matrix::solve::direct::DenseGaussSolver;
@@ -18,8 +19,7 @@ fn line_integrals() {
 
 #[test]
 fn assemblage() {
-    let mut elas = ElementAssemblage::new(2, AL6061);
-    elas.set_thickness(0.1);
+    let mut elas = ElementAssemblage::new(AL6061, Condition::PlaneStress(0.1));
 
     let nids = elas.add_nodes(&[(0.0, 1.0), (1.0, 1.0), (0.0, 0.0), (1.0, 0.0)]);
     elas.add_element(ElementDescriptor::new([nids[0], nids[2], nids[3]]));
@@ -38,8 +38,7 @@ fn assemblage() {
 
 #[test]
 fn triangles() {
-    let mut elas = ElementAssemblage::new(2, AL6061);
-    elas.set_thickness(0.2);
+    let mut elas = ElementAssemblage::new(AL6061, Condition::PlaneStress(0.2));
 
     let mut nids = Vec::new();
     for i in 0..20 {
@@ -70,8 +69,7 @@ fn triangles() {
 
 #[test]
 fn dist_line() {
-    let mut elas = ElementAssemblage::new(2, AL6061);
-    elas.set_thickness(0.2);
+    let mut elas = ElementAssemblage::new(AL6061, Condition::PlaneStress(0.2));
 
     let nids = elas.add_nodes(&[(0.0, 0.0), (2.0, 0.0), (4.0, 0.0), (1.0, 1.0), (3.0, 1.0)]);
 

@@ -2,9 +2,8 @@
 
 $Header
 version 1
-dim 2
 material AL6061
-thickness 0.01
+condition planestress 0.01
 $EndHeader
 
 $Nodes

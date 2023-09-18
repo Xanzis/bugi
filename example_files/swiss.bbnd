@@ -28,7 +28,7 @@ polygon
 0.95 0.35
 0.95 0.25
 end
-thickness 0.2
+condition planestress 0.2
 material AL6061
 distributed_constraint a b xy
 distributed_force c d 10000 -1000000

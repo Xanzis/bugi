@@ -4,6 +4,7 @@ use crate::visual::Visualizer;
 
 use crate::element::loading::Constraint;
 use crate::element::material::Material;
+use crate::element::strain::Condition;
 
 use super::Vertex;
 
@@ -147,7 +148,7 @@ pub struct PlaneBoundary {
     // in_diametral_map: HashMap<Segment, >
 
     // also store some BC / material information
-    thickness: Option<f64>,
+    condition: Option<Condition>,
     material: Option<Material>,
     constraints: HashMap<Vertex, Constraint>,
     distributed_forces: HashMap<Segment, Point>,
@@ -166,7 +167,7 @@ impl PlaneBoundary {
             base_wall_starts: Vec::new(),
             base_seg_map: HashMap::new(),
 
-            thickness: None,
+            condition: None,
             material: None,
             constraints: HashMap::new(),
             distributed_forces: HashMap::new(),
@@ -210,12 +211,12 @@ impl PlaneBoundary {
         self.seg_set.insert(s);
     }
 
-    pub fn set_thickness(&mut self, t: f64) {
-        self.thickness = Some(t);
+    pub fn set_condition(&mut self, c: Condition) {
+        self.condition = Some(c);
     }
 
-    pub fn thickness(&self) -> Option<f64> {
-        self.thickness
+    pub fn condition(&self) -> Option<Condition> {
+        self.condition
     }
 
     pub fn set_material(&mut self, m: Material) {

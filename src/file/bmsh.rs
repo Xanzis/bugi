@@ -2,6 +2,7 @@ use std::convert::TryInto;
 
 use crate::element::loading::Constraint;
 use crate::element::material::Material;
+use crate::element::strain::Condition;
 use crate::element::ElementDescriptor;
 use crate::element::{ElementAssemblage, NodeId};
 use crate::spatial::Point;
@@ -149,33 +150,25 @@ where
 
 struct ParseHeader {
     version: u8,
-    dim: usize,
     material: Material,
-    thickness: Option<f64>,
-    area: Option<f64>,
+    condition: Condition,
 }
 
 impl ParseHeader {
     fn into_elas(self) -> ElementAssemblage {
-        let mut res = ElementAssemblage::new(self.dim, self.material);
-        if let Some(t) = self.thickness {
-            res.set_thickness(t);
-        }
-        if let Some(a) = self.area {
-            res.set_area(a);
-        }
-        res
+        ElementAssemblage::new(self.material, self.condition)
     }
 }
 
 pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
     use nom::{
+        branch::alt,
         bytes::complete::tag,
         character::complete::{self, alphanumeric1},
-        combinator::{map, opt},
+        combinator::map,
         multi::separated_list0,
         number::complete::double,
-        sequence::{separated_pair, terminated, tuple},
+        sequence::{preceded, separated_pair, terminated, tuple},
     };
 
     // preprocess to remove comment and empty lines
@@ -192,23 +185,29 @@ pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
 
     // parse the header
     let version = named_value("version", complete::u8);
-    let dim = named_value("dim", complete::u64);
     let material = named_value("material", alphanumeric1);
-    let thickness = named_value("thickness", double);
-    let area = named_value("area", double);
+
+    let condition_parser = alt((
+        map(preceded(tag("planestrain "), double), |t: f64| {
+            Condition::PlaneStrain(t)
+        }),
+        map(preceded(tag("planestress "), double), |t: f64| {
+            Condition::PlaneStress(t)
+        }),
+        map(tag("axisymmetric"), |_| Condition::Axisymmetric),
+    ));
+
+    let condition = named_value("condition", condition_parser);
 
     let (input, header) = section_parse(
         "Header",
-        map(
-            tuple((version, dim, material, opt(thickness), opt(area))),
-            |(v, d, m, t, a)| ParseHeader {
+        map(tuple((version, material, condition)), |(v, m, c)| {
+            ParseHeader {
                 version: v,
-                dim: d as usize,
                 material: m.parse().expect("bad material"),
-                thickness: t,
-                area: a,
-            },
-        ),
+                condition: c,
+            }
+        }),
     )(input)?;
 
     if header.version != 1 {
@@ -304,28 +303,15 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
     // construct a bmsh representation of the elas for dumping to file
     // assumes elas is properly constructed and panics otherwise
 
-    let dim = elas.dim();
-
     let mut res = "$Header\nversion 1".to_string();
-    res += &format!("\ndim {}", dim);
     res += &format!("\nmaterial {}", elas.material().to_string());
-    if let Some(t) = elas.thickness() {
-        res += &format!("\nthickness {}", t);
-    }
-    if let Some(a) = elas.area() {
-        res += &format!("\narea {}", a);
-    }
+    res += &format!("\ncondition {}", elas.condition().to_string());
     res += "\n$EndHeader\n\n$Nodes";
 
     let nodes = elas.nodes();
     res += &format!("\ncount {}", nodes.len());
     for (i, n) in nodes.into_iter().enumerate() {
-        match dim {
-            1 => res += &format!("\n{} {:.6}", i, n[0]),
-            2 => res += &format!("\n{} {:.6}/{:.6}", i, n[0], n[1]),
-            3 => res += &format!("\n{} {:.6}/{:.6}/{:.6}", i, n[0], n[1], n[2]),
-            _ => unreachable!(),
-        }
+        res += &format!("\n{} {:.6}/{:.6}", i, n[0], n[1]);
     }
     res += "\n$EndNodes\n\n$Elements";
 
@@ -367,22 +353,20 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
     let forces = elas.conc_forces();
     res += &format!("\ncount {}", forces.len());
     for (n, frc) in forces {
-        res += &format!("\n{} {:.3}", n.into_idx(), frc[0]);
-
-        for i in (0..dim).skip(1) {
-            res += &format!("/{:.3}", frc[i]);
-        }
+        res += &format!("\n{} {:.3}/{:.3}", n.into_idx(), frc[0], frc[1]);
     }
     res.push_str("\n$EndForces\n\n$DistForces");
 
     let dist_forces = elas.dist_forces();
     res += &format!("\ncount {}", dist_forces.len());
     for ((na, nb), frc) in dist_forces {
-        res += &format!("\n{} {} {:.3}", na.into_idx(), nb.into_idx(), frc[0]);
-
-        for i in (0..dim).skip(1) {
-            res += &format!("/{:.3}", frc[i]);
-        }
+        res += &format!(
+            "\n{} {} {:.3}/{:.3}",
+            na.into_idx(),
+            nb.into_idx(),
+            frc[0],
+            frc[1]
+        );
     }
     res += "\n$EndDistForces";
 

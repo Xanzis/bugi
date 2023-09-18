@@ -568,12 +568,7 @@ impl PlaneTriangulation {
     pub fn assemble(self) -> Result<ElementAssemblage, &'static str> {
         let mat = self.bound.material().ok_or("missing material definition")?;
 
-        // TODO add logic when 1D/3D is implemented
-        let mut res = ElementAssemblage::new(2, mat);
-
-        if let Some(t) = self.bound.thickness() {
-            res.set_thickness(t);
-        }
+        let mut res = ElementAssemblage::new(mat, self.bound.condition().unwrap());
 
         // build vertex list and translation to elas node ids
         let vertex_list: Vec<(f64, f64)>;
