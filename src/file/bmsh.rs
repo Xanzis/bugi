@@ -41,7 +41,7 @@ where
     move |init_input| {
         let mut items = Vec::new();
         let (mut input, total_exp) =
-            delimited(tag("count "), character::complete::u64, tag("\n"))(init_input.clone())?;
+            delimited(tag("count "), character::complete::u64, tag("\n"))(init_input)?;
         let total_exp = total_exp as usize;
 
         // need any returned errors to contain the initial slice
@@ -89,7 +89,7 @@ where
     move |init_input| {
         let mut items = Vec::new();
         let (mut input, total_exp) =
-            delimited(tag("count "), character::complete::u64, tag("\n"))(init_input.clone())?;
+            delimited(tag("count "), character::complete::u64, tag("\n"))(init_input)?;
         let total_exp = total_exp as usize;
 
         // need any returned errors to contain the initial slice
