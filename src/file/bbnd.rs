@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::element::loading::Constraint;
+use crate::element::constraint::Constraint;
 use crate::element::material::Material;
 use crate::element::strain::Condition;
 use crate::mesher::bounds::PlaneBoundary;

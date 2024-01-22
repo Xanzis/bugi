@@ -100,7 +100,9 @@ impl System {
 
         for row in 0..dofs {
             for col in 0..dofs {
-                k_mat[(row, col)] = k[(row, col)];
+                if k[(row, col)] != 0.0 {
+                    k_mat[(row, col)] = k[(row, col)];
+                }
             }
             r_vec[row] = r[(row, 0)];
         }

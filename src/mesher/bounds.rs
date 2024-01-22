@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::visual::Visualizer;
 
-use crate::element::loading::Constraint;
+use crate::element::constraint::Constraint;
 use crate::element::material::Material;
 use crate::element::strain::Condition;
 

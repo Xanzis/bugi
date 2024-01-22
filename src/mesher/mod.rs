@@ -156,7 +156,7 @@ mod tests {
     #[test]
     fn distributed() {
         use super::bounds;
-        use crate::element::loading::Constraint;
+        use crate::element::constraint::Constraint;
 
         let mut bound = bounds::PlaneBoundary::new();
 
@@ -172,7 +172,7 @@ mod tests {
         bound.store_segment((d, a));
 
         // store a distributed constraint and a distributed force
-        bound.store_distributed_constraint(a, b, Constraint::PlainDof(true, false, false));
+        bound.store_distributed_constraint(a, b, Constraint::XFixed);
         bound.store_distributed_force(c, d, (1.0, 2.0).into());
 
         // get the boundary to subdivide every edge

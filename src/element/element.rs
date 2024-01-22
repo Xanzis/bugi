@@ -55,11 +55,6 @@ impl Element {
         self.material
     }
 
-    pub fn material_problem(&self) -> ProblemType {
-        // TODO: may want to make plane stress / plane strain selectable
-        ProblemType::PlaneStress
-    }
-
     pub fn node_points(&self) -> [Point; EL_NODES] {
         self.node_points
     }
@@ -189,6 +184,7 @@ impl Element {
     }
 
     pub fn triangles(&self) -> Vec<(NodeId, NodeId, NodeId)> {
+        // TODO remove downstream callers as all elements are now a single triangle
         vec![(self.node_ids[0], self.node_ids[1], self.node_ids[2])]
     }
 

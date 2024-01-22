@@ -1,18 +1,18 @@
 pub mod element;
 pub mod integrate;
-pub mod loading;
+pub mod constraint;
 pub mod material;
 pub mod strain;
 pub mod stress;
 
 use crate::matrix::solve::eigen::{DeterminantSearcher, EigenSystem};
 use crate::matrix::solve::{Solver, System};
-use crate::matrix::Average;
+use crate::matrix::{Average, Dictionary, MatrixLike, LinearMatrix};
 use crate::spatial::Point;
 use crate::visual::Visualizer;
 
 use element::Element;
-use loading::Constraint;
+use constraint::{Constraint, DofTransform};
 use material::Material;
 use strain::Condition;
 use stress::StressState;
@@ -40,9 +40,21 @@ impl NodeId {
 #[derive(Debug, Clone, Copy)]
 pub struct Dof(usize);
 
+impl Dof {
+    fn to_node_dof(self) -> NodeDof {
+        NodeDof(NodeId(self.0 / NODE_DIM), self.0 % NODE_DIM)
+    }
+}
+
 // a node idx + dof of that node (x/y/z) pair
 #[derive(Debug, Clone, Copy)]
 pub struct NodeDof(NodeId, usize);
+
+impl NodeDof {
+    fn to_dof(self) -> Dof {
+        Dof(self.0.0 * NODE_DIM + self.1)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ElementDescriptor {
@@ -67,17 +79,14 @@ fn build_element(elas: &ElementAssemblage, desc: ElementDescriptor) -> Element {
 #[derive(Debug)]
 pub struct ElementAssemblage {
     nodes: Vec<Point>,
-    dofs: usize,
 
     condition: Condition,
     material: Material,
 
     elements: Vec<Element>,
-    constraints: HashMap<NodeId, Constraint>,
+    constraints: Vec<Constraint>,
     concentrated_forces: HashMap<NodeId, Point>,
     line_forces: HashMap<(NodeId, NodeId), Point>,
-
-    dof_lookup: Option<Vec<[Option<Dof>; 3]>>,
 }
 
 impl ElementAssemblage {
@@ -85,11 +94,9 @@ impl ElementAssemblage {
         ElementAssemblage {
             nodes: Vec::new(),
             elements: Vec::new(),
-            constraints: HashMap::new(),
+            constraints: Vec::new(),
             concentrated_forces: HashMap::new(),
             line_forces: HashMap::new(),
-            dof_lookup: None,
-            dofs: 0,
             condition,
             material,
         }
@@ -124,6 +131,7 @@ impl ElementAssemblage {
         for n in ns.iter() {
             let p: Point = n.clone().into();
             self.nodes.push(p);
+            self.constraints.push(Constraint::Free);
         }
 
         let next_idx = self.nodes.len();
@@ -178,98 +186,57 @@ impl ElementAssemblage {
     }
 
     pub fn constraints(&self) -> Vec<(NodeId, Constraint)> {
-        self.constraints
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect()
+        self.constraints.iter().enumerate().map(|(i, &c)| (NodeId(i), c)).collect()
     }
 
     pub fn add_constraint(&mut self, n: NodeId, constraint: Constraint) {
         // TODO avoid overwriting existing constraints
-        self.constraints.insert(n, constraint);
-    }
-
-    fn find_dof(&self, nd: NodeDof) -> Option<Dof> {
-        self.dof_lookup.as_ref().map(|l| l[nd.0 .0][nd.1]).flatten()
+        self.constraints[n.0] = constraint
     }
 
     pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
 
-    fn compile_lookup(&mut self) {
-        // assign dof indices to dof_lookup and count the dofs
-        // depends on constraints, not elements
-        // TODO: add handling for constraints in transformed coordinate systems
-        let mut i = 0;
-        let mut lookup: Vec<[Option<Dof>; 3]> = Vec::new();
-
-        for nid in self.node_ids() {
-            if let Some(constraint) = self.constraints.get(&nid) {
-                // there is a constraint on node p
-                if constraint.is_plain() {
-                    let mut node_lookup = [None, None, None];
-                    for d in 0..NODE_DIM {
-                        if constraint.plain_dim_struck(d) {
-                            continue;
-                        }
-                        node_lookup[d] = Some(Dof(i));
-                        i += 1;
-                    }
-                    lookup.push(node_lookup);
-                } else {
-                    unimplemented!()
-                }
-            } else {
-                // node p is unconstrained
-                let mut node_lookup = [None, None, None];
-                for d in 0..NODE_DIM {
-                    node_lookup[d] = Some(Dof(i));
-                    i += 1;
-                }
-                lookup.push(node_lookup);
-            }
-        }
-
-        self.dof_lookup = Some(lookup);
-        self.dofs = i;
-    }
-
-    fn calc_k(&self, sys: &mut System) {
-        // evaluate the global K matrix, filling it into sys
+    fn calc_k(&self) -> Dictionary {
+        // evaluate the global K matrix
+        let mut res = Dictionary::zeros((self.node_count() * 2, self.node_count() * 2));
 
         for el in self.elements.iter() {
             for (i, j, coef) in el.calc_k() {
                 // i and j are node dofs, coef is the coefficient to add
-                if let (Some(i_dof), Some(j_dof)) = (self.find_dof(i), self.find_dof(j)) {
-                    sys.add_k_coefficient((i_dof.0, j_dof.0), coef);
-                }
+                let (i_dof, j_dof) = (i.to_dof(), j.to_dof());
+                res[(i_dof.0, j_dof.0)] = coef;
             }
         }
+
+        res
     }
 
-    fn calc_m(&self, sys: &mut System) {
+    fn calc_m(&self) -> Dictionary {
         // evaluate the global M matrix
+        let mut res = Dictionary::zeros((self.node_count() * 2, self.node_count() * 2));
 
         for el in self.elements.iter() {
             for (i, j, coef) in el.calc_m() {
                 // i and j are node dofs, coef is the coefficient to add
-                if let (Some(i_dof), Some(j_dof)) = (self.find_dof(i), self.find_dof(j)) {
-                    sys.add_m_coefficient((i_dof.0, j_dof.0), coef);
-                }
+                let (i_dof, j_dof) = (i.to_dof(), j.to_dof());
+                res[(i_dof.0, j_dof.0)] = coef;
             }
         }
+
+        res
     }
 
-    fn calc_load(&self, sys: &mut System) {
+    fn calc_load(&self) -> Vec<f64> {
         // evaluate the global load vector, filling it into the system
+        let mut res = vec![0.0; self.node_count() * 2];
 
         for (&n, &f) in self.concentrated_forces.iter() {
             // check if each node dof still exists and if so apply that part of force
             for d in 0..NODE_DIM {
-                if let Some(dof) = self.find_dof(NodeDof(n, d)) {
-                    sys.add_rhs_val(dof.0, f[d]);
-                }
+                let node_dof = NodeDof(n, d);
+                res[node_dof.to_dof().0] = f[d];
             }
         }
 
@@ -278,30 +245,29 @@ impl ElementAssemblage {
                 // TODO this is a bad way of locating affected elements - very slow, lots of loops
                 if el.nodes_connect(n, m) {
                     for (i, val) in el.int_f_l((n, m), f).unwrap() {
-                        if let Some(dof) = self.find_dof(i) {
-                            sys.add_rhs_val(dof.0, val);
-                        }
+                        res[i.to_dof().0] = val;
                     }
                 }
             }
         }
 
-        // TODO add area body forces / initial loads
+        res
     }
 
     fn raw_to_node_disp(&self, raw_disp: &[f64]) -> Vec<Point> {
         // internal helper to relate raw solution results to deformations
-        // use the dof lookup to fill out node displacements
-        assert_eq!(raw_disp.len(), self.dofs);
-
+        // reverse masking and transforms of the solver coordinate space
         let mut node_disp = Vec::new();
+
+        let constrainer = DofTransform::from_constraints(&self.constraints);
+
+        let dof_disp = constrainer.untransform_vec(raw_disp);
 
         for n in self.node_ids() {
             let mut disp = Point::zero(NODE_DIM);
             for d in 0..NODE_DIM {
-                if let Some(i) = self.find_dof(NodeDof(n, d)) {
-                    disp[d] = raw_disp[i.0];
-                }
+                let node_dof = NodeDof(n, d);
+                disp[d] = dof_disp[node_dof.to_dof().0];
             }
             node_disp.push(disp);
         }
@@ -311,32 +277,41 @@ impl ElementAssemblage {
 
     pub fn calc_displacements<T: Solver>(&mut self) -> Deformation {
         // find the displacements under load and store them in the assemblage
-        if self.dof_lookup.is_none() {
-            self.compile_lookup();
-        }
+        let constrainer = DofTransform::from_constraints(&self.constraints);
 
-        let mut system = System::new(self.dofs);
-        self.calc_k(&mut system);
-        self.calc_load(&mut system);
+        let k = self.calc_k();
+        let r = self.calc_load();
+
+        println!("k\n{}", k.disp());
+        println!("r\n{:?}", r);
+
+        let k = constrainer.transform_matrix(k);
+        let r = constrainer.transform_vec(&r);
+
+        println!("k\n{}", k.disp());
+        println!("r\n{:?}", r);
+
+        let mut system = System::from_kr(&k, &LinearMatrix::col_vec(r));
 
         let solver = T::new(system);
 
         // TODO properly handle solver errors
-        let raw_disp = solver.solve().unwrap();
-
-        Deformation::new(self, self.raw_to_node_disp(raw_disp.as_slice()))
+        let raw_disp = dbg!(solver.solve().unwrap());
+        let node_disp = self.raw_to_node_disp(raw_disp.as_slice());
+        Deformation::new(self, node_disp)
     }
 
     pub fn calc_modes(&mut self, n: usize) -> Vec<Deformation> {
         // find the n lowest-frequency modes
         // for now, this solution procedure ignores loads
-        if self.dof_lookup.is_none() {
-            self.compile_lookup();
-        }
+        let constrainer = DofTransform::from_constraints(&self.constraints);
 
-        let mut sys = System::new(self.dofs);
-        self.calc_k(&mut sys);
-        self.calc_m(&mut sys);
+        let k = self.calc_k();
+        let k = constrainer.transform_matrix(k);
+        let m = self.calc_m();
+        let m = constrainer.transform_matrix(m);
+
+        let mut sys = System::from_km(&k, &m);
 
         let eigensys = EigenSystem::new(sys);
         let mut searcher = DeterminantSearcher::new(eigensys);

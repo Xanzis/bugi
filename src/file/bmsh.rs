@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use crate::element::loading::Constraint;
+use crate::element::constraint::Constraint;
 use crate::element::material::Material;
 use crate::element::strain::Condition;
 use crate::element::ElementDescriptor;
@@ -374,7 +374,7 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
 }
 
 fn make_constraint(no: usize, tp: u8, dims: Vec<usize>) -> Result<Constraint, FileError> {
-    // simple for now
+    // TODO update file format to reflect new constraint logic
     match tp {
         0 => {
             if dims.len() != 3 {
@@ -384,7 +384,15 @@ fn make_constraint(no: usize, tp: u8, dims: Vec<usize>) -> Result<Constraint, Fi
                 ))
             } else {
                 let (a, b, c) = (dims[0] != 0, dims[1] != 0, dims[2] != 0);
-                Ok(Constraint::PlainDof(a, b, c))
+                if a && b {
+                    Ok(Constraint::XYFixed)
+                } else if a {
+                    Ok(Constraint::XFixed)
+                } else if b {
+                    Ok(Constraint::YFixed)
+                } else {
+                    Err(parse_error(no, "aaa"))
+                }
             }
         }
         _ => Err(parse_error(no, "unsupported constraint type")),

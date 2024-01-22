@@ -517,6 +517,64 @@ impl Dictionary {
         // to avoid duplicates for symmetrical matrices
         self.data.keys().cloned().filter(|&(x, y)| x <= y)
     }
+
+    pub fn rotate(&mut self, a_idx: usize, b_idx: usize, angle: f64) {
+        // rotate a square matrix on a basis formed by a and b
+        let (n, m) = self.shape;
+        if n != m {
+            panic!("cannot rotate a matrix of shape {:?}", self.shape);
+        }
+        if a_idx >= n || b_idx >= n {
+            panic!("rows {}, {} out of bounds for matrix of dimension {}", a_idx, b_idx, n);
+        }
+
+        let sin = angle.sin();
+        let cos = angle.cos();
+
+        for i in 0..n {
+            let (y, w) = match (self.data.get(&(a_idx, i)), self.data.get(&(b_idx, i))) {
+                (None, None) => continue,
+                (None, Some(&b)) => (0.0, b),
+                (Some(&a), None) => (a, 0.0),
+                (Some(&a), Some(&b)) => (a, b),
+            };
+
+            *self.data.entry((a_idx, i)).or_insert(0.0) = cos*y - sin*w;
+            *self.data.entry((b_idx, i)).or_insert(0.0) = sin*w + cos*y;
+        }
+    }
+
+    pub fn mask(mut self, mask: &[bool]) -> Self {
+        // mask rows and columns of a square matrix to obtain a smaller one
+        let (n, m) = self.shape;
+        if n != m {
+            panic!("cannot mask a non-square matrix");
+        }
+
+        if n != mask.len() {
+            panic!("provided mask of length {} does not match shape {:?}", mask.len(), self.shape)
+        }
+
+        let mut idxs = Vec::new();
+        let mut idx = 0;
+        for m in mask.iter() {
+            if *m {
+                idxs.push(Some(idx));
+                idx += 1;
+            } else {
+                idxs.push(None);
+            }
+        }
+
+        let mut res = Self::zeros((idx, idx));
+        for ((i, j), x) in self.data.drain() {
+            if let (Some(i), Some(j)) = (idxs[i], idxs[j]) {
+                res[(i, j)] = x;
+            }
+        }
+
+        res
+    }
 }
 
 impl From<Dictionary> for LowerRowEnvelope {

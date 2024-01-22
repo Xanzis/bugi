@@ -1,5 +1,5 @@
 use super::integrate::gauss_segment_mat;
-use super::loading::Constraint;
+use super::constraint::Constraint;
 use super::material::{AL6061, TEST};
 use super::strain::Condition;
 use super::{ElementAssemblage, ElementDescriptor};
@@ -26,10 +26,11 @@ fn assemblage() {
     elas.add_element(ElementDescriptor::new([nids[3], nids[1], nids[0]]));
     elas.add_conc_force(nids[1], Point::new(&[1.0e7, 0.0]));
     // TODO need better constructors for, like, all of this
-    elas.add_constraint(nids[2], Constraint::PlainDof(true, true, false));
-    elas.add_constraint(nids[3], Constraint::PlainDof(false, true, false));
+    elas.add_constraint(nids[2], Constraint::XYFixed);
+    elas.add_constraint(nids[3], Constraint::YFixed);
 
     let dfm = elas.calc_displacements::<DenseGaussSolver>();
+    println!("{:?}", dfm);
 
     let mut vis = dfm.visualize(50.0);
     vis.set_vals(dfm.displacement_norms());
@@ -55,8 +56,8 @@ fn triangles() {
         elas.add_element(ElementDescriptor::new(b_nodes));
     }
 
-    elas.add_constraint(nids[0], Constraint::PlainDof(true, true, false));
-    elas.add_constraint(nids[29], Constraint::PlainDof(true, true, false));
+    elas.add_constraint(nids[0], Constraint::XYFixed);
+    elas.add_constraint(nids[29], Constraint::XYFixed);
 
     elas.add_conc_force(nids[39], Point::new(&[0.0, -1.0e5]));
     let dfm = elas.calc_displacements::<DenseGaussSolver>();
@@ -77,9 +78,9 @@ fn dist_line() {
     elas.add_element(ElementDescriptor::new([nids[4], nids[3], nids[1]]));
     elas.add_element(ElementDescriptor::new([nids[1], nids[2], nids[4]]));
 
-    elas.add_constraint(nids[0], Constraint::PlainDof(false, true, false));
-    elas.add_constraint(nids[1], Constraint::PlainDof(true, true, false));
-    elas.add_constraint(nids[2], Constraint::PlainDof(false, true, false));
+    elas.add_constraint(nids[0], Constraint::YFixed);
+    elas.add_constraint(nids[1], Constraint::XYFixed);
+    elas.add_constraint(nids[2], Constraint::YFixed);
 
     elas.add_dist_line_force(nids[3], nids[4], Point::new(&[2.0e3, -1.0e3]));
 
