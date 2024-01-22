@@ -1,5 +1,5 @@
-use super::integrate::gauss_segment_mat;
 use super::constraint::Constraint;
+use super::integrate::gauss_segment_mat;
 use super::material::{AL6061, TEST};
 use super::strain::Condition;
 use super::{ElementAssemblage, ElementDescriptor};

@@ -525,7 +525,10 @@ impl Dictionary {
             panic!("cannot rotate a matrix of shape {:?}", self.shape);
         }
         if a_idx >= n || b_idx >= n {
-            panic!("rows {}, {} out of bounds for matrix of dimension {}", a_idx, b_idx, n);
+            panic!(
+                "rows {}, {} out of bounds for matrix of dimension {}",
+                a_idx, b_idx, n
+            );
         }
 
         let sin = angle.sin();
@@ -539,8 +542,8 @@ impl Dictionary {
                 (Some(&a), Some(&b)) => (a, b),
             };
 
-            *self.data.entry((a_idx, i)).or_insert(0.0) = cos*y - sin*w;
-            *self.data.entry((b_idx, i)).or_insert(0.0) = sin*w + cos*y;
+            *self.data.entry((a_idx, i)).or_insert(0.0) = cos * y - sin * w;
+            *self.data.entry((b_idx, i)).or_insert(0.0) = sin * w + cos * y;
         }
     }
 
@@ -552,7 +555,11 @@ impl Dictionary {
         }
 
         if n != mask.len() {
-            panic!("provided mask of length {} does not match shape {:?}", mask.len(), self.shape)
+            panic!(
+                "provided mask of length {} does not match shape {:?}",
+                mask.len(),
+                self.shape
+            )
         }
 
         let mut idxs = Vec::new();

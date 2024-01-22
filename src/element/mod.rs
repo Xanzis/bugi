@@ -1,18 +1,18 @@
+pub mod constraint;
 pub mod element;
 pub mod integrate;
-pub mod constraint;
 pub mod material;
 pub mod strain;
 pub mod stress;
 
 use crate::matrix::solve::eigen::{DeterminantSearcher, EigenSystem};
 use crate::matrix::solve::{Solver, System};
-use crate::matrix::{Average, Dictionary, MatrixLike, LinearMatrix};
+use crate::matrix::{Average, Dictionary, LinearMatrix, MatrixLike};
 use crate::spatial::Point;
 use crate::visual::Visualizer;
 
-use element::Element;
 use constraint::{Constraint, DofTransform};
+use element::Element;
 use material::Material;
 use strain::Condition;
 use stress::StressState;
@@ -52,7 +52,7 @@ pub struct NodeDof(NodeId, usize);
 
 impl NodeDof {
     fn to_dof(self) -> Dof {
-        Dof(self.0.0 * NODE_DIM + self.1)
+        Dof(self.0 .0 * NODE_DIM + self.1)
     }
 }
 
@@ -186,7 +186,11 @@ impl ElementAssemblage {
     }
 
     pub fn constraints(&self) -> Vec<(NodeId, Constraint)> {
-        self.constraints.iter().enumerate().map(|(i, &c)| (NodeId(i), c)).collect()
+        self.constraints
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| (NodeId(i), c))
+            .collect()
     }
 
     pub fn add_constraint(&mut self, n: NodeId, constraint: Constraint) {

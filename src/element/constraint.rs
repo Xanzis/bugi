@@ -1,5 +1,5 @@
-use std::str::FromStr;
 use crate::matrix::Dictionary;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Constraint {
@@ -26,7 +26,7 @@ impl Constraint {
             Constraint::XFixed => dim == 0,
             Constraint::YFixed => dim == 1,
             Constraint::XYFixed => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -42,7 +42,10 @@ impl FromStr for Constraint {
             "xy" => Ok(Constraint::XYFixed),
             other => {
                 if other.starts_with("angle:") {
-                    other[6..].parse::<f64>().map(|x| Constraint::AngleFixed(x)).map_err(|e| ())
+                    other[6..]
+                        .parse::<f64>()
+                        .map(|x| Constraint::AngleFixed(x))
+                        .map_err(|e| ())
                 } else {
                     Err(())
                 }
@@ -59,25 +62,28 @@ pub struct DofTransform {
 
 impl DofTransform {
     pub fn from_constraints(cons: &[Constraint]) -> Self {
-        let mut res = Self {mask: vec![true; cons.len()*2], rotations: Vec::new()};
+        let mut res = Self {
+            mask: vec![true; cons.len() * 2],
+            rotations: Vec::new(),
+        };
 
         for (i, con) in cons.iter().copied().enumerate() {
             match con {
                 Constraint::Free => continue,
                 Constraint::XFixed => {
-                    res.mask[i*2] = false;
-                },
+                    res.mask[i * 2] = false;
+                }
                 Constraint::YFixed => {
-                    res.mask[i*2 + 1] = false;
-                },
+                    res.mask[i * 2 + 1] = false;
+                }
                 Constraint::XYFixed => {
-                    res.mask[i*2] = false;
-                    res.mask[i*2 + 1] = false;
+                    res.mask[i * 2] = false;
+                    res.mask[i * 2 + 1] = false;
                 }
                 Constraint::AngleFixed(theta) => {
-                    res.mask[i*2] = false; // by convention the struck dof is the transformed x vector
-                    res.rotations.push((i*2, i*2 + 1, theta))
-                },
+                    res.mask[i * 2] = false; // by convention the struck dof is the transformed x vector
+                    res.rotations.push((i * 2, i * 2 + 1, theta))
+                }
             }
         }
 
@@ -102,13 +108,25 @@ impl DofTransform {
     }
 
     fn mask_vec(&self, xs: &[f64]) -> Vec<f64> {
-        assert_eq!(self.mask.len(), xs.len(), "mask length does not match provided vector");
-        self.mask.iter().zip(xs).filter(|(&m, x)| m).map(|(m, x)| *x).collect()
+        assert_eq!(
+            self.mask.len(),
+            xs.len(),
+            "mask length does not match provided vector"
+        );
+        self.mask
+            .iter()
+            .zip(xs)
+            .filter(|(&m, x)| m)
+            .map(|(m, x)| *x)
+            .collect()
     }
 
     fn unmask_vec(&self, xs: &[f64]) -> Vec<f64> {
         let mut xs = xs.iter();
-        self.mask.iter().map(|&m| if m {*xs.next().unwrap()} else {0.0}).collect()
+        self.mask
+            .iter()
+            .map(|&m| if m { *xs.next().unwrap() } else { 0.0 })
+            .collect()
     }
 
     fn rotate_matrix(&self, mat: &mut Dictionary) {
@@ -117,25 +135,25 @@ impl DofTransform {
         }
     }
 
-    fn rotate_vec(&self, xs: &mut[f64]) {
+    fn rotate_vec(&self, xs: &mut [f64]) {
         for (a, b, theta) in self.rotations.iter().cloned() {
             let cos = theta.cos();
             let sin = theta.sin();
             let y = xs[a];
             let w = xs[b];
-            xs[a] = cos*y - sin*w;
-            xs[b] = sin*w + cos*y;
+            xs[a] = cos * y - sin * w;
+            xs[b] = sin * w + cos * y;
         }
     }
 
-    fn unrotate_vec(&self, xs: &mut[f64]) {
+    fn unrotate_vec(&self, xs: &mut [f64]) {
         for (a, b, theta) in self.rotations.iter().cloned() {
             let cos = theta.cos();
             let sin = theta.sin();
             let y = xs[a];
             let w = xs[b];
-            xs[a] = sin*w + cos*y;
-            xs[b] = cos*y - sin*w;
+            xs[a] = sin * w + cos * y;
+            xs[b] = cos * y - sin * w;
         }
     }
 }
