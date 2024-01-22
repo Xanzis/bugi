@@ -206,7 +206,7 @@ impl ElementAssemblage {
             for (i, j, coef) in el.calc_k() {
                 // i and j are node dofs, coef is the coefficient to add
                 let (i_dof, j_dof) = (i.to_dof(), j.to_dof());
-                res[(i_dof.0, j_dof.0)] = coef;
+                res[(i_dof.0, j_dof.0)] += coef;
             }
         }
 
@@ -221,7 +221,7 @@ impl ElementAssemblage {
             for (i, j, coef) in el.calc_m() {
                 // i and j are node dofs, coef is the coefficient to add
                 let (i_dof, j_dof) = (i.to_dof(), j.to_dof());
-                res[(i_dof.0, j_dof.0)] = coef;
+                res[(i_dof.0, j_dof.0)] += coef;
             }
         }
 
