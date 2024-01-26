@@ -518,33 +518,44 @@ impl Dictionary {
         self.data.keys().cloned().filter(|&(x, y)| x <= y)
     }
 
-    pub fn rotate(&mut self, a_idx: usize, b_idx: usize, angle: f64) {
-        // rotate a square matrix on a basis formed by a and b
-        let (n, m) = self.shape;
-        if n != m {
-            panic!("cannot rotate a matrix of shape {:?}", self.shape);
-        }
-        if a_idx >= n || b_idx >= n {
-            panic!(
-                "rows {}, {} out of bounds for matrix of dimension {}",
-                a_idx, b_idx, n
-            );
+    pub fn transposed(&self) -> Self {
+        let mut res = Self {
+            shape: self.shape,
+            data: HashMap::new(),
+        };
+
+        for (&(r, c), &x) in self.data.iter() {
+            res.data.insert((c, r), x);
         }
 
-        let sin = angle.sin();
-        let cos = angle.cos();
+        res
+    }
 
-        for i in 0..n {
-            let (y, w) = match (self.data.get(&(a_idx, i)), self.data.get(&(b_idx, i))) {
-                (None, None) => continue,
-                (None, Some(&b)) => (0.0, b),
-                (Some(&a), None) => (a, 0.0),
-                (Some(&a), Some(&b)) => (a, b),
-            };
+    pub fn mul_dict(&self, other: &Self) -> Self {
+        // sparse specialization for multiplications between two dictionary-based matrices
+        assert_eq!(
+            self.shape.1, other.shape.0,
+            "cannot multiply matrices of shapes {:?} and {:?}",
+            self.shape, other.shape
+        );
+        let mut res = Dictionary::zeros((self.shape.0, other.shape.1));
 
-            *self.data.entry((a_idx, i)).or_insert(0.0) = cos * y - sin * w;
-            *self.data.entry((b_idx, i)).or_insert(0.0) = sin * w + cos * y;
+        let mut other_nz_idxs: Vec<(usize, usize)> = other.data.keys().copied().collect();
+        other_nz_idxs.sort_unstable();
+
+        for (&(self_r, self_c), &x) in self.data.iter() {
+            // find all indices of data in other where self_c == other_r
+            let start_idx = other_nz_idxs.partition_point(|&(other_r, _)| other_r < self_c);
+            let run_len =
+                &other_nz_idxs[start_idx..].partition_point(|&(other_r, _)| other_r == self_c);
+            let end_idx = start_idx + run_len;
+            for &(other_r, other_c) in &other_nz_idxs[start_idx..end_idx] {
+                *res.data.entry((self_r, other_c)).or_insert(0.0) +=
+                    self[(self_r, self_c)] * other[(other_r, other_c)];
+            }
         }
+
+        res
     }
 
     pub fn mask(mut self, mask: &[bool]) -> Self {

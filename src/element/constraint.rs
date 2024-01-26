@@ -1,7 +1,8 @@
-use crate::matrix::Dictionary;
+use crate::matrix::{Dictionary, MatrixLike};
+use std::fmt;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Constraint {
     Free,
     XFixed,
@@ -54,6 +55,18 @@ impl FromStr for Constraint {
     }
 }
 
+impl fmt::Display for Constraint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Constraint::Free => write!(f, "free"),
+            Constraint::XFixed => write!(f, "x"),
+            Constraint::YFixed => write!(f, "y"),
+            Constraint::XYFixed => write!(f, "xy"),
+            Constraint::AngleFixed(theta) => write!(f, "angle:{}", theta),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct DofTransform {
     mask: Vec<bool>,
@@ -90,23 +103,6 @@ impl DofTransform {
         res
     }
 
-    pub fn transform_vec(&self, xs: &[f64]) -> Vec<f64> {
-        let mut xs = xs.to_vec();
-        self.rotate_vec(&mut xs);
-        self.mask_vec(&xs)
-    }
-
-    pub fn untransform_vec(&self, xs: &[f64]) -> Vec<f64> {
-        let mut xs = self.unmask_vec(xs);
-        self.unrotate_vec(&mut xs);
-        xs
-    }
-
-    pub fn transform_matrix(&self, mut mat: Dictionary) -> Dictionary {
-        self.rotate_matrix(&mut mat);
-        mat.mask(&self.mask)
-    }
-
     fn mask_vec(&self, xs: &[f64]) -> Vec<f64> {
         assert_eq!(
             self.mask.len(),
@@ -129,31 +125,52 @@ impl DofTransform {
             .collect()
     }
 
-    fn rotate_matrix(&self, mat: &mut Dictionary) {
+    // names come from notation in Bathe, p139, (4.42)
+    pub fn bar_matrix(&self, mat: &Dictionary) -> Dictionary {
+        // K_bar = T' K T
+
+        let mut rot = Dictionary::eye(mat.shape().0);
         for (a, b, theta) in self.rotations.iter().cloned() {
-            mat.rotate(a, b, theta);
+            let rotation = Dictionary::rotation(mat.shape().0, a, b, theta);
+            rot = rotation.mul_dict(&rot);
         }
+
+        let rot_prime = rot.transposed();
+
+        let res = rot_prime.mul_dict(&mat.mul_dict(&rot));
+
+        res.mask(&self.mask)
     }
 
-    fn rotate_vec(&self, xs: &mut [f64]) {
+    pub fn unbar_vec(&self, xs: &[f64]) -> Vec<f64> {
+        // U = T U_bar
+        let mut xs = self.unmask_vec(xs);
+
         for (a, b, theta) in self.rotations.iter().cloned() {
             let cos = theta.cos();
             let sin = theta.sin();
-            let y = xs[a];
-            let w = xs[b];
-            xs[a] = cos * y - sin * w;
-            xs[b] = sin * w + cos * y;
+            let u = xs[a];
+            let v = xs[b];
+            xs[a] = 0.0 + cos * u - sin * v;
+            xs[b] = 0.0 + sin * u + cos * v;
         }
+
+        xs
     }
 
-    fn unrotate_vec(&self, xs: &mut [f64]) {
+    pub fn bar_vec(&self, xs: &[f64]) -> Vec<f64> {
+        // R_bar = T' R
+        let mut xs = xs.to_vec();
+
         for (a, b, theta) in self.rotations.iter().cloned() {
             let cos = theta.cos();
             let sin = theta.sin();
-            let y = xs[a];
-            let w = xs[b];
-            xs[a] = sin * w + cos * y;
-            xs[b] = cos * y - sin * w;
+            let u = xs[a];
+            let v = xs[b];
+            xs[a] = 0.0 + cos * u + sin * v;
+            xs[b] = 0.0 - sin * u + cos * v;
         }
+
+        self.mask_vec(&xs)
     }
 }

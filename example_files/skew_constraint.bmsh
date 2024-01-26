@@ -1,0 +1,32 @@
+$Header
+version 1
+material AL6061
+condition planestress 0.10000
+$EndHeader
+
+$Nodes
+count 3
+0 0.0/0.0
+1 1.0/0.0
+2 0.5/0.8
+$EndNodes
+
+$Elements
+count 1
+0 0/1/2
+$EndElements
+
+$Constraints
+count 2
+0 xy
+1 angle:0.5
+$EndConstraints
+
+$Forces
+count 1
+2 1000000.0/0.0
+$EndForces
+
+$DistForces
+count 0
+$EndDistForces

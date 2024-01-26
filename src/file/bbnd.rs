@@ -12,7 +12,7 @@ use nom::{
     self,
     branch::alt,
     bytes::complete::tag,
-    character::complete::{self, alphanumeric1},
+    character::complete::{self, alphanumeric1, not_line_ending},
     combinator::map,
     multi::{separated_list0, separated_list1},
     number::complete::double,
@@ -151,7 +151,7 @@ fn parse_file<'a>(file: &'a str) -> Result<Vec<ParseItem<'a>>, FileError> {
             tuple((
                 alphanumeric1,
                 preceded(complete::char(' '), alphanumeric1),
-                preceded(complete::char(' '), alphanumeric1),
+                preceded(complete::char(' '), not_line_ending),
             )),
         ),
         |f: (&str, &str, &str)| {

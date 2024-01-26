@@ -265,7 +265,7 @@ impl ElementAssemblage {
 
         let constrainer = DofTransform::from_constraints(&self.constraints);
 
-        let dof_disp = constrainer.untransform_vec(raw_disp);
+        let dof_disp = constrainer.unbar_vec(raw_disp);
 
         for n in self.node_ids() {
             let mut disp = Point::zero(NODE_DIM);
@@ -286,21 +286,15 @@ impl ElementAssemblage {
         let k = self.calc_k();
         let r = self.calc_load();
 
-        println!("k\n{}", k.disp());
-        println!("r\n{:?}", r);
-
-        let k = constrainer.transform_matrix(k);
-        let r = constrainer.transform_vec(&r);
-
-        println!("k\n{}", k.disp());
-        println!("r\n{:?}", r);
+        let k = constrainer.bar_matrix(&k);
+        let r = constrainer.bar_vec(&r);
 
         let mut system = System::from_kr(&k, &LinearMatrix::col_vec(r));
 
         let solver = T::new(system);
 
         // TODO properly handle solver errors
-        let raw_disp = dbg!(solver.solve().unwrap());
+        let raw_disp = solver.solve().unwrap();
         let node_disp = self.raw_to_node_disp(raw_disp.as_slice());
         Deformation::new(self, node_disp)
     }
@@ -311,9 +305,9 @@ impl ElementAssemblage {
         let constrainer = DofTransform::from_constraints(&self.constraints);
 
         let k = self.calc_k();
-        let k = constrainer.transform_matrix(k);
+        let k = constrainer.bar_matrix(&k);
         let m = self.calc_m();
-        let m = constrainer.transform_matrix(m);
+        let m = constrainer.bar_matrix(&m);
 
         let mut sys = System::from_km(&k, &m);
 

@@ -265,6 +265,23 @@ where
         res
     }
 
+    fn rotation(n: usize, a_idx: usize, b_idx: usize, theta: f64) -> Self {
+        // a nxn rotation by theta on basis a, b
+        assert!(a_idx < n, "invalid index");
+        assert!(b_idx < n, "invalid index");
+        assert!(a_idx != b_idx, "invalid indices");
+
+        let mut res = Self::eye(n);
+        res[(a_idx, a_idx)] = theta.cos();
+        res[(a_idx, b_idx)] = -1.0 * theta.sin();
+        res[(b_idx, a_idx)] = theta.sin();
+        res[(b_idx, b_idx)] = theta.cos();
+
+        println!("rotation matrix:\n{}", res.disp());
+
+        res
+    }
+
     fn from_rows(data: Vec<Vec<f64>>) -> Self {
         let mut total = Vec::new();
         let nrow = data.len();

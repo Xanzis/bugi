@@ -164,7 +164,7 @@ pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
     use nom::{
         branch::alt,
         bytes::complete::tag,
-        character::complete::{self, alphanumeric1},
+        character::complete::{self, alphanumeric1, not_line_ending},
         combinator::map,
         multi::separated_list0,
         number::complete::double,
@@ -239,13 +239,9 @@ pub fn bmsh_to_elas(file: &str) -> Result<ElementAssemblage, FileError> {
             map(complete::u64, |x| x as usize),
             tag(" "),
             map(
-                separated_pair(
-                    complete::u8,
-                    tag(" "),
-                    separated_list0(tag("/"), map(complete::u64, |x| x as usize)),
-                ),
+                not_line_ending,
                 // TODO: remove redundant info from make_constraint
-                |(tp, dims)| make_constraint(0, tp, dims).expect("bad constraint"),
+                |con: &str| con.parse::<Constraint>().expect("bad constraint"),
             ),
         )),
     )(input)?;
@@ -334,19 +330,15 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
     res += "\n$EndElements\n\n$Constraints";
 
     let cons = elas.constraints();
+    let cons = cons
+        .into_iter()
+        .filter(|(n, con)| *con != Constraint::Free)
+        .collect::<Vec<_>>();
     res += &format!("\ncount {}", cons.len());
+    let mut i = 0;
     for (n, con) in cons {
         // TODO update the '0' when more constraint types are available
-        res += &format!(
-            "\n{} 0 {}",
-            n.into_idx(),
-            if con.plain_dim_struck(0) { 1 } else { 0 }
-        );
-
-        // TODO fix constraint reader to accept 2 and 1-dim assemblage constraints
-        for i in 1..3 {
-            res += if con.plain_dim_struck(i) { "/1" } else { "/0" };
-        }
+        res += &format!("\n{} {}", n.into_idx(), con.to_string(),);
     }
     res += "\n$EndConstraints\n\n$Forces";
 
