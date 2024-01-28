@@ -46,7 +46,7 @@ impl FromStr for Constraint {
                     other[6..]
                         .parse::<f64>()
                         .map(|x| Constraint::AngleFixed(x))
-                        .map_err(|e| ())
+                        .map_err(|_| ())
                 } else {
                     Err(())
                 }
@@ -130,8 +130,8 @@ impl DofTransform {
         self.mask
             .iter()
             .zip(xs)
-            .filter(|(&m, x)| m)
-            .map(|(m, x)| *x)
+            .filter(|(&m, _)| m)
+            .map(|(_, x)| *x)
             .collect()
     }
 

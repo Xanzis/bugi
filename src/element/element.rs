@@ -1,5 +1,5 @@
 use super::integrate::{self, GAUSS_TRI_SAMPLES};
-use super::material::{Material, ProblemType};
+use super::material::Material;
 use super::strain::Condition;
 use super::stress::StressState;
 use super::{ElementAssemblage, NodeDof, NodeId};

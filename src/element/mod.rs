@@ -305,7 +305,7 @@ impl ElementAssemblage {
         let k = constrainer.bar_matrix(&k);
         let r = constrainer.bar_vec(&r);
 
-        let mut system = System::from_kr(&k, &LinearMatrix::col_vec(r));
+        let system = System::from_kr(&k, &LinearMatrix::col_vec(r));
 
         let solver = T::new(system);
 
@@ -325,7 +325,7 @@ impl ElementAssemblage {
         let m = self.calc_m();
         let m = constrainer.bar_matrix(&m);
 
-        let mut sys = System::from_km(&k, &m);
+        let sys = System::from_km(&k, &m);
 
         let eigensys = EigenSystem::new(sys);
         let mut searcher = DeterminantSearcher::new(eigensys);
