@@ -540,18 +540,26 @@ impl Dictionary {
         );
         let mut res = Dictionary::zeros((self.shape.0, other.shape.1));
 
-        let mut other_nz_idxs: Vec<(usize, usize)> = other.data.keys().copied().collect();
-        other_nz_idxs.sort_unstable();
+        let mut other_nzs: Vec<((usize, usize), f64)> =
+            other.data.iter().map(|(&i, &x)| (i, x)).collect();
+        other_nzs.sort_unstable_by_key(|v| v.0 .0); // sort them by row
 
-        for (&(self_r, self_c), &x) in self.data.iter() {
-            // find all indices of data in other where self_c == other_r
-            let start_idx = other_nz_idxs.partition_point(|&(other_r, _)| other_r < self_c);
-            let run_len =
-                &other_nz_idxs[start_idx..].partition_point(|&(other_r, _)| other_r == self_c);
-            let end_idx = start_idx + run_len;
-            for &(other_r, other_c) in &other_nz_idxs[start_idx..end_idx] {
-                *res.data.entry((self_r, other_c)).or_insert(0.0) +=
-                    self[(self_r, self_c)] * other[(other_r, other_c)];
+        // prep work - get slices of labeled vals in other by row
+        let mut other_row_slices = Vec::new();
+        let mut cur_start = 0;
+        for i in 0..other.shape.0 {
+            let mut end = cur_start;
+            while end < other_nzs.len() && other_nzs[end].0 .0 == i {
+                end += 1;
+            }
+            other_row_slices.push(&other_nzs[cur_start..end]);
+            cur_start = end;
+        }
+
+        for (&(self_r, self_c), &self_x) in self.data.iter() {
+            for &((other_r, other_c), other_x) in other_row_slices[self_c] {
+                assert_eq!(self_c, other_r, "whoops");
+                res[(self_r, other_c)] += self_x * other_x;
             }
         }
 
@@ -939,6 +947,10 @@ impl MatrixLike for Dictionary {
         }
 
         res
+    }
+
+    fn nzs<'a>(&'a self) -> impl Iterator<Item = ((usize, usize), f64)> + 'a {
+        self.data.iter().map(|(&(r, c), &x)| ((r, c), x))
     }
 }
 

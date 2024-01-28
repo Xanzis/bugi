@@ -99,12 +99,11 @@ impl System {
         let mut r_vec = vec![0.0; dofs];
 
         for row in 0..dofs {
-            for col in 0..dofs {
-                if k[(row, col)] != 0.0 {
-                    k_mat[(row, col)] = k[(row, col)];
-                }
-            }
             r_vec[row] = r[(row, 0)];
+        }
+
+        for ((r, c), x) in k.nzs() {
+            k_mat[(r, c)] = x;
         }
 
         res.k_mat = Some(k_mat);
@@ -127,15 +126,12 @@ impl System {
         let mut k_mat = Dictionary::zeros(dofs);
         let mut m_mat = Dictionary::zeros(dofs);
 
-        for row in 0..dofs {
-            for col in 0..dofs {
-                if k[(row, col)] != 0.0 {
-                    k_mat[(row, col)] = k[(row, col)];
-                }
-                if m[(row, col)] != 0.0 {
-                    m_mat[(row, col)] = m[(row, col)];
-                }
-            }
+        for ((r, c), x) in k.nzs() {
+            k_mat[(r, c)] = x;
+        }
+
+        for ((r, c), x) in m.nzs() {
+            m_mat[(r, c)] = x;
         }
 
         res.k_mat = Some(k_mat);

@@ -103,6 +103,24 @@ impl DofTransform {
         res
     }
 
+    fn rotation_matrix(&self) -> Dictionary {
+        let mut rot = Dictionary::eye(self.mask.len());
+        let mut visited = vec![false; self.mask.len()];
+
+        for (a, b, theta) in self.rotations.iter().copied() {
+            assert!(!visited[a] && !visited[b], "overlapping constraints");
+            visited[a] = true;
+            visited[b] = true;
+
+            rot[(a, a)] = theta.cos();
+            rot[(a, b)] = -1.0 * theta.sin();
+            rot[(b, a)] = theta.sin();
+            rot[(b, b)] = theta.cos();
+        }
+
+        rot
+    }
+
     fn mask_vec(&self, xs: &[f64]) -> Vec<f64> {
         assert_eq!(
             self.mask.len(),
@@ -129,12 +147,7 @@ impl DofTransform {
     pub fn bar_matrix(&self, mat: &Dictionary) -> Dictionary {
         // K_bar = T' K T
 
-        let mut rot = Dictionary::eye(mat.shape().0);
-        for (a, b, theta) in self.rotations.iter().cloned() {
-            let rotation = Dictionary::rotation(mat.shape().0, a, b, theta);
-            rot = rotation.mul_dict(&rot);
-        }
-
+        let rot = self.rotation_matrix();
         let rot_prime = rot.transposed();
 
         let res = rot_prime.mul_dict(&mat.mul_dict(&rot));

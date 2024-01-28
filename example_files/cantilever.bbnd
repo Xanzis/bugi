@@ -12,5 +12,5 @@ end
 condition planestress 0.2
 material AL6061
 distributed_constraint a b xy
-distributed_constraint c d angle:1.0
+distributed_constraint c d y
 distributed_force e f 0 -10000

@@ -194,8 +194,24 @@ impl ElementAssemblage {
     }
 
     pub fn add_constraint(&mut self, n: NodeId, constraint: Constraint) {
-        // TODO avoid overwriting existing constraints
-        self.constraints[n.0] = constraint
+        match (self.constraints[n.0], constraint) {
+            (Constraint::Free, c) => {
+                self.constraints[n.0] = c;
+            }
+            (Constraint::AngleFixed(a), Constraint::AngleFixed(b)) => {
+                self.constraints[n.0] = Constraint::AngleFixed((a + b) / 2.0);
+            }
+            (Constraint::AngleFixed(_), c) => {
+                self.constraints[n.0] = c;
+            }
+            (c, Constraint::AngleFixed(_)) => {
+                self.constraints[n.0] = c;
+            }
+            (Constraint::XFixed, Constraint::YFixed) | (Constraint::YFixed, Constraint::XFixed) => {
+                self.constraints[n.0] = Constraint::XYFixed;
+            }
+            _ => {}
+        }
     }
 
     pub fn node_count(&self) -> usize {

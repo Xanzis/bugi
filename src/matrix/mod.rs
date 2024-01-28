@@ -195,6 +195,18 @@ where
         MatrixAll::new(&self)
     }
 
+    fn nzs<'a>(&'a self) -> impl Iterator<Item = ((usize, usize), f64)> + 'a {
+        let (rows, cols) = self.shape();
+        (0..(rows * cols))
+            .map(move |i| {
+                let r = i / cols;
+                let c = i % cols;
+                let x = self[(i / cols, i % cols)];
+                ((r, c), x)
+            })
+            .filter(|(_, x)| *x != 0.0)
+    }
+
     fn indices(&self) -> MatrixIndices {
         // visit all valid matrix indices in row-major order
         MatrixIndices::new(self)
@@ -276,8 +288,6 @@ where
         res[(a_idx, b_idx)] = -1.0 * theta.sin();
         res[(b_idx, a_idx)] = theta.sin();
         res[(b_idx, b_idx)] = theta.cos();
-
-        println!("rotation matrix:\n{}", res.disp());
 
         res
     }
