@@ -13,11 +13,6 @@ use super::FileError;
 
 type NomStrErr<'a> = nom::error::Error<&'a str>;
 
-fn parse_error(line_no: usize, text: &'static str) -> FileError {
-    let s = format!("line {}: {}", line_no, text);
-    FileError::BadParse(s)
-}
-
 fn code_to_desc(code: Vec<NodeId>) -> ElementDescriptor {
     assert!(code.len() == 3);
 
@@ -332,10 +327,9 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
     let cons = elas.constraints();
     let cons = cons
         .into_iter()
-        .filter(|(n, con)| *con != Constraint::Free)
+        .filter(|(_, con)| *con != Constraint::Free)
         .collect::<Vec<_>>();
     res += &format!("\ncount {}", cons.len());
-    let mut i = 0;
     for (n, con) in cons {
         // TODO update the '0' when more constraint types are available
         res += &format!("\n{} {}", n.into_idx(), con.to_string(),);
@@ -363,32 +357,6 @@ pub fn elas_to_bmsh(elas: ElementAssemblage) -> String {
     res += "\n$EndDistForces";
 
     res
-}
-
-fn make_constraint(no: usize, tp: u8, dims: Vec<usize>) -> Result<Constraint, FileError> {
-    // TODO update file format to reflect new constraint logic
-    match tp {
-        0 => {
-            if dims.len() != 3 {
-                Err(parse_error(
-                    no,
-                    "constraint requires three dimensional specifiers",
-                ))
-            } else {
-                let (a, b, c) = (dims[0] != 0, dims[1] != 0, dims[2] != 0);
-                if a && b {
-                    Ok(Constraint::XYFixed)
-                } else if a {
-                    Ok(Constraint::XFixed)
-                } else if b {
-                    Ok(Constraint::YFixed)
-                } else {
-                    Err(parse_error(no, "aaa"))
-                }
-            }
-        }
-        _ => Err(parse_error(no, "unsupported constraint type")),
-    }
 }
 
 // BMSH file specification

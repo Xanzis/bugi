@@ -6,16 +6,15 @@ use crate::matrix::{dot, BiEnvelope, LinearMatrix, LowerRowEnvelope, MatrixLike}
 // stores the number of eigenvalues under this one (same as val index)
 #[derive(Clone, Copy, Debug)]
 struct OneEigenRange {
-    i: usize,
     lower: f64,
     upper: f64,
 }
 
 impl OneEigenRange {
-    fn new(lower: f64, upper: f64, i: usize) -> Self {
+    fn new(lower: f64, upper: f64) -> Self {
         assert!(lower < upper, "invalid range");
 
-        Self { lower, upper, i }
+        Self { lower, upper }
     }
 
     fn mid_val(&self) -> f64 {
@@ -64,13 +63,13 @@ impl ManyEigenRange {
 
         let l_range = match l_count {
             0 => Empty,
-            1 => One(OneEigenRange::new(self.lower, mid_val, self.low_i)),
+            1 => One(OneEigenRange::new(self.lower, mid_val)),
             _ => Many(ManyEigenRange::new(self.lower, mid_val, self.low_i, n)),
         };
 
         let u_range = match u_count {
             0 => Empty,
-            1 => One(OneEigenRange::new(mid_val, self.upper, n)),
+            1 => One(OneEigenRange::new(mid_val, self.upper)),
             _ => Many(ManyEigenRange::new(mid_val, self.upper, n, self.next_i)),
         };
 
@@ -90,7 +89,7 @@ impl EigenRange {
         assert!(under_lower < under_upper);
 
         if under_upper - under_lower == 1 {
-            Self::One(OneEigenRange::new(lower, upper, under_lower))
+            Self::One(OneEigenRange::new(lower, upper))
         } else {
             Self::Many(ManyEigenRange::new(lower, upper, under_lower, under_upper))
         }
@@ -263,7 +262,8 @@ impl DeterminantSearcher {
 
         // choose the first two sample points
         // use sample points from a previous iteration round if available
-        let (mut mu_old, mut mu_new) = self.last_mus.unwrap_or_else(|| self.secant_starts());
+        let (_mu_old, mut mu_new) = self.last_mus.unwrap_or_else(|| self.secant_starts());
+        let mut mu_old;
 
         let eigens_under = self.eigenpairs.len();
 

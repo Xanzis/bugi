@@ -40,12 +40,6 @@ impl NodeId {
 #[derive(Debug, Clone, Copy)]
 pub struct Dof(usize);
 
-impl Dof {
-    fn to_node_dof(self) -> NodeDof {
-        NodeDof(NodeId(self.0 / NODE_DIM), self.0 % NODE_DIM)
-    }
-}
-
 // a node idx + dof of that node (x/y/z) pair
 #[derive(Debug, Clone, Copy)]
 pub struct NodeDof(NodeId, usize);

@@ -440,7 +440,7 @@ impl PlaneTriangulation {
             .adjacent(s)
             .expect("this should exist if self was triangulated");
         let Segment(v, w) = s;
-        self.delete_triangle((v, w, x));
+        self.delete_triangle((v, w, x)).unwrap();
 
         let (child_a, child_b, new_v) = self.bound.split_segment(s);
         let u = child_a.1;
